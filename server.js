@@ -9,9 +9,12 @@ const fs       = require('fs');
 const path     = require('path');
 const crypto   = require('crypto');
 const fetch    = require('node-fetch');
+const { AsyncLocalStorage } = require('async_hooks');
+const { Pool } = require('pg');
 
 const app  = express();
 const PORT = 3000;
+const isVercel = Boolean(process.env.VERCEL);
 
 app.use(cors());
 app.use(express.json());
@@ -19,14 +22,25 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Data Helpers ──────────────────────────────────────
 const dataDir = path.join(__dirname, 'data');
-fs.mkdirSync(dataDir, { recursive: true });
+if (!isVercel) fs.mkdirSync(dataDir, { recursive: true });
 const dp  = f  => path.join(dataDir, f);
-const rd  = f  => JSON.parse(fs.readFileSync(dp(f), 'utf8'));
-const wd  = (f,d) => fs.writeFileSync(dp(f), JSON.stringify(d, null, 2));
+const requestState = new AsyncLocalStorage();
+const rd = f => {
+  const state = requestState.getStore();
+  return state ? state[f] : JSON.parse(fs.readFileSync(dp(f), 'utf8'));
+};
+const wd = (f, data) => {
+  const state = requestState.getStore();
+  if (state) state[f] = data;
+  else fs.writeFileSync(dp(f), JSON.stringify(data, null, 2));
+};
 
-[['config.json', 'config.example.json'], ['users.json', 'users.example.json'], ['liked.json', 'liked.example.json'], ['plays.json', 'plays.example.json']]
-  .forEach(([file, example]) => { if (!fs.existsSync(dp(file))) fs.copyFileSync(dp(example), dp(file)); });
+if (!isVercel) {
+  [['config.json', 'config.example.json'], ['users.json', 'users.example.json'], ['liked.json', 'liked.example.json'], ['plays.json', 'plays.example.json']]
+    .forEach(([file, example]) => { if (!fs.existsSync(dp(file))) fs.copyFileSync(dp(example), dp(file)); });
+}
 
+if (isVercel && !process.env.JWT_SECRET) throw new Error('JWT_SECRET must be configured in Vercel');
 const SECRET = process.env.JWT_SECRET || (() => {
   const secretPath = dp('jwt-secret');
   try { return fs.readFileSync(secretPath, 'utf8').trim(); }
@@ -37,18 +51,108 @@ const SECRET = process.env.JWT_SECRET || (() => {
   }
 })();
 
-const users = rd('users.json');
-const seededSuperAdmin = users.find(user => user.id === 'admin_001');
-if (seededSuperAdmin && seededSuperAdmin.role === 'admin') {
-  seededSuperAdmin.role = 'super_admin';
-  wd('users.json', users);
+if (!isVercel) {
+  const users = rd('users.json');
+  const seededSuperAdmin = users.find(user => user.id === 'admin_001');
+  if (seededSuperAdmin && seededSuperAdmin.role === 'admin') {
+    seededSuperAdmin.role = 'super_admin';
+    wd('users.json', users);
+  }
+  if (seededSuperAdmin && seededSuperAdmin.password === '__GENERATE_ON_FIRST_START__') {
+    const password = process.env.SUPER_ADMIN_PASSWORD || crypto.randomBytes(18).toString('base64url');
+    seededSuperAdmin.password = bcrypt.hashSync(password, 10);
+    wd('users.json', users);
+    if (!process.env.SUPER_ADMIN_PASSWORD) console.log(`Initial Super Admin password: ${password}`);
+  }
 }
-if (seededSuperAdmin && seededSuperAdmin.password === '__GENERATE_ON_FIRST_START__') {
-  const password = process.env.SUPER_ADMIN_PASSWORD || crypto.randomBytes(18).toString('base64url');
-  seededSuperAdmin.password = bcrypt.hashSync(password, 10);
-  wd('users.json', users);
-  if (!process.env.SUPER_ADMIN_PASSWORD) console.log(`Initial Super Admin password: ${password}`);
+
+const database = isVercel && process.env.DATABASE_URL
+  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3 })
+  : null;
+let databaseInitialization;
+
+async function initializeDatabase() {
+  if (!database) throw new Error('DATABASE_URL must be configured in Vercel');
+  if (!databaseInitialization) {
+    databaseInitialization = (async () => {
+      await database.query(`CREATE TABLE IF NOT EXISTS nymix_state (
+        id smallint PRIMARY KEY CHECK (id = 1),
+        config jsonb NOT NULL,
+        users jsonb NOT NULL,
+        liked jsonb NOT NULL,
+        plays jsonb NOT NULL
+      )`);
+      const existing = await database.query('SELECT id FROM nymix_state WHERE id = 1');
+      if (existing.rowCount) return;
+      if (!process.env.SUPER_ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD.length < 12) {
+        throw new Error('SUPER_ADMIN_PASSWORD (at least 12 characters) must be configured in Vercel');
+      }
+      const seed = name => JSON.parse(fs.readFileSync(path.join(dataDir, name), 'utf8'));
+      const config = seed('config.example.json');
+      if (process.env.YOUTUBE_API_KEY) config.ytApiKey = process.env.YOUTUBE_API_KEY;
+      const users = seed('users.example.json');
+      const superAdmin = users.find(user => user.id === 'admin_001');
+      superAdmin.role = 'super_admin';
+      superAdmin.password = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, 10);
+      await database.query(
+        'INSERT INTO nymix_state (id, config, users, liked, plays) VALUES (1, $1::jsonb, $2::jsonb, $3::jsonb, $4::jsonb) ON CONFLICT (id) DO NOTHING',
+        [JSON.stringify(config), JSON.stringify(users), JSON.stringify(seed('liked.example.json')), JSON.stringify(seed('plays.example.json'))],
+      );
+    })();
+  }
+  return databaseInitialization;
 }
+
+async function persistentState(req, res, next) {
+  if (!isVercel) return next();
+  let client;
+  try {
+    await initializeDatabase();
+    client = await database.connect();
+    await client.query('BEGIN');
+    const result = await client.query('SELECT config, users, liked, plays FROM nymix_state WHERE id = 1 FOR UPDATE');
+    if (!result.rowCount) throw new Error('Application database state is not initialized');
+    const state = {
+      'config.json': result.rows[0].config,
+      'users.json': result.rows[0].users,
+      'liked.json': result.rows[0].liked,
+      'plays.json': result.rows[0].plays,
+    };
+    let finished = false;
+    const sendJson = res.json.bind(res);
+    res.json = body => {
+      if (finished) return res;
+      finished = true;
+      (async () => {
+        try {
+          await client.query(
+            'UPDATE nymix_state SET config = $1::jsonb, users = $2::jsonb, liked = $3::jsonb, plays = $4::jsonb WHERE id = 1',
+            [JSON.stringify(state['config.json']), JSON.stringify(state['users.json']), JSON.stringify(state['liked.json']), JSON.stringify(state['plays.json'])],
+          );
+          await client.query('COMMIT');
+          sendJson(body);
+        } catch (error) {
+          await client.query('ROLLBACK').catch(() => {});
+          if (!res.headersSent) { res.status(500); sendJson({ error: 'Database transaction failed' }); }
+        } finally { client.release(); }
+      })();
+      return res;
+    };
+    res.on('close', () => {
+      if (!finished) {
+        finished = true;
+        client.query('ROLLBACK').catch(() => {}).finally(() => client.release());
+      }
+    });
+    requestState.run(state, next);
+  } catch (error) {
+    if (client) { await client.query('ROLLBACK').catch(() => {}); client.release(); }
+    console.error('Persistent storage unavailable:', error.message);
+    res.status(503).json({ error: 'Persistent database is not configured or available' });
+  }
+}
+
+app.use('/api', persistentState);
 
 // ── Auth Middleware ───────────────────────────────────
 const auth = (req, res, next) => {

@@ -100,7 +100,7 @@
     </main>
   </div>
 <script>
-const API='http://localhost:3000/api';
+const API='/api';
 const token=()=>localStorage.getItem('nx_token');
 const currentUser=()=>JSON.parse(localStorage.getItem('nx_user')||'null');
 const headers=()=>({'Content-Type':'application/json',Authorization:`Bearer ${token()}`});

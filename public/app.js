@@ -1,7 +1,7 @@
 /* =====================================================
    NYMIX public/app.js — Fixed YouTube Playback
    ===================================================== */
-const API = 'http://localhost:3000/api';
+const API = '/api';
 const token = () => localStorage.getItem('nx_token');
 const user  = () => JSON.parse(localStorage.getItem('nx_user') || 'null');
 
