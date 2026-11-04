@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Nymix — Admin</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0d0520;--bg2:#130930;--card:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.08);--purple:#7c3aed;--pl:#a855f7;--glow:rgba(124,58,237,0.35);--text:#fff;--t2:#c4b5fd;--t3:#9ca3af;--red:#ef4444;--green:#22c55e;--sidebar:200px}
+html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
+.blob{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
+.b1{width:500px;height:500px;background:rgba(109,40,217,0.25);top:-150px;left:-150px}
+.b2{width:350px;height:350px;background:rgba(79,30,180,0.15);bottom:-100px;right:100px}
+.app{display:grid;grid-template-columns:var(--sidebar) 1fr;height:100vh;position:relative;z-index:1}
+.sidebar{background:rgba(10,5,25,0.95);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px;backdrop-filter:blur(20px)}
+.logo{display:flex;align-items:center;gap:9px;padding:0 8px;margin-bottom:28px}
+.logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--purple),var(--pl));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 15px var(--glow);flex-shrink:0}
+.logo span{font-size:18px;font-weight:800}
+.logo sub{font-size:9px;background:var(--red);color:#fff;padding:2px 5px;border-radius:4px;margin-left:2px;font-weight:700;vertical-align:middle}
+.nav{display:flex;flex-direction:column;gap:2px;flex:1}
+.nav a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;color:var(--t3);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;text-decoration:none;border-left:3px solid transparent}
+.nav a:hover{background:var(--card);color:var(--text)}
+.nav a.active{background:rgba(124,58,237,0.2);color:var(--text);border-left-color:var(--purple)}
+.nav a span{font-size:16px;width:20px;text-align:center}
+.sidebar-footer{margin-top:auto}
+.admin-badge{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border);border-radius:11px;padding:10px 11px}
+.admin-av{width:32px;height:32px;background:linear-gradient(135deg,var(--red),#f97316);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
+.admin-name{font-size:12px;font-weight:600}
+.admin-role{font-size:10px;color:var(--red);font-weight:600}
+.logout-btn{margin-left:auto;background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;transition:color 0.15s}
+.logout-btn:hover{color:var(--red)}
+.main{display:flex;flex-direction:column;overflow:hidden}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:rgba(13,5,32,0.9);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);flex-shrink:0}
+.topbar h1{font-size:20px;font-weight:800}
+.topbar-right{display:flex;align-items:center;gap:12px}
+.refresh-btn{background:var(--card);border:1px solid var(--border);color:var(--t3);border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s}
+.refresh-btn:hover{color:var(--text);border-color:var(--purple)}
+.content{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
+.content::-webkit-scrollbar{width:4px}
+.content::-webkit-scrollbar-thumb{background:#333;border-radius:4px}
+.section{display:none}
+.section.active{display:flex;flex-direction:column;gap:20px}
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px;position:relative;overflow:hidden;transition:all 0.2s;cursor:default}
+.stat-card::before{content:'';position:absolute;top:-20px;right:-20px;width:80px;height:80px;border-radius:50%;filter:blur(30px);opacity:0.5}
+.stat-card:nth-child(1)::before{background:#7c3aed}
+.stat-card:nth-child(2)::before{background:#0891b2}
+.stat-card:nth-child(3)::before{background:#059669}
+.stat-card:nth-child(4)::before{background:#ef4444}
+.stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.3)}
+.stat-icon{font-size:24px;margin-bottom:10px}
+.stat-num{font-size:32px;font-weight:800;line-height:1}
+.stat-label{font-size:12px;color:var(--t3);margin-top:6px;font-weight:500}
+.stat-change{font-size:11px;margin-top:4px}
+.two-col{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:20px}
+.card-title{font-size:14px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.card-title span{font-size:16px}
+.bar-chart{display:flex;align-items:flex-end;gap:8px;height:100px}
+.bar-wrap{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1}
+.bar{width:100%;background:linear-gradient(180deg,var(--pl),var(--purple));border-radius:4px 4px 0 0;min-height:4px;transition:height 0.6s ease}
+.bar-label{font-size:9px;color:var(--t3);text-align:center}
+.top-song{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.top-song:last-child{border-bottom:none}
+.top-rank{width:20px;text-align:center;font-size:12px;color:var(--t3);font-weight:700}
+.top-song img{width:38px;height:38px;border-radius:6px;object-fit:cover;flex-shrink:0;background:#1a0f35}
+.top-info{flex:1;min-width:0}
+.top-title{font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top-artist{font-size:10px;color:var(--t3)}
+.top-plays{font-size:11px;color:var(--pl);font-weight:600;white-space:nowrap}
+.activity-item{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)}
+.activity-item:last-child{border-bottom:none}
+.activity-av{width:32px;height:32px;background:linear-gradient(135deg,var(--purple),var(--pl));border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.activity-info{flex:1;min-width:0}
+.activity-desc{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.activity-time{font-size:10px;color:var(--t3)}
+.activity-song{font-size:11px;color:var(--pl)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{font-size:11px;letter-spacing:0.8px;color:var(--t3);text-align:left;padding:0 12px 12px;font-weight:600;text-transform:uppercase}
+tbody tr{transition:background 0.15s}
+tbody tr:hover{background:rgba(255,255,255,0.03)}
+tbody td{padding:11px 12px;font-size:13px;vertical-align:middle}
+.user-cell{display:flex;align-items:center;gap:10px}
+.u-av{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0}
+.u-name{font-size:13px;font-weight:600}
+.u-email{font-size:11px;color:var(--t3)}
+.badge{padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600}
+.badge-active{background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}
+.badge-banned{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)}
+.badge-admin{background:rgba(239,68,68,0.2);color:#fca5a5}
+.badge-user{background:rgba(124,58,237,0.15);color:var(--pl)}
+.action-btns{display:flex;gap:6px}
+.btn-ban{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s}
+.btn-unban{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s}
+.btn-del{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--t3);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s}
+.btn-del:hover{background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.3)}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.setting-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px}
+.setting-title{font-size:14px;font-weight:700;margin-bottom:6px}
+.setting-desc{font-size:12px;color:var(--t3);margin-bottom:16px;line-height:1.5}
+label{font-size:11px;color:var(--t3);font-weight:500;display:block;margin-bottom:6px}
+input[type=text]{width:100%;background:rgba(255,255,255,0.08);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-size:13px;outline:none;font-family:'Inter',sans-serif;transition:all 0.2s;margin-bottom:10px}
+input[type=text]:focus{border-color:var(--purple);box-shadow:0 0 0 3px rgba(124,58,237,0.2)}
+input[readonly]{opacity:0.6;cursor:not-allowed}
+.btn-save{background:linear-gradient(135deg,var(--purple),var(--pl));color:#fff;border:none;border-radius:10px;padding:10px 20px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s;box-shadow:0 4px 15px var(--glow)}
+.btn-save:hover{transform:translateY(-1px);box-shadow:0 6px 20px var(--glow)}
+.save-msg{font-size:12px;min-height:16px;margin-top:8px}
+.save-msg.ok{color:var(--green)}.save-msg.err{color:var(--red)}
+.loading{display:flex;align-items:center;justify-content:center;padding:30px;color:var(--t3);gap:10px}
+.spinner{width:22px;height:22px;border:3px solid rgba(124,58,237,0.2);border-top-color:var(--purple);border-radius:50%;animation:spin 0.8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty{text-align:center;padding:24px;color:var(--t3);font-size:13px}
+.toast{position:fixed;bottom:24px;right:24px;background:#1e1040;border:1px solid var(--border);border-radius:12px;padding:12px 18px;font-size:13px;z-index:999;opacity:0;transform:translateY(10px);transition:all 0.3s;box-shadow:0 8px 30px rgba(0,0,0,0.4)}
+.toast.show{opacity:1;transform:translateY(0)}
+.toast.ok{border-color:rgba(34,197,94,0.4);color:#4ade80}
+.toast.err{border-color:rgba(239,68,68,0.4);color:#f87171}
+.search-row{display:flex;gap:12px;margin-bottom:16px;align-items:center}
+.table-search{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:8px 14px;color:var(--text);font-size:13px;outline:none;font-family:'Inter',sans-serif;width:220px;transition:border-color 0.2s}
+.table-search:focus{border-color:var(--purple)}
+.total-badge{font-size:12px;color:var(--t3);margin-left:auto}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">🎵</div>
+      <span>Nymix <sub>ADMIN</sub></span>
+    </div>
+    <nav class="nav">
+      <a class="active" data-s="dashboard"><span>📊</span> Dashboard</a>
+      <a data-s="users"><span>👥</span> Users</a>
+      <a data-s="analytics"><span>📈</span> Analytics</a>
+      <a data-s="songs"><span>🎵</span> Songs</a>
+      <a data-s="settings"><span>⚙️</span> Settings</a>
+      <a href="/" style="margin-top:8px"><span>🌐</span> Player</a>
+    </nav>
+    <div class="sidebar-footer">
+      <div class="admin-badge">
+        <div class="admin-av" id="admin-av">A</div>
+        <div><div class="admin-name" id="admin-name">Admin</div><div class="admin-role">Administrator</div></div>
+        <button class="logout-btn" onclick="logout()">🚪</button>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="topbar">
+      <h1 id="page-title">📊 Dashboard Overview</h1>
+      <div class="topbar-right">
+        <div style="font-size:12px;color:var(--t3)" id="last-updated"></div>
+        <button class="refresh-btn" onclick="loadAll()">🔄 Refresh</button>
+      </div>
+    </div>
+    <div class="content">
+
+      <!-- Dashboard -->
+      <div class="section active" id="s-dashboard">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num" id="st-users">—</div><div class="stat-label">Total Users</div><div class="stat-change" style="color:#4ade80">↑ Active members</div></div>
+          <div class="stat-card"><div class="stat-icon">▶️</div><div class="stat-num" id="st-plays">—</div><div class="stat-label">Total Plays</div><div class="stat-change" style="color:#38bdf8">🎵 All time</div></div>
+          <div class="stat-card"><div class="stat-icon">❤️</div><div class="stat-num" id="st-likes">—</div><div class="stat-label">Total Likes</div><div class="stat-change" style="color:#a855f7">💜 Songs liked</div></div>
+          <div class="stat-card"><div class="stat-icon">🚫</div><div class="stat-num" id="st-banned">—</div><div class="stat-label">Banned Users</div><div class="stat-change" style="color:#f87171">⚠ Restricted</div></div>
+        </div>
+        <div class="two-col">
+          <div class="card"><div class="card-title"><span>📈</span> Plays — Last 7 Days</div><div class="bar-chart" id="bar-chart"></div></div>
+          <div class="card"><div class="card-title"><span>🔥</span> Top Songs</div><div id="top-songs"><div class="loading"><div class="spinner"></div></div></div></div>
+        </div>
+        <div class="card"><div class="card-title"><span>⚡</span> Recent Activity</div><div id="recent-activity"><div class="loading"><div class="spinner"></div></div></div></div>
+      </div>
+
+      <!-- Users -->
+      <div class="section" id="s-users">
+        <div class="card">
+          <div class="card-title"><span>👥</span> User Management</div>
+          <div class="search-row">
+            <input class="table-search" type="text" id="user-search" placeholder="Search users..." oninput="filterUsers(this.value)"/>
+            <span class="total-badge" id="user-count"></span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead><tr><th>#</th><th>User</th><th>Role</th><th>Plays</th><th>Listened</th><th>Now Playing</th><th>Joined</th><th>Status</th><th>Actions</th></tr></thead>
+              <tbody id="users-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Analytics -->
+      <div class="section" id="s-analytics">
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-icon">🎵</div><div class="stat-num" id="an-plays">—</div><div class="stat-label">Total Plays</div></div>
+          <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num" id="an-users">—</div><div class="stat-label">Total Users</div></div>
+          <div class="stat-card"><div class="stat-icon">❤️</div><div class="stat-num" id="an-likes">—</div><div class="stat-label">Songs Liked</div></div>
+          <div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-num" id="an-top">—</div><div class="stat-label">Top Song Plays</div></div>
+        </div>
+        <div class="card"><div class="card-title"><span>📊</span> Plays Per Day (Last 7 Days)</div><div class="bar-chart" id="bar-chart2" style="height:120px"></div></div>
+        <div class="card"><div class="card-title"><span>🏆</span> Top Songs (All Time)</div><div id="top-songs-full"></div></div>
+      </div>
+
+      <!-- Songs -->
+      <div class="section" id="s-songs">
+        <div class="card">
+          <div class="card-title"><span>🎵</span> Add a featured song</div>
+          <form id="song-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0 18px">
+            <label>YouTube URL or ID<input class="table-search" id="song-url" required placeholder="YouTube video URL" style="width:100%"/></label>
+            <label>Title<input class="table-search" id="song-title" required style="width:100%"/></label>
+            <label>Artist<input class="table-search" id="song-artist" required style="width:100%"/></label>
+            <button class="btn-save" type="submit" style="align-self:end">Add song</button>
+          </form>
+          <div class="save-msg" id="song-msg" role="status"></div>
+        </div>
+        <div class="card"><div class="card-title"><span>🎼</span> Featured Playlist</div><div id="featured-list"></div></div>
+      </div>
+
+      <!-- Settings -->
+      <div class="section" id="s-settings">
+        <div class="settings-grid">
+          <div class="setting-card">
+            <div class="setting-title">Administrator account</div>
+            <div class="setting-desc">Admin accounts and platform credentials are managed separately by a Super Admin.</div>
+            <label>Email</label><input type="text" id="cfg-email" readonly/>
+            <label>Role</label><input type="text" value="Administrator" readonly/>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const API='http://localhost:3000/api';
+const tk=()=>localStorage.getItem('nx_token');
+const me=()=>JSON.parse(localStorage.getItem('nx_user')||'null');
+// Auth guard
+(function(){
+  const u=me(),t=tk();
+  if(u?.role==='super_admin'){window.location.href='/super-admin/';return;}
+  if(!u||!t||u.role!=='admin'){window.location.href='/login.html';return;}
+  document.getElementById('admin-name').textContent=u.name||'Admin';
+  document.getElementById('admin-av').textContent=(u.name||'A')[0].toUpperCase();
+  if(u.email)document.getElementById('cfg-email').value=u.email;
+})();
+function logout(){localStorage.clear();window.location.href='/login.html';}
+const hdr={'Content-Type':'application/json','Authorization':'Bearer '+tk()};
+const api=(url,opts={})=>fetch(API+url,{headers:hdr,...opts}).then(r=>r.json());
+function toast(msg,type='ok'){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show '+type;setTimeout(()=>el.classList.remove('show'),3000);}
+// Nav
+let usersData=[];
+const TITLES={dashboard:'📊 Dashboard Overview',users:'👥 User Management',analytics:'📈 Analytics',songs:'🎵 Featured Songs',settings:'⚙️ Settings'};
+document.querySelectorAll('.nav a[data-s]').forEach(a=>{
+  a.addEventListener('click',()=>{
+    document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));a.classList.add('active');
+    document.querySelectorAll('.section').forEach(s=>s.classList.remove('active'));
+    document.getElementById('s-'+a.dataset.s).classList.add('active');
+    document.getElementById('page-title').textContent=TITLES[a.dataset.s]||'';
+  });
+});
+async function loadAll(){
+  document.getElementById('last-updated').textContent='Updated: '+new Date().toLocaleTimeString();
+  await Promise.all([loadStats(),loadUsers(),loadFeaturedSongs()]);
+}
+async function loadStats(){
+  try{
+    const d=await api('/admin/stats');
+    ['st-users','st-plays','st-likes','st-banned','an-plays','an-users','an-likes'].forEach(id=>{
+      const map={'st-users':d.totalUsers,'st-plays':d.totalPlays,'st-likes':d.totalLikes,'st-banned':d.bannedUsers,'an-plays':d.totalPlays,'an-users':d.totalUsers,'an-likes':d.totalLikes};
+      document.getElementById(id).textContent=map[id]??'';
+    });
+    document.getElementById('an-top').textContent=d.topSongs[0]?.count||0;
+    renderBar('bar-chart',d.playsPerDay);renderBar('bar-chart2',d.playsPerDay);
+    renderTop('top-songs',d.topSongs.slice(0,5));renderTop('top-songs-full',d.topSongs);
+    renderRecent(d.recentActivity||[]);
+  }catch(e){console.error(e);}
+}
+function renderBar(id,data){
+  const el=document.getElementById(id);if(!el)return;
+  const max=Math.max(...data.map(d=>d.count),1);
+  el.innerHTML=data.map(d=>`<div class="bar-wrap"><div class="bar" style="height:${Math.max((d.count/max)*100,4)}%"></div><div class="bar-label">${d.label}</div></div>`).join('');
+}
+function renderTop(id,songs){
+  const el=document.getElementById(id);if(!el)return;
+  el.innerHTML=songs.length?songs.map((s,i)=>`
+    <div class="top-song">
+      <div class="top-rank">${i+1}</div>
+      <img src="https://img.youtube.com/vi/${s.id}/mqdefault.jpg" onerror="this.style.display='none'" />
+      <div class="top-info"><div class="top-title">${esc(s.title)}</div><div class="top-artist">${esc(s.artist||'')}</div></div>
+      <div class="top-plays">${s.count} plays</div>
+    </div>`).join(''):'<div class="empty">No plays recorded yet</div>';
+}
+function renderRecent(recent){
+  const el=document.getElementById('recent-activity');if(!el)return;
+  el.innerHTML=recent.length?recent.map(r=>`
+    <div class="activity-item">
+      <div class="activity-av">${(r.user||'?')[0].toUpperCase()}</div>
+      <div class="activity-info">
+        <div class="activity-desc"><strong>${esc(r.user)}</strong> played a song</div>
+        <div class="activity-song">🎵 ${esc(r.song)}</div>
+      </div>
+      <div class="activity-time">${new Date(r.time).toLocaleString()}</div>
+    </div>`).join(''):'<div class="empty">No recent activity</div>';
+}
+async function loadUsers(){
+  try{
+    usersData=await api('/admin/users');renderUsers(usersData);
+    document.getElementById('user-count').textContent=usersData.length+' users';
+  }catch(e){console.error(e);}
+}
+const COLORS=['#7c3aed','#0891b2','#059669','#dc2626','#b45309','#9d174d'];
+function renderUsers(list){
+  const tbody=document.getElementById('users-tbody');
+  tbody.innerHTML=list.length?list.map((u,i)=>`
+    <tr>
+      <td style="color:#9ca3af;font-size:12px">${i+1}</td>
+      <td><div class="user-cell"><div class="u-av" style="background:${COLORS[i%COLORS.length]}">${(u.name||'?')[0].toUpperCase()}</div><div><div class="u-name">${esc(u.name)}</div><div class="u-email">${esc(u.email)}</div></div></div></td>
+      <td><span class="badge badge-user">${u.role}</span></td>
+      <td style="color:#c4b5fd;font-weight:600">${u.totalPlays||0}</td>
+      <td>${Math.floor((u.listenSeconds||0)/60)} min</td>
+      <td>${esc(u.currentSong||'—')}</td>
+      <td style="color:#9ca3af;font-size:12px">${new Date(u.createdAt).toLocaleDateString()}</td>
+      <td><span class="badge ${u.banned?'badge-banned':'badge-active'}">${u.banned?'Banned':'Active'}</span></td>
+      <td><div class="action-btns">${u.banned?`<button class="btn-unban" onclick="banUser('${u.id}',false)">✓ Unban</button>`:`<button class="btn-ban" onclick="banUser('${u.id}',true)">🚫 Ban</button>`}<button class="btn-del" onclick="delUser('${u.id}','${esc(u.name)}')">🗑</button></div></td>
+    </tr>`).join(''):'<tr><td colspan="9"><div class="empty">No users found</div></td></tr>';
+}
+function filterUsers(q){renderUsers(usersData.filter(u=>u.name.toLowerCase().includes(q.toLowerCase())||u.email.toLowerCase().includes(q.toLowerCase())));}
+async function banUser(id,ban){
+  try{await api('/admin/users/'+id,{method:'PUT',body:JSON.stringify({banned:ban})});toast(ban?'🚫 User banned':'✓ User unbanned',ban?'err':'ok');await loadUsers();await loadStats();}
+  catch(e){toast('Error: '+e.message,'err');}
+}
+async function delUser(id,name){
+  if(!confirm('Delete user "'+name+'"? This cannot be undone.'))return;
+  try{await api('/admin/users/'+id,{method:'DELETE'});toast('🗑 User deleted');await loadUsers();await loadStats();}
+  catch(e){toast('Error: '+e.message,'err');}
+}
+async function loadFeaturedSongs(){
+  try{const songs=await api('/admin/songs');renderFeatured(Array.isArray(songs)?songs:[]);}catch(e){}
+}
+function renderFeatured(songs){
+  document.getElementById('featured-list').innerHTML=songs.map((s,i)=>`
+    <div class="top-song">
+      <div class="top-rank">${i+1}</div>
+      <img src="https://img.youtube.com/vi/${s.id}/mqdefault.jpg" onerror="this.style.display='none'" style="width:38px;height:38px;border-radius:6px;object-fit:cover"/>
+      <div class="top-info"><div class="top-title">${esc(s.title)}</div><div class="top-artist">${esc(s.artist)} · ${s.dur||''}</div></div>
+      <span class="badge badge-active">Featured</span>
+      <button class="btn-del" onclick="removeSong('${s.id}')" title="Remove song">Remove</button>
+    </div>`).join('');
+}
+document.getElementById('song-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const message=document.getElementById('song-msg');
+  try{
+    await api('/admin/songs',{method:'POST',body:JSON.stringify({youtubeUrl:document.getElementById('song-url').value.trim(),title:document.getElementById('song-title').value.trim(),artist:document.getElementById('song-artist').value.trim()})});
+    event.currentTarget.reset();message.textContent='Song added';message.className='save-msg ok';await loadFeaturedSongs();
+  }catch(error){message.textContent=error.message;message.className='save-msg err';}
+});
+async function removeSong(id){
+  if(!confirm('Remove this song from the featured playlist?'))return;
+  try{await api('/admin/songs/'+encodeURIComponent(id),{method:'DELETE'});await loadFeaturedSongs();toast('Song removed');}
+  catch(error){toast(error.message,'err');}
+}
+const esc=s=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+loadAll();
+</script>
+</body>
+</html>

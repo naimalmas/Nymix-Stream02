@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nymix | Super Admin</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: dark; --bg:#10191b; --panel:#182427; --line:#2a3a3d; --text:#edf5f2; --muted:#9bb0ac; --mint:#67e2bd; --red:#ff7777; }
+    body { margin:0; background:var(--bg); color:var(--text); font:14px/1.45 "Segoe UI",sans-serif; }
+    button,input { font:inherit; }
+    .shell { min-height:100vh; display:grid; grid-template-columns:230px minmax(0,1fr); }
+    aside { padding:24px 16px; border-right:1px solid var(--line); background:#131f21; display:flex; flex-direction:column; gap:26px; }
+    .brand { display:flex; align-items:center; gap:10px; font-size:17px; font-weight:750; }
+    .brand-mark { width:34px; aspect-ratio:1; display:grid; place-items:center; background:var(--mint); color:#10201c; border-radius:9px; font-size:18px; }
+    .role { color:var(--mint); font-size:11px; font-weight:700; text-transform:uppercase; }
+    .nav { display:grid; gap:5px; }
+    .nav a,.logout { padding:10px 12px; color:var(--muted); border:0; border-radius:7px; background:transparent; text-decoration:none; text-align:left; cursor:pointer; }
+    .nav a.active,.nav a:hover,.logout:hover { color:var(--text); background:#203337; }
+    .aside-bottom { margin-top:auto; border-top:1px solid var(--line); padding-top:16px; }
+    .identity { color:var(--muted); overflow-wrap:anywhere; font-size:12px; padding:8px 12px; }
+    main { min-width:0; padding:30px clamp(18px,4vw,48px); }
+    .top { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:26px; }
+    h1 { margin:0; font-size:24px; }
+    h2 { font-size:16px; margin:0; }
+    .sub { color:var(--muted); margin:4px 0 0; }
+    .stats { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:12px; margin-bottom:22px; }
+    .stat,.panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; }
+    .stat { padding:18px; }
+    .stat-label { color:var(--muted); font-size:12px; }
+    .stat-value { font-size:28px; font-weight:750; margin-top:9px; }
+    .grid { display:grid; grid-template-columns:minmax(280px,.8fr) minmax(0,1.5fr); gap:14px; align-items:start; }
+    .panel { padding:18px; min-width:0; }
+    .panel-head { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+    .form { display:grid; gap:12px; }
+    label { color:var(--muted); font-size:12px; display:grid; gap:6px; }
+    input { width:100%; min-width:0; border:1px solid var(--line); background:#111c1e; color:var(--text); border-radius:6px; padding:10px 11px; outline:none; }
+    input:focus { border-color:var(--mint); }
+    .btn { border:1px solid transparent; background:var(--mint); color:#0e201a; border-radius:6px; padding:9px 12px; font-weight:700; cursor:pointer; }
+    .btn:hover { filter:brightness(1.06); }
+    .btn-muted { background:#203337; border-color:var(--line); color:var(--text); }
+    .btn-danger { background:#3a2526; border-color:#694143; color:#ffb5b5; }
+    .table-wrap { overflow:auto; }
+    table { border-collapse:collapse; width:100%; min-width:520px; }
+    th,td { text-align:left; padding:11px 9px; border-bottom:1px solid var(--line); vertical-align:middle; }
+    th { color:var(--muted); font-size:11px; text-transform:uppercase; }
+    td.actions { white-space:nowrap; }
+    .actions .btn { margin-right:5px; }
+    .status { color:var(--mint); }
+    .status.off { color:var(--red); }
+    .message { min-height:18px; color:var(--muted); font-size:12px; }
+    .message.error { color:var(--red); }
+    #key-status { color:var(--muted); font-size:12px; min-height:18px; }
+    @media (max-width:900px) { .shell { grid-template-columns:190px minmax(0,1fr); } .stats { grid-template-columns:repeat(2,minmax(0,1fr)); } .grid { grid-template-columns:1fr; } }
+    @media (max-width:600px) { .shell { display:block; } aside { padding:13px 15px; border-right:0; border-bottom:1px solid var(--line); gap:12px; } .nav { grid-template-columns:repeat(2,1fr); } .aside-bottom { display:flex; align-items:center; justify-content:space-between; margin:0; padding-top:8px; } main { padding:22px 14px; } .top { align-items:flex-start; } h1 { font-size:20px; } .stats { gap:8px; } .stat { padding:13px; } .stat-value { font-size:23px; } }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside>
+      <div class="brand"><div class="brand-mark">N</div><div>Nymix <span class="role">Super Admin</span></div></div>
+      <nav class="nav"><a class="active" href="#overview">Overview</a><a href="#administrators">Administrators</a><a href="#platform">Platform settings</a></nav>
+      <div class="aside-bottom"><div class="identity" id="identity">Super Admin</div><button class="logout" onclick="logout()">Sign out</button></div>
+    </aside>
+    <main>
+      <header class="top">
+        <div><h1>Super Admin</h1><p class="sub">Platform access and administrator accounts</p></div>
+        <button class="btn btn-muted" onclick="loadAll()" title="Refresh">Refresh</button>
+      </header>
+      <section id="overview" class="stats">
+        <div class="stat"><div class="stat-label">Users</div><div class="stat-value" id="user-total">—</div></div>
+        <div class="stat"><div class="stat-label">Administrators</div><div class="stat-value" id="admin-total">—</div></div>
+        <div class="stat"><div class="stat-label">Plays</div><div class="stat-value" id="play-total">—</div></div>
+        <div class="stat"><div class="stat-label">Banned users</div><div class="stat-value" id="banned-total">—</div></div>
+      </section>
+      <section id="administrators" class="grid">
+        <div class="panel">
+          <div class="panel-head"><h2>Create administrator</h2></div>
+          <form id="admin-form" class="form">
+            <label>Name<input name="name" required maxlength="80" autocomplete="name" /></label>
+            <label>Email<input name="email" required type="email" maxlength="254" autocomplete="email" /></label>
+            <label>Password<input name="password" required type="password" minlength="8" autocomplete="new-password" /></label>
+            <button class="btn" type="submit">Create admin</button>
+            <div class="message" id="form-message" role="status"></div>
+          </form>
+        </div>
+        <div class="panel">
+          <div class="panel-head"><h2>Administrator accounts</h2><span class="sub" id="admin-count"></span></div>
+          <div class="table-wrap"><table><thead><tr><th>Name</th><th>Email</th><th>Status</th><th>Actions</th></tr></thead><tbody id="admins-body"><tr><td colspan="4">Loading...</td></tr></tbody></table></div>
+        </div>
+      </section>
+      <section id="platform" class="panel" style="margin-top:14px;max-width:700px">
+        <div class="panel-head"><h2>YouTube search configuration</h2></div>
+        <form id="key-form" class="form">
+          <label>API key<input id="api-key" type="password" autocomplete="new-password" placeholder="Enter a key to replace the saved key" /></label>
+          <button class="btn" type="submit">Save key</button>
+          <div id="key-status" role="status"></div>
+        </form>
+      </section>
+    </main>
+  </div>
+<script>
+const API='http://localhost:3000/api';
+const token=()=>localStorage.getItem('nx_token');
+const currentUser=()=>JSON.parse(localStorage.getItem('nx_user')||'null');
+const headers=()=>({'Content-Type':'application/json',Authorization:`Bearer ${token()}`});
+async function api(path,options={}){
+  const response=await fetch(API+path,{headers:headers(),...options});
+  const data=await response.json();
+  if(!response.ok)throw new Error(data.error||`Request failed (${response.status})`);
+  return data;
+}
+function routeByRole(role){return role==='super_admin'?'/super-admin/':role==='admin'?'/admin/':'/';}
+function logout(){localStorage.removeItem('nx_token');localStorage.removeItem('nx_user');location.href='/login.html';}
+const authorized=(()=>{
+  const user=currentUser();
+  if(!token()||!user){location.href='/login.html';return false;}
+  if(user.role!=='super_admin'){location.href=routeByRole(user.role);return false;}
+  document.getElementById('identity').textContent=user.name||user.email||'Super Admin';
+  return true;
+})();
+function showMessage(element,message,error=false){element.textContent=message;element.classList.toggle('error',error);}
+async function loadOverview(){
+  const data=await api('/super-admin/overview');
+  document.getElementById('user-total').textContent=data.users;
+  document.getElementById('admin-total').textContent=data.admins;
+  document.getElementById('play-total').textContent=data.plays;
+  document.getElementById('banned-total').textContent=data.bannedUsers;
+}
+async function loadAdmins(){
+  const admins=await api('/super-admin/admins');
+  document.getElementById('admin-count').textContent=`${admins.length} total`;
+  document.getElementById('admins-body').innerHTML=admins.length?admins.map(admin=>`
+    <tr>
+      <td>${escapeHtml(admin.name)}</td><td>${escapeHtml(admin.email)}</td>
+      <td class="status ${admin.banned?'off':''}">${admin.banned?'Disabled':'Active'}</td>
+      <td class="actions">
+        <button class="btn btn-muted" onclick="setAdminStatus('${admin.id}',${!admin.banned})">${admin.banned?'Enable':'Disable'}</button>
+        <button class="btn btn-danger" onclick="deleteAdmin('${admin.id}','${escapeHtml(admin.name)}')">Delete</button>
+      </td>
+    </tr>`).join(''):'<tr><td colspan="4">No administrator accounts</td></tr>';
+}
+async function loadKeyStatus(){
+  const data=await api('/admin/config');
+  document.getElementById('key-status').textContent=data.ytApiKeyConfigured?'A key is configured':'No key configured';
+}
+async function loadAll(){
+  try{await Promise.all([loadOverview(),loadAdmins(),loadKeyStatus()]);}
+  catch(error){console.error(error);document.getElementById('key-status').textContent='Some dashboard data could not be loaded';}
+}
+function escapeHtml(value){return String(value||'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
+document.getElementById('admin-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const form=event.currentTarget;
+  const values=Object.fromEntries(new FormData(form));
+  const message=document.getElementById('form-message');
+  try{await api('/super-admin/admins',{method:'POST',body:JSON.stringify(values)});form.reset();showMessage(message,'Administrator created');await loadAll();}
+  catch(error){showMessage(message,error.message,true);}
+});
+document.getElementById('key-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const key=document.getElementById('api-key').value.trim();
+  const status=document.getElementById('key-status');
+  if(!key){showMessage(status,'Enter an API key first',true);return;}
+  try{await api('/admin/config',{method:'PUT',body:JSON.stringify({ytApiKey:key})});document.getElementById('api-key').value='';showMessage(status,'API key saved');}
+  catch(error){showMessage(status,error.message,true);}
+});
+async function setAdminStatus(id,banned){
+  try{await api(`/super-admin/admins/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({banned})});await loadAll();}
+  catch(error){alert(error.message);}
+}
+async function deleteAdmin(id,name){
+  if(!confirm(`Delete administrator ${name}?`))return;
+  try{await api(`/super-admin/admins/${encodeURIComponent(id)}`,{method:'DELETE'});await loadAll();}
+  catch(error){alert(error.message);}
+}
+if(authorized)loadAll();
+</script>
+</body>
+</html>

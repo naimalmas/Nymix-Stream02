@@ -1,0 +1,868 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nymix – My Dashboard</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0520;
+      --bg2: #110728;
+      --accent: #7c3aed;
+      --accent2: #a855f7;
+      --accent3: #c084fc;
+      --glass: rgba(255,255,255,0.05);
+      --glass-border: rgba(255,255,255,0.10);
+      --text: #f1f0f7;
+      --muted: #9d8ec4;
+      --danger: #ef4444;
+      --sidebar-w: 240px;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      overflow-x: hidden;
+    }
+
+    /* ── Blobs ── */
+    .blobs {
+      position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden;
+    }
+    .blob {
+      position: absolute; border-radius: 50%; filter: blur(120px); opacity: 0.18;
+    }
+    .blob-1 { width: 600px; height: 600px; background: #7c3aed; top: -200px; left: -150px; }
+    .blob-2 { width: 500px; height: 500px; background: #a855f7; bottom: -180px; right: -100px; }
+    .blob-3 { width: 350px; height: 350px; background: #4c1d95; top: 40%; left: 40%; }
+
+    /* ── Layout ── */
+    .layout {
+      position: relative; z-index: 1;
+      display: flex; min-height: 100vh;
+    }
+
+    /* ── Sidebar ── */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: rgba(13, 5, 32, 0.85);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid var(--glass-border);
+      display: flex;
+      flex-direction: column;
+      padding: 28px 0;
+      position: fixed;
+      top: 0; left: 0;
+      height: 100vh;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex; align-items: center; gap: 10px;
+      padding: 0 24px 32px;
+      text-decoration: none;
+    }
+    .logo-icon {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 800; color: #fff;
+      flex-shrink: 0;
+    }
+    .logo-text { font-size: 20px; font-weight: 800; letter-spacing: -0.5px;
+      background: linear-gradient(90deg, #fff, var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+    .nav { flex: 1; display: flex; flex-direction: column; gap: 4px; padding: 0 12px; }
+    .nav a {
+      display: flex; align-items: center; gap: 12px;
+      padding: 11px 14px; border-radius: 12px;
+      text-decoration: none; color: var(--muted);
+      font-size: 14px; font-weight: 500;
+      transition: all .2s;
+    }
+    .nav a:hover, .nav a.active {
+      background: var(--glass); color: #fff;
+    }
+    .nav a.active { background: rgba(124,58,237,0.25); color: var(--accent3); }
+    .nav a svg { width: 18px; height: 18px; flex-shrink: 0; }
+    .nav .sep { height: 1px; background: var(--glass-border); margin: 10px 2px; }
+
+    .nav a.logout { color: #f87171; }
+    .nav a.logout:hover { background: rgba(239,68,68,0.15); color: #ef4444; }
+
+    /* ── Main ── */
+    .main {
+      flex: 1;
+      margin-left: var(--sidebar-w);
+      padding: 32px 36px;
+      max-width: 1100px;
+    }
+
+    /* ── Top Bar ── */
+    .topbar {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 36px;
+    }
+    .greeting h1 { font-size: 26px; font-weight: 700; letter-spacing: -0.5px; }
+    .greeting h1 span { background: linear-gradient(90deg, var(--accent2), var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .greeting p { color: var(--muted); font-size: 14px; margin-top: 4px; }
+
+    .user-chip {
+      display: flex; align-items: center; gap: 10px;
+      background: var(--glass); border: 1px solid var(--glass-border);
+      padding: 8px 16px 8px 8px; border-radius: 999px;
+    }
+    .avatar-sm {
+      width: 36px; height: 36px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 15px; color: #fff;
+      flex-shrink: 0;
+    }
+    .user-chip span { font-size: 14px; font-weight: 500; color: var(--text); }
+
+    /* ── Cards / Glass ── */
+    .card {
+      background: var(--glass);
+      border: 1px solid var(--glass-border);
+      border-radius: 20px;
+      padding: 28px;
+      backdrop-filter: blur(12px);
+    }
+
+    .section-title {
+      font-size: 18px; font-weight: 700; margin-bottom: 20px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title svg { color: var(--accent2); }
+
+    /* ── Profile Card ── */
+    .profile-card {
+      display: flex; gap: 28px; align-items: flex-start;
+      margin-bottom: 28px;
+    }
+    .avatar-lg {
+      width: 88px; height: 88px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 34px; font-weight: 800; color: #fff;
+      flex-shrink: 0;
+      box-shadow: 0 0 40px rgba(168,85,247,0.4);
+    }
+    .profile-info { flex: 1; }
+    .profile-info .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 16px; }
+    .field-group label { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; display: block; margin-bottom: 6px; }
+    .field-group input {
+      width: 100%; background: rgba(255,255,255,0.07); border: 1px solid var(--glass-border);
+      border-radius: 10px; padding: 10px 14px; color: var(--text);
+      font-family: inherit; font-size: 14px; outline: none;
+      transition: border-color .2s;
+    }
+    .field-group input:focus { border-color: var(--accent2); }
+    .field-group input[readonly] { opacity: .6; cursor: not-allowed; }
+
+    .member-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(124,58,237,0.2); border: 1px solid rgba(124,58,237,0.4);
+      padding: 4px 12px; border-radius: 999px; font-size: 12px; color: var(--accent3);
+      margin-top: 10px;
+    }
+
+    .btn-save {
+      margin-top: 20px;
+      display: inline-flex; align-items: center; gap: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border: none; border-radius: 12px;
+      padding: 11px 24px; color: #fff;
+      font-family: inherit; font-size: 14px; font-weight: 600;
+      cursor: pointer; transition: all .2s;
+    }
+    .btn-save:hover { opacity: .88; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(124,58,237,.4); }
+    .btn-save:active { transform: translateY(0); }
+    .btn-save.saving { opacity: .7; pointer-events: none; }
+
+    .save-msg { font-size: 13px; color: #4ade80; margin-left: 12px; opacity: 0; transition: opacity .3s; }
+    .save-msg.show { opacity: 1; }
+
+    /* ── Stats Row ── */
+    .stats-row {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 18px; margin-bottom: 28px;
+    }
+    .stat-card {
+      background: var(--glass); border: 1px solid var(--glass-border);
+      border-radius: 18px; padding: 22px 24px;
+      display: flex; flex-direction: column; gap: 8px;
+      transition: transform .2s, box-shadow .2s;
+    }
+    .stat-card:hover { transform: translateY(-3px); box-shadow: 0 12px 32px rgba(0,0,0,.3); }
+    .stat-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .6px; }
+    .stat-value { font-size: 32px; font-weight: 800; letter-spacing: -1px;
+      background: linear-gradient(135deg, #fff, var(--accent3));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .stat-icon { font-size: 22px; }
+
+    /* ── Liked Songs ── */
+    .liked-list { display: flex; flex-direction: column; gap: 8px; }
+    .song-row {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 14px; border-radius: 14px;
+      background: rgba(255,255,255,0.03); border: 1px solid transparent;
+      transition: all .2s; cursor: pointer;
+    }
+    .song-row:hover { background: rgba(255,255,255,0.07); border-color: var(--glass-border); }
+    .song-thumb {
+      width: 44px; height: 44px; border-radius: 10px;
+      object-fit: cover; flex-shrink: 0;
+      background: linear-gradient(135deg, #2d1b69, #4c1d95);
+    }
+    .song-thumb-placeholder {
+      width: 44px; height: 44px; border-radius: 10px; flex-shrink: 0;
+      background: linear-gradient(135deg, #2d1b69, #4c1d95);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .song-info { flex: 1; min-width: 0; }
+    .song-title { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .song-artist { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .song-plays { font-size: 12px; color: var(--muted); margin-right: 4px; white-space: nowrap; }
+    .btn-unlike {
+      width: 34px; height: 34px; border-radius: 50%; border: none; background: rgba(239,68,68,0.1);
+      color: #f87171; cursor: pointer; display: flex; align-items: center; justify-content: center;
+      transition: all .2s; flex-shrink: 0;
+    }
+    .btn-unlike:hover { background: rgba(239,68,68,0.25); transform: scale(1.1); }
+    .btn-unlike svg { width: 16px; height: 16px; }
+
+    /* ── History Table ── */
+    .history-table {
+      width: 100%; border-collapse: collapse;
+    }
+    .history-table thead th {
+      text-align: left; font-size: 11px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: .6px;
+      padding: 0 14px 14px; border-bottom: 1px solid var(--glass-border);
+    }
+    .history-table tbody tr {
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      transition: background .2s;
+    }
+    .history-table tbody tr:hover { background: rgba(255,255,255,0.04); }
+    .history-table tbody tr:last-child { border-bottom: none; }
+    .history-table td {
+      padding: 13px 14px; font-size: 14px;
+      vertical-align: middle;
+    }
+    .history-table td.song-cell { display: flex; align-items: center; gap: 10px; }
+    .history-table td .h-thumb {
+      width: 36px; height: 36px; border-radius: 8px; object-fit: cover;
+      background: linear-gradient(135deg, #2d1b69, #4c1d95); flex-shrink: 0;
+    }
+    .history-table td .h-thumb-ph {
+      width: 36px; height: 36px; border-radius: 8px; flex-shrink: 0;
+      background: linear-gradient(135deg, #2d1b69, #4c1d95);
+      display: flex; align-items: center; justify-content: center; font-size: 14px;
+    }
+    .h-title { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 220px; }
+    .h-artist { font-size: 12px; color: var(--muted); }
+    .time-ago { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .time-badge {
+      display: inline-block; padding: 3px 10px; border-radius: 999px;
+      background: rgba(124,58,237,0.15); color: var(--accent3);
+      font-size: 12px; font-weight: 500;
+    }
+
+    /* ── Quick Actions ── */
+    .quick-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    .quick-card {
+      background: var(--glass); border: 1px solid var(--glass-border);
+      border-radius: 18px; padding: 24px;
+      text-decoration: none; color: var(--text);
+      display: flex; flex-direction: column; gap: 12px;
+      transition: all .22s;
+      cursor: pointer;
+    }
+    .quick-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 16px 40px rgba(0,0,0,.35);
+      border-color: rgba(168,85,247,0.3);
+      background: rgba(255,255,255,0.08);
+    }
+    .quick-icon {
+      width: 48px; height: 48px; border-radius: 14px;
+      display: flex; align-items: center; justify-content: center; font-size: 22px;
+    }
+    .quick-icon.purple { background: rgba(124,58,237,0.25); }
+    .quick-icon.pink   { background: rgba(236,72,153,0.2); }
+    .quick-icon.teal   { background: rgba(20,184,166,0.2); }
+    .quick-title { font-size: 15px; font-weight: 700; }
+    .quick-desc  { font-size: 13px; color: var(--muted); }
+
+    /* ── Empty State ── */
+    .empty-state {
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; padding: 48px 24px; gap: 12px;
+      text-align: center;
+    }
+    .empty-state .empty-icon { font-size: 48px; opacity: .5; }
+    .empty-state p { color: var(--muted); font-size: 15px; }
+
+    /* ── Spinner ── */
+    .spinner {
+      width: 28px; height: 28px; border-radius: 50%;
+      border: 3px solid rgba(168,85,247,0.2);
+      border-top-color: var(--accent2);
+      animation: spin .7s linear infinite;
+      margin: 24px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Loading overlay ── */
+    .loading-wrap { display: flex; align-items: center; justify-content: center; padding: 32px; }
+
+    /* ── Toast ── */
+    .toast {
+      position: fixed; bottom: 28px; right: 28px; z-index: 9999;
+      background: rgba(30,10,60,0.95); border: 1px solid var(--glass-border);
+      backdrop-filter: blur(16px); border-radius: 14px;
+      padding: 14px 20px; font-size: 14px; font-weight: 500;
+      display: flex; align-items: center; gap: 10px;
+      box-shadow: 0 8px 32px rgba(0,0,0,.5);
+      transform: translateY(80px); opacity: 0;
+      transition: all .35s cubic-bezier(.34,1.56,.64,1);
+      max-width: 340px;
+    }
+    .toast.show { transform: translateY(0); opacity: 1; }
+    .toast.success { border-color: rgba(74,222,128,.3); }
+    .toast.error   { border-color: rgba(239,68,68,.3); }
+
+    /* ── Scroll ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: rgba(168,85,247,0.3); border-radius: 999px; }
+
+    /* ── Section gap ── */
+    .section { margin-bottom: 28px; }
+
+    @media (max-width: 900px) {
+      .sidebar { transform: translateX(-100%); }
+      .main { margin-left: 0; padding: 20px 16px; }
+      .stats-row { grid-template-columns: 1fr 1fr; }
+      .quick-grid { grid-template-columns: 1fr 1fr; }
+      .profile-info .fields { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- Background Blobs -->
+<div class="blobs">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+</div>
+
+<!-- Layout -->
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <a class="logo" href="/">
+      <div class="logo-icon">N</div>
+      <span class="logo-text">Nymix</span>
+    </a>
+
+    <nav class="nav">
+      <a href="#profile" class="active">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        My Profile
+      </a>
+      <a href="#liked">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Liked Songs
+      </a>
+      <a href="#history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        History
+      </a>
+      <div class="sep"></div>
+      <a href="/">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Back to Player
+      </a>
+      <a href="#" class="logout" id="logoutBtn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        Logout
+      </a>
+    </nav>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main">
+
+    <!-- Top Bar -->
+    <div class="topbar">
+      <div class="greeting">
+        <h1>Welcome back, <span id="greetName">...</span>!</h1>
+        <p id="greetDate">Loading your dashboard...</p>
+      </div>
+      <div class="user-chip">
+        <div class="avatar-sm" id="topAvatar">?</div>
+        <span id="topEmail">...</span>
+      </div>
+    </div>
+
+    <!-- Profile Card -->
+    <div class="card section" id="profile">
+      <div class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+        My Profile
+      </div>
+      <div class="profile-card">
+        <div class="avatar-lg" id="profileAvatar">?</div>
+        <div class="profile-info">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
+            <div class="member-badge">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+              Member
+            </div>
+            <span class="member-badge" id="totalPlaysBadge" style="background:rgba(168,85,247,0.15);border-color:rgba(168,85,247,0.35);">
+              🎵 0 Plays
+            </span>
+          </div>
+          <div class="fields" style="margin-top:14px;">
+            <div class="field-group">
+              <label>Display Name</label>
+              <input type="text" id="profileName" placeholder="Your name" />
+            </div>
+            <div class="field-group">
+              <label>Email</label>
+              <input type="text" id="profileEmail" readonly placeholder="you@example.com" />
+            </div>
+            <div class="field-group">
+              <label>Member Since</label>
+              <input type="text" id="profileSince" readonly placeholder="..." />
+            </div>
+            <div class="field-group">
+              <label>Role</label>
+              <input type="text" id="profileRole" readonly placeholder="user" />
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;flex-wrap:wrap;gap:8px;">
+            <button class="btn-save" id="saveBtn" onclick="saveProfile()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save Changes
+            </button>
+            <span class="save-msg" id="saveMsg">✓ Saved!</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row section">
+      <div class="stat-card">
+        <div class="stat-icon">❤️</div>
+        <div class="stat-label">Liked Songs</div>
+        <div class="stat-value" id="statLiked">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">🎵</div>
+        <div class="stat-label">Total Plays</div>
+        <div class="stat-value" id="statPlays">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📅</div>
+        <div class="stat-label">Member Since</div>
+        <div class="stat-value" id="statSince" style="font-size:18px;line-height:1.3;">—</div>
+      </div>
+    </div>
+
+    <!-- Liked Songs -->
+    <div class="card section" id="liked">
+      <div class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="color:var(--accent2)"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        Liked Songs
+      </div>
+      <div id="likedContainer">
+        <div class="loading-wrap"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Play History -->
+    <div class="card section" id="history">
+      <div class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        Play History
+        <span style="margin-left:auto;font-size:13px;color:var(--muted);font-weight:400;">Last 20 plays</span>
+      </div>
+      <div id="historyContainer">
+        <div class="loading-wrap"><div class="spinner"></div></div>
+      </div>
+    </div>
+
+    <!-- Quick Actions -->
+    <div class="card section">
+      <div class="section-title">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent2)"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        Quick Actions
+      </div>
+      <div class="quick-grid">
+        <a class="quick-card" href="/">
+          <div class="quick-icon purple">🎵</div>
+          <div class="quick-title">Go to Player</div>
+          <div class="quick-desc">Jump back into the music experience</div>
+        </a>
+        <a class="quick-card" href="/songs.html">
+          <div class="quick-icon pink">🔍</div>
+          <div class="quick-title">Browse Songs</div>
+          <div class="quick-desc">Explore the full Nymix library</div>
+        </a>
+        <a class="quick-card" href="/discover.html">
+          <div class="quick-icon teal">✨</div>
+          <div class="quick-title">Discover</div>
+          <div class="quick-desc">Find new artists & trending tracks</div>
+        </a>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <span id="toastIcon">✓</span>
+  <span id="toastMsg">Done</span>
+</div>
+
+<script>
+  /* ═══════════════════════════════════════════════
+     CONFIG
+  ═══════════════════════════════════════════════ */
+  const API = 'http://localhost:3000/api';
+
+  function getToken() { return localStorage.getItem('nx_token'); }
+
+  function authHeaders() {
+    return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + getToken() };
+  }
+
+  /* ═══════════════════════════════════════════════
+     TOAST
+  ═══════════════════════════════════════════════ */
+  let toastTimer;
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    const i = document.getElementById('toastIcon');
+    const m = document.getElementById('toastMsg');
+    i.textContent = type === 'success' ? '✓' : '✕';
+    m.textContent = msg;
+    t.className = 'toast ' + type + ' show';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => t.classList.remove('show'), 3200);
+  }
+
+  /* ═══════════════════════════════════════════════
+     TIME AGO
+  ═══════════════════════════════════════════════ */
+  function timeAgo(dateStr) {
+    const diff = Math.floor((Date.now() - new Date(dateStr)) / 1000);
+    if (diff < 60)         return diff + ' sec ago';
+    if (diff < 3600)       return Math.floor(diff / 60) + ' min ago';
+    if (diff < 86400)      return Math.floor(diff / 3600) + ' hr ago';
+    if (diff < 2592000)    return Math.floor(diff / 86400) + ' day ago';
+    if (diff < 31536000)   return Math.floor(diff / 2592000) + ' mo ago';
+    return Math.floor(diff / 31536000) + ' yr ago';
+  }
+
+  function fmtDate(dateStr) {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  }
+
+  function initials(name) {
+    if (!name) return '?';
+    return name.trim().split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  }
+
+  /* ═══════════════════════════════════════════════
+     YT THUMBNAIL
+  ═══════════════════════════════════════════════ */
+  function ytThumb(videoId) {
+    if (!videoId) return null;
+    return 'https://img.youtube.com/vi/' + videoId + '/mqdefault.jpg';
+  }
+
+  /* ═══════════════════════════════════════════════
+     AUTH CHECK
+  ═══════════════════════════════════════════════ */
+  async function init() {
+    const token = getToken();
+    if (!token) { window.location.href = '/login.html'; return; }
+
+    try {
+      const res = await fetch(API + '/auth/me', { headers: authHeaders() });
+      if (!res.ok) throw new Error('Unauthorized');
+      const data = await res.json();
+      const user = data.user || data;
+      if (user.role === 'super_admin') { window.location.href = '/super-admin/'; return; }
+      if (user.role === 'admin') { window.location.href = '/admin/'; return; }
+      if (user.role !== 'user') { window.location.href = '/login.html'; return; }
+      populateProfile(user);
+      loadLiked();
+      loadHistory();
+    } catch (e) {
+      window.location.href = '/login.html';
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     POPULATE PROFILE
+  ═══════════════════════════════════════════════ */
+  function populateProfile(user) {
+    const name  = user.name  || user.username || 'Listener';
+    const email = user.email || '';
+    const since = user.createdAt || user.created_at || null;
+    const plays = user.totalPlays || user.total_plays || 0;
+    const role  = user.role  || 'user';
+
+    // Top bar
+    document.getElementById('greetName').textContent = name;
+    document.getElementById('greetDate').textContent = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+    document.getElementById('topEmail').textContent   = email;
+    document.getElementById('topAvatar').textContent  = initials(name);
+
+    // Profile inputs
+    document.getElementById('profileAvatar').textContent = initials(name);
+    document.getElementById('profileName').value  = name;
+    document.getElementById('profileEmail').value = email;
+    document.getElementById('profileSince').value = since ? fmtDate(since) : 'Unknown';
+    document.getElementById('profileRole').value  = role.charAt(0).toUpperCase() + role.slice(1);
+
+    // Badges & stats
+    document.getElementById('totalPlaysBadge').textContent = '🎵 ' + plays + ' Plays';
+    document.getElementById('statPlays').textContent       = plays.toLocaleString();
+    document.getElementById('statSince').textContent       = since ? new Date(since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
+  }
+
+  /* ═══════════════════════════════════════════════
+     SAVE PROFILE
+  ═══════════════════════════════════════════════ */
+  async function saveProfile() {
+    const btn = document.getElementById('saveBtn');
+    const msg = document.getElementById('saveMsg');
+    const name = document.getElementById('profileName').value.trim();
+    if (!name) { showToast('Name cannot be empty', 'error'); return; }
+
+    btn.classList.add('saving');
+    btn.textContent = 'Saving…';
+
+    try {
+      const res = await fetch(API + '/user/profile', {
+        method: 'PUT',
+        headers: authHeaders(),
+        body: JSON.stringify({ name })
+      });
+      if (!res.ok) throw new Error('Save failed');
+      document.getElementById('greetName').textContent = name;
+      document.getElementById('topAvatar').textContent = initials(name);
+      document.getElementById('profileAvatar').textContent = initials(name);
+      showToast('Profile updated successfully!', 'success');
+      msg.classList.add('show');
+      setTimeout(() => msg.classList.remove('show'), 2500);
+    } catch (e) {
+      showToast('Failed to save profile', 'error');
+    } finally {
+      btn.classList.remove('saving');
+      btn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Save Changes`;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     LIKED SONGS
+  ═══════════════════════════════════════════════ */
+  async function loadLiked() {
+    const container = document.getElementById('likedContainer');
+    try {
+      const res = await fetch(API + '/user/liked', { headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const songs = data.songs || data.liked || data || [];
+      document.getElementById('statLiked').textContent = songs.length.toLocaleString();
+      renderLiked(songs);
+    } catch (e) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">❤️</div><p>Could not load liked songs.</p></div>`;
+    }
+  }
+
+  function renderLiked(songs) {
+    const container = document.getElementById('likedContainer');
+    if (!songs.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🎶</div><p>No liked songs yet — go heart something!</p></div>`;
+      return;
+    }
+    const list = document.createElement('div');
+    list.className = 'liked-list';
+    songs.forEach(s => {
+      const id    = s.videoId || s.video_id || s.id || '';
+      const title = s.title   || 'Unknown Title';
+      const artist= s.artist  || s.channel || 'Unknown Artist';
+      const plays = s.playCount || s.play_count || s.plays || 0;
+      const thumb = s.thumbnail || (id ? ytThumb(id) : null);
+
+      const row = document.createElement('div');
+      row.className = 'song-row';
+      row.innerHTML = `
+        ${thumb
+          ? `<img class="song-thumb" src="${thumb}" alt="${title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="song-thumb-placeholder" style="display:none">🎵</div>`
+          : `<div class="song-thumb-placeholder">🎵</div>`
+        }
+        <div class="song-info">
+          <div class="song-title">${escHtml(title)}</div>
+          <div class="song-artist">${escHtml(artist)}</div>
+        </div>
+        <span class="song-plays">${plays ? plays.toLocaleString() + ' plays' : ''}</span>
+        <button class="btn-unlike" title="Remove from liked" onclick="unlikeSong('${escHtml(id)}', this)">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+        </button>
+      `;
+      list.appendChild(row);
+    });
+    container.innerHTML = '';
+    container.appendChild(list);
+  }
+
+  async function unlikeSong(videoId, btn) {
+    if (!videoId) return;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+    try {
+      const res = await fetch(API + '/user/liked/' + videoId, {
+        method: 'DELETE', headers: authHeaders()
+      });
+      if (!res.ok) throw new Error();
+      const row = btn.closest('.song-row');
+      row.style.transition = 'all .3s';
+      row.style.opacity = '0'; row.style.transform = 'translateX(30px)';
+      setTimeout(() => { row.remove(); updateLikedCount(); }, 310);
+      showToast('Removed from liked songs', 'success');
+    } catch (e) {
+      btn.disabled = false; btn.style.opacity = '1';
+      showToast('Failed to remove song', 'error');
+    }
+  }
+
+  function updateLikedCount() {
+    const count = document.querySelectorAll('#likedContainer .song-row').length;
+    document.getElementById('statLiked').textContent = count.toLocaleString();
+    if (count === 0) {
+      document.getElementById('likedContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">🎶</div><p>No liked songs yet — go heart something!</p></div>`;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     HISTORY
+  ═══════════════════════════════════════════════ */
+  async function loadHistory() {
+    const container = document.getElementById('historyContainer');
+    try {
+      const res = await fetch(API + '/user/history', { headers: authHeaders() });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      const history = (data.history || data.plays || data || []).slice(0, 20);
+      renderHistory(history);
+    } catch (e) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🕒</div><p>Could not load play history.</p></div>`;
+    }
+  }
+
+  function renderHistory(history) {
+    const container = document.getElementById('historyContainer');
+    if (!history.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🕒</div><p>No play history yet — start listening!</p></div>`;
+      return;
+    }
+    const table = document.createElement('table');
+    table.className = 'history-table';
+    table.innerHTML = `
+      <thead>
+        <tr>
+          <th style="width:50%">Song</th>
+          <th>Artist</th>
+          <th>Played At</th>
+        </tr>
+      </thead>
+      <tbody id="historyBody"></tbody>
+    `;
+    const tbody = table.querySelector('#historyBody');
+    history.forEach(item => {
+      const id     = item.videoId || item.video_id || item.id || '';
+      const title  = item.title   || item.songTitle || 'Unknown';
+      const artist = item.artist  || item.channel   || '—';
+      const thumb  = item.thumbnail || (id ? ytThumb(id) : null);
+      const playedAt = item.playedAt || item.played_at || item.createdAt || null;
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>
+          <div style="display:flex;align-items:center;gap:10px;">
+            ${thumb
+              ? `<img class="h-thumb" src="${thumb}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="h-thumb-ph" style="display:none">🎵</div>`
+              : `<div class="h-thumb-ph">🎵</div>`
+            }
+            <span class="h-title">${escHtml(title)}</span>
+          </div>
+        </td>
+        <td><span class="h-artist">${escHtml(artist)}</span></td>
+        <td><span class="time-badge">${playedAt ? timeAgo(playedAt) : '—'}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+    container.innerHTML = '';
+    container.appendChild(table);
+  }
+
+  /* ═══════════════════════════════════════════════
+     UTILS
+  ═══════════════════════════════════════════════ */
+  function escHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  /* ═══════════════════════════════════════════════
+     LOGOUT
+  ═══════════════════════════════════════════════ */
+  document.getElementById('logoutBtn').addEventListener('click', e => {
+    e.preventDefault();
+    localStorage.clear();
+    window.location.href = '/login.html';
+  });
+
+  /* ═══════════════════════════════════════════════
+     SMOOTH NAV HIGHLIGHTING
+  ═══════════════════════════════════════════════ */
+  document.querySelectorAll('.nav a[href^="#"]').forEach(a => {
+    a.addEventListener('click', () => {
+      document.querySelectorAll('.nav a').forEach(x => x.classList.remove('active'));
+      a.classList.add('active');
+    });
+  });
+
+  /* ═══════════════════════════════════════════════
+     BOOT
+  ═══════════════════════════════════════════════ */
+  init();
+</script>
+</body>
+</html>

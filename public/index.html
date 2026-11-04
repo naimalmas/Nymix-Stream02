@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nymix</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+
+  <!-- YouTube Player — needs real size to work in browsers -->
+  <div style="position:fixed;top:-9999px;left:-9999px;width:320px;height:180px;overflow:hidden;z-index:-9999;opacity:0;pointer-events:none;">
+    <div id="yt-player"></div>
+  </div>
+
+  <!-- Background blobs -->
+  <div class="bg-blob blob1"></div>
+  <div class="bg-blob blob2"></div>
+  <div class="bg-blob blob3"></div>
+
+  <div class="app">
+
+    <!-- ══════════ LEFT SIDEBAR ══════════ -->
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+        </div>
+        <span>Nymix</span>
+      </div>
+
+      <div class="search-box">
+        <svg width="15" height="15" fill="#aaa" viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+        <input type="text" id="search-input" placeholder="Search ..." autocomplete="off" />
+      </div>
+
+      <div class="nav-section-label">Menu: 5</div>
+      <nav class="nav-menu">
+        <a class="nav-link active" data-view="home">
+          <span class="nav-icon">🏠</span> Home
+        </a>
+        <a class="nav-link" data-view="discover">
+          <span class="nav-icon">🧭</span> Discover
+        </a>
+        <a class="nav-link" data-view="browse">
+          <span class="nav-icon">📻</span> Browse
+        </a>
+        <a class="nav-link" data-view="liked">
+          <span class="nav-icon">❤️</span> Liked
+        </a>
+        <a class="nav-link" data-view="radio">
+          <span class="nav-icon">🎙️</span> Radio
+          <span class="badge-new">new</span>
+        </a>
+      </nav>
+
+      <div class="nav-section-label" style="margin-top:20px">Library: 3</div>
+      <nav class="nav-menu">
+        <a class="nav-link" data-view="albums">
+          <span class="nav-icon lib-icon" style="background:#7c3aed">▶</span> Albums
+          <span class="dot-blue"></span>
+        </a>
+        <a class="nav-link" data-view="songs">
+          <span class="nav-icon lib-icon" style="background:#059669">♪</span> Songs
+        </a>
+        <a class="nav-link" data-view="artists">
+          <span class="nav-icon lib-icon" style="background:#dc2626">👤</span> Artists
+        </a>
+      </nav>
+
+      <div class="sidebar-bottom">
+        <div class="user-profile">
+          <div class="user-avatar">N</div>
+          <div class="user-info">
+            <div class="user-name">Naim Almas</div>
+            <div class="user-plan">Premium member</div>
+          </div>
+          <button class="settings-btn" id="settings-btn">⚙️</button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ══════════ CENTER ══════════ -->
+    <main class="center">
+      <!-- Top Nav -->
+      <div class="center-topbar">
+        <button class="nav-arrow" id="btn-back">‹</button>
+        <button class="nav-arrow" id="btn-fwd">›</button>
+        <div class="view-title" id="view-title">What's hot</div>
+      </div>
+
+      <!-- Home View -->
+      <div class="view active" id="view-home">
+        <h1 class="section-big-title">Trending</h1>
+
+        <!-- Hero Banner -->
+        <div class="hero-banner" id="hero-banner">
+          <div class="hero-overlay"></div>
+          <img class="hero-bg" id="hero-img" src="https://img.youtube.com/vi/JGwWNGJdvx8/maxresdefault.jpg" alt="trending" />
+          <div class="hero-content">
+            <div class="hero-tag">Artist</div>
+            <div class="hero-listeners">👥 Monthly listeners: <strong id="hero-listeners">1.2M</strong></div>
+            <h2 class="hero-title" id="hero-title">Top hits worldwide</h2>
+            <div class="hero-actions">
+              <button class="btn-play-hero" id="hero-play-btn">
+                <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                Play
+              </button>
+              <button class="btn-follow">Follow</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Playlist Table -->
+        <div class="playlist-section">
+          <div class="playlist-header">
+            <h2>Playlist</h2>
+            <button class="show-all-btn" id="show-all-btn">Show all</button>
+          </div>
+          <table class="playlist-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>TITLE</th>
+                <th>ARTIST</th>
+                <th>TIME</th>
+                <th>ALBUM</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody id="playlist-body">
+              <!-- filled by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Search/Discover View -->
+      <div class="view" id="view-discover">
+        <h1 class="section-big-title" id="search-heading">Search Results</h1>
+        <div id="search-status" class="search-status-text"></div>
+        <div id="search-results-grid" class="search-grid"></div>
+      </div>
+
+      <!-- Browse View -->
+      <div class="view" id="view-browse">
+        <h1 class="section-big-title">Browse Genres</h1>
+        <div class="genre-grid" id="genre-grid"></div>
+      </div>
+
+      <!-- Liked View -->
+      <div class="view" id="view-liked">
+        <h1 class="section-big-title">❤️ Liked Songs</h1>
+        <div id="liked-list" class="song-list-view"></div>
+      </div>
+
+      <!-- Radio View -->
+      <div class="view" id="view-radio">
+        <h1 class="section-big-title">🎙️ Radio</h1>
+        <div class="radio-grid" id="radio-grid"></div>
+      </div>
+
+      <!-- Bottom Player Bar -->
+      <div class="player-bar">
+        <div class="player-left">
+          <button class="p-ctrl-btn" title="Like" id="p-like-btn">♡</button>
+          <button class="p-ctrl-btn" title="Add">⊞</button>
+          <button class="p-ctrl-btn active" id="btn-shuffle" title="Shuffle">⇄</button>
+        </div>
+        <div class="player-center">
+          <button class="p-ctrl-btn" id="btn-prev">⏮</button>
+          <button class="p-ctrl-btn repeat-btn" id="btn-repeat">↺</button>
+          <button class="play-pause-btn" id="btn-playpause">
+            <span id="play-icon-main">▶</span>
+            <span id="pause-icon-main" style="display:none">⏸</span>
+          </button>
+          <button class="p-ctrl-btn" id="btn-next">⏭</button>
+          <button class="p-ctrl-btn" title="Queue">☰</button>
+        </div>
+        <div class="player-right">
+          <svg width="14" height="14" fill="#aaa" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+          <input type="range" id="volume-slider" min="0" max="100" value="80" class="vol-range" />
+        </div>
+
+        <div class="player-progress-wrap">
+          <span class="p-time" id="p-current">0:00</span>
+          <div class="p-progress-track" id="progress-track">
+            <div class="p-progress-fill" id="progress-fill"></div>
+            <div class="p-progress-dot" id="progress-dot"></div>
+          </div>
+          <span class="p-time" id="p-duration">0:00</span>
+        </div>
+      </div>
+    </main>
+
+    <!-- ══════════ RIGHT SIDEBAR ══════════ -->
+    <aside class="right-panel">
+      <!-- Tags -->
+      <div class="tags-section">
+        <div class="right-section-header">
+          <h3>Tags</h3>
+          <button class="more-btn">···</button>
+        </div>
+        <div class="tags-grid">
+          <button class="tag-pill" onclick="searchTag('Acoustic')">🎸 Acoustic</button>
+          <button class="tag-pill" onclick="searchTag('Piano jazz')">🎹 Piano jazz</button>
+          <button class="tag-pill" onclick="searchTag('Jazz')">🎷 Jazz</button>
+          <button class="tag-pill" onclick="searchTag('Indie pop')">🎵 Indie pop</button>
+          <button class="tag-pill" onclick="searchTag('Lo-fi')">🌙 Lo-fi</button>
+          <button class="tag-pill" onclick="searchTag('Hip hop')">🎤 Hip hop</button>
+        </div>
+      </div>
+
+      <!-- Now Playing Card -->
+      <div class="now-playing-card">
+        <div class="np-card-img-wrap">
+          <div id="yt-player"></div>
+          <img id="np-card-img" src="" alt="now playing" style="display:none" />
+          <div class="np-card-placeholder" id="np-placeholder">
+            <svg width="40" height="40" fill="#ffffff44" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          </div>
+        </div>
+        <div class="np-card-info">
+          <div class="np-card-title" id="np-card-title">Select a song</div>
+          <div class="np-card-artist" id="np-card-artist">—</div>
+        </div>
+        <button class="np-add-btn">+</button>
+      </div>
+
+      <!-- Recently Played -->
+      <div class="played-section">
+        <div class="right-section-header">
+          <h3>Played</h3>
+          <button class="see-all-btn" id="see-all-btn">See all</button>
+        </div>
+        <div id="played-list" class="played-list">
+          <div class="played-empty">গান বাজালে এখানে দেখাবে</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-bg hidden" id="modal-bg">
+    <div class="modal-box">
+      <div class="modal-top">
+        <h3>⚙️ Settings</h3>
+        <button id="modal-close">✕</button>
+      </div>
+      <div class="modal-content">
+        <label>YouTube API Key</label>
+        <input type="password" id="api-input" placeholder="Paste a new YouTube API key" autocomplete="off" />
+        <div class="api-msg" id="api-msg"></div>
+        <button class="save-btn" id="save-btn">Save Key</button>
+        <p class="modal-hint">💡 console.cloud.google.com → YouTube Data API v3 → Create Credentials</p>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,13 @@
+[
+  {
+    "id": "admin_001",
+    "name": "Admin",
+    "email": "admin@nymix.com",
+    "password": "__GENERATE_ON_FIRST_START__",
+    "role": "super_admin",
+    "avatar": "",
+    "createdAt": "2026-11-01T00:00:00.000Z",
+    "banned": false,
+    "totalPlays": 0
+  }
+]

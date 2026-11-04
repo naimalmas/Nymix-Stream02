@@ -1,0 +1,15 @@
+{
+  "ytApiKey": "",
+  "featuredSongs": [
+    { "id": "JGwWNGJdvx8", "title": "Shape of You", "artist": "Ed Sheeran", "dur": "3:53", "album": "÷ (Divide)" },
+    { "id": "ktvTqknDobU", "title": "Radioactive", "artist": "Imagine Dragons", "dur": "3:06", "album": "Night Visions" },
+    { "id": "09R8_2nJtjg", "title": "Payphone", "artist": "Maroon 5", "dur": "3:45", "album": "Overexposed" },
+    { "id": "RgKAFK5djSk", "title": "See You Again", "artist": "Wiz Khalifa", "dur": "3:50", "album": "Furious 7" },
+    { "id": "YQHsXMglC9A", "title": "Hello", "artist": "Adele", "dur": "4:55", "album": "25" },
+    { "id": "OPf0YbXqDm0", "title": "Happy", "artist": "Pharrell Williams", "dur": "3:53", "album": "G I R L" },
+    { "id": "hT_nvWreIhg", "title": "Counting Stars", "artist": "OneRepublic", "dur": "4:17", "album": "Native" },
+    { "id": "CevxZvSJLk8", "title": "Roar", "artist": "Katy Perry", "dur": "3:43", "album": "Prism" },
+    { "id": "e-ORhEE9VVg", "title": "Blinding Lights", "artist": "The Weeknd", "dur": "3:20", "album": "After Hours" },
+    { "id": "60ItHLz5WEA", "title": "Firework", "artist": "Katy Perry", "dur": "3:47", "album": "Teenage Dream" }
+  ]
+}
