@@ -23,12 +23,15 @@
   <div class="app">
 
     <!-- ══════════ LEFT SIDEBAR ══════════ -->
-    <aside class="sidebar">
+    <aside class="sidebar" id="app-sidebar" aria-label="Main navigation">
       <div class="logo">
         <div class="logo-icon">
           <svg width="22" height="22" viewBox="0 0 24 24" fill="white"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
         </div>
         <span>Nymix</span>
+        <button class="sidebar-close" id="mobile-menu-close" type="button" aria-label="Close menu">
+          <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg>
+        </button>
       </div>
 
       <div class="search-box">
@@ -36,7 +39,7 @@
         <input type="text" id="search-input" placeholder="Search ..." autocomplete="off" />
       </div>
 
-      <div class="nav-section-label">Menu: 5</div>
+      <div class="nav-section-label">Menu</div>
       <nav class="nav-menu">
         <a class="nav-link active" data-view="home">
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#home"></use></svg> Home
@@ -54,11 +57,17 @@
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg> Radio
           <span class="badge-new">new</span>
         </a>
-        <a class="nav-link" data-view="messages">
-          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#users"></use></svg> Messages
-        </a>
         <a class="nav-link" data-view="add-friend">
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> Add friend
+        </a>
+        <a class="nav-link" data-view="feed" aria-label="Feed" title="Feed">
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#album"></use></svg> Feed
+        </a>
+        <a class="nav-link" data-view="profile" aria-label="Profile" title="Profile">
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg> Profile
+        </a>
+        <a class="nav-link" data-view="messages">
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#users"></use></svg> Messages
         </a>
       </nav>
 
@@ -87,11 +96,15 @@
         </div>
       </div>
     </aside>
+    <button class="mobile-menu-backdrop" id="mobile-menu-backdrop" type="button" aria-label="Close navigation" hidden></button>
 
     <!-- ══════════ CENTER ══════════ -->
     <main class="center">
       <!-- Top Nav -->
       <div class="center-topbar">
+        <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Open menu" aria-controls="app-sidebar" aria-expanded="false">
+          <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#list"></use></svg>
+        </button>
         <button class="nav-arrow" id="btn-back" aria-label="Go back"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-left"></use></svg></button>
         <button class="nav-arrow" id="btn-fwd" aria-label="Go forward"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg></button>
         <div class="view-title" id="view-title">What's hot</div>

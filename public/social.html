@@ -17,6 +17,8 @@
     <nav aria-label="Nymix navigation">
       <button class="tab active" data-panel="chat"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#list"></use></svg> Messages</button>
       <button class="tab" data-panel="people"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Discover</button>
+      <button class="tab" data-panel="feed"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#album"></use></svg> Feed</button>
+      <button class="tab" data-panel="profile"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg> Profile</button>
     </nav>
     <div class="account">
       <button type="button" class="account-profile-button" id="account-profile-button" aria-label="View your profile">
@@ -29,6 +31,64 @@
 
   <main class="messages-main">
     <p class="notice" id="notice" role="status" aria-live="polite"></p>
+
+    <section class="panel" id="panel-profile">
+      <section class="profile-page" aria-labelledby="profile-page-name">
+        <header class="profile-page-header">
+          <div class="profile-page-avatar" id="profile-page-avatar"></div>
+          <div class="profile-page-details">
+            <div class="profile-page-title-row">
+              <h1 id="profile-page-name">Your profile</h1>
+              <button type="button" class="button secondary" id="profile-page-edit" hidden>Edit profile</button>
+              <button type="button" class="button secondary" id="profile-page-action" hidden></button>
+              <label class="button secondary profile-page-add" id="profile-page-add-label" for="profile-page-photo-input" hidden>Add photo</label>
+              <input class="sr-only" id="profile-page-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple disabled />
+            </div>
+            <div class="profile-page-stats">
+              <span><strong id="profile-page-photo-count">0</strong> posts</span>
+              <span><strong id="profile-page-play-count">0</strong> plays</span>
+              <span id="profile-page-member-since"></span>
+            </div>
+            <p class="profile-page-bio" id="profile-page-bio"></p>
+            <p class="profile-page-notice" id="profile-page-notice" role="status" aria-live="polite"></p>
+          </div>
+        </header>
+        <section class="profile-page-posts" aria-labelledby="profile-page-posts-title">
+          <header><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#album"></use></svg><h2 id="profile-page-posts-title">Posts</h2></header>
+          <div class="profile-page-grid" id="profile-page-grid"></div>
+          <p class="feed-empty" id="profile-page-empty">No photos yet. Add your first photo to share it on your profile and feed.</p>
+        </section>
+      </section>
+    </section>
+
+    <section class="panel" id="panel-feed">
+      <div class="feed-layout">
+        <section class="feed-main" aria-labelledby="feed-title">
+          <header class="feed-heading">
+            <div><p class="eyebrow">YOUR COMMUNITY</p><h1 id="feed-title">Photo feed</h1><p>Share a moment and see what people are posting.</p></div>
+            <button type="button" class="button secondary" id="feed-refresh">Refresh</button>
+          </header>
+          <form class="card feed-composer" id="feed-form">
+            <label class="feed-upload" for="feed-photo">
+              <span class="feed-upload-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#album"></use></svg></span>
+              <span><strong>Share a photo</strong><small>JPG, PNG or WebP · up to 10 MB before compression</small></span>
+              <span class="button secondary">Choose photo</span>
+            </label>
+            <input class="sr-only" id="feed-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" required />
+            <img class="feed-preview" id="feed-preview" alt="Selected photo preview" hidden />
+            <label class="sr-only" for="feed-caption">Write a caption</label>
+            <textarea id="feed-caption" maxlength="150" rows="2" placeholder="Write a caption…"></textarea>
+            <div class="feed-composer-footer"><span id="feed-form-notice" role="status"></span><button class="button" type="submit" id="feed-submit" disabled>Share photo</button></div>
+          </form>
+          <div class="feed-list" id="feed-list" aria-live="polite"><p class="feed-empty">Loading photos…</p></div>
+        </section>
+        <aside class="card feed-sidebar" aria-label="Feed information">
+          <p class="eyebrow">YOUR PROFILE</p><h2>Make it yours</h2>
+          <p>Your feed photos are also saved to your profile photo grid. Add a caption when you share.</p>
+          <button type="button" class="button secondary" id="feed-profile-button">View your profile</button>
+        </aside>
+      </div>
+    </section>
 
     <section class="panel" id="panel-people">
       <section class="discover-hero" aria-labelledby="discover-title">
@@ -265,7 +325,7 @@
         </header>
         <div class="profile-photo-grid" id="profile-photo-grid"></div>
         <p class="profile-gallery-empty" id="profile-gallery-empty">Your profile photos will appear here.</p>
-        <p class="profile-photo-hint" id="profile-gallery-hint">Add up to 9 photos. Use the arrows to arrange your grid.</p>
+        <p class="profile-photo-hint" id="profile-gallery-hint">Share up to 100 photos. Use the arrows to arrange your grid.</p>
       </section>
       <section class="profile-dashboard" id="profile-dashboard" hidden aria-label="Your listening dashboard">
         <h3>Your listening</h3>

@@ -406,6 +406,8 @@ function validProfileImage(dataUrl, maxBytes) {
   return imageType === photo[1];
 }
 
+const MAX_PROFILE_PHOTOS = 100;
+
 app.put('/api/user/profile', auth, async (req, res) => {
   try {
     const { name, avatar, bio } = req.body;
@@ -444,7 +446,7 @@ app.post('/api/user/photos', userAuth, (req, res) => {
   const account = users.find(user => user.id === req.user.id);
   if (!account) return res.status(404).json({ error: 'Account not found' });
   account.photos ||= [];
-  if (account.photos.length >= 9) return res.status(409).json({ error: 'Your profile photo grid is full. Remove a photo before adding another.' });
+  if (account.photos.length >= MAX_PROFILE_PHOTOS) return res.status(409).json({ error: 'Your profile is full. Remove a photo before adding another.' });
   const photo = {
     id: crypto.randomBytes(12).toString('hex'),
     image,
@@ -468,9 +470,24 @@ app.delete('/api/user/photos/:photoId', userAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.post('/api/user/photos/:photoId/like', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const photo = users
+    .filter(account => account.role === 'user' && !account.banned)
+    .flatMap(account => Array.isArray(account.photos) ? account.photos : [])
+    .find(item => item.id === req.params.photoId);
+  if (!photo) return res.status(404).json({ error: 'Photo not found' });
+  photo.likes = Array.isArray(photo.likes) ? photo.likes : [];
+  const index = photo.likes.indexOf(req.user.id);
+  if (index >= 0) photo.likes.splice(index, 1);
+  else photo.likes.push(req.user.id);
+  wd('users.json', users);
+  res.json({ liked: index < 0, likes: photo.likes.length });
+});
+
 app.put('/api/user/photos/order', userAuth, (req, res) => {
   const { photoIds } = req.body;
-  if (!Array.isArray(photoIds) || photoIds.length > 9 || photoIds.some(id => typeof id !== 'string') ||
+  if (!Array.isArray(photoIds) || photoIds.length > MAX_PROFILE_PHOTOS || photoIds.some(id => typeof id !== 'string') ||
       new Set(photoIds).size !== photoIds.length) {
     return res.status(400).json({ error: 'Invalid photo order' });
   }
@@ -485,6 +502,26 @@ app.put('/api/user/photos/order', userAuth, (req, res) => {
   account.photos = photoIds.map(id => photosById.get(id));
   wd('users.json', users);
   res.json({ photos: account.photos });
+});
+
+app.get('/api/social/feed', userAuth, (req, res) => {
+  const posts = rd('users.json')
+    .filter(account => account.role === 'user' && !account.banned)
+    .flatMap(account => (Array.isArray(account.photos) ? account.photos : [])
+      .filter(photo => photo && typeof photo.id === 'string' &&
+        typeof photo.image === 'string' && photo.image.length <= 90000)
+      .map(photo => ({
+        id: photo.id,
+        image: photo.image,
+        caption: typeof photo.caption === 'string' ? photo.caption : '',
+        createdAt: photo.createdAt || '',
+        likes: Array.isArray(photo.likes) ? photo.likes.length : 0,
+        liked: Array.isArray(photo.likes) && photo.likes.includes(req.user.id),
+        author: safeProfile(account),
+      })))
+    .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, 60);
+  res.json(posts);
 });
 
 // ══════════════════════════════════════════════════════

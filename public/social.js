@@ -1,4 +1,5 @@
 const API = '/api';
+const PROFILE_PHOTO_LIMIT = 100;
 const state = {
   user: JSON.parse(localStorage.getItem('nx_user') || 'null'),
   friends: [],
@@ -37,6 +38,8 @@ const state = {
   voiceTimeout: null,
   profileTarget: null,
   profilePhoto: '',
+  feedPreviewUrl: '',
+  feedLoading: false,
   callSignalError: '',
   youtubeReady: false,
   player: null,
@@ -112,7 +115,7 @@ function setAvatar(element, profile) {
   element.appendChild(image);
 }
 
-async function openProfile(profileOrId) {
+async function openProfile(profileOrId, syncParent = true) {
   try {
     const id = typeof profileOrId === 'string' ? profileOrId : profileOrId?.id;
     if (!id) throw new Error('Profile not found');
@@ -142,22 +145,57 @@ async function openProfile(profileOrId) {
     $('profile-gallery-input').disabled = !isOwnProfile;
     renderProfilePhotos(profile);
     const action = $('profile-action');
-    action.hidden = isOwnProfile || profile.relation === 'sent';
-    if (!isOwnProfile && profile.relation === 'received') {
-      action.hidden = false;
-      action.textContent = 'View request';
-      action.disabled = false;
-    } else if (!isOwnProfile && profile.relation === 'friends') {
-      action.textContent = 'Message';
-      action.disabled = false;
-    } else if (!isOwnProfile && profile.relation === 'none') {
-      action.textContent = 'Add friend';
-      action.disabled = false;
-    }
-    $('profile-dialog').showModal();
+    configureProfileAction(action, profile, isOwnProfile);
+    configureProfileAction($('profile-page-action'), profile, isOwnProfile);
+    renderProfilePage(profile);
+    setPanel('profile', syncParent);
   } catch (error) {
     showNotice(error.message, true);
   }
+}
+
+function configureProfileAction(action, profile, isOwnProfile) {
+  action.hidden = isOwnProfile || profile.relation === 'sent';
+  action.disabled = false;
+  if (!isOwnProfile && profile.relation === 'received') action.textContent = 'View request';
+  else if (!isOwnProfile && profile.relation === 'friends') action.textContent = 'Message';
+  else if (!isOwnProfile && profile.relation === 'none') action.textContent = 'Add friend';
+}
+
+function renderProfilePage(profile) {
+  const photos = Array.isArray(profile.photos) ? profile.photos : [];
+  setAvatar($('profile-page-avatar'), profile);
+  $('profile-page-name').textContent = profile.name || 'Nymix member';
+  $('profile-page-photo-count').textContent = String(photos.length);
+  $('profile-page-play-count').textContent = (Number(profile.totalPlays) || 0).toLocaleString();
+  $('profile-page-member-since').textContent = profile.createdAt
+    ? `Joined ${new Date(profile.createdAt).toLocaleDateString([], { month: 'short', year: 'numeric' })}`
+    : '';
+  $('profile-page-bio').textContent = profile.bio || '';
+  $('profile-page-edit').hidden = profile.id !== state.user.id;
+  $('profile-page-add-label').hidden = profile.id !== state.user.id;
+  $('profile-page-photo-input').disabled = profile.id !== state.user.id;
+  $('profile-page-notice').textContent = '';
+  $('profile-page-grid').replaceChildren();
+  $('profile-page-empty').hidden = photos.length > 0;
+  $('profile-page-empty').textContent = profile.id === state.user.id
+    ? 'No photos yet. Add your first photo to share it on your profile and feed.'
+    : 'No photos shared yet.';
+  photos.forEach(photo => {
+    const tile = document.createElement('article');
+    tile.className = 'profile-page-tile';
+    const image = document.createElement('img');
+    image.src = photo.image;
+    image.alt = photo.caption || `${profile.name}'s photo`;
+    image.loading = 'lazy';
+    tile.appendChild(image);
+    if (photo.caption) {
+      const caption = document.createElement('p');
+      caption.textContent = photo.caption;
+      tile.appendChild(caption);
+    }
+    $('profile-page-grid').appendChild(tile);
+  });
 }
 
 function renderProfilePhotos(profile) {
@@ -211,6 +249,45 @@ function renderProfilePhotos(profile) {
   });
 }
 
+async function uploadProfilePhotos(input, addLabel, notice) {
+  const files = [...(input.files || [])];
+  if (!files.length || state.profileTarget?.id !== state.user.id) return;
+  const profile = state.profileTarget;
+  const remaining = PROFILE_PHOTO_LIMIT - (profile.photos || []).length;
+  if (remaining <= 0) {
+    notice.textContent = 'Your profile photo grid is full. Remove a photo before adding another.';
+    notice.classList.add('error');
+    input.value = '';
+    return;
+  }
+  input.disabled = true;
+  addLabel.classList.add('disabled');
+  const failures = [];
+  try {
+    for (const file of files.slice(0, remaining)) {
+      try {
+        const image = await compressProfilePhoto(file, 64 * 1024);
+        const photo = await post('/user/photos', { image });
+        profile.photos ||= [];
+        profile.photos.push(photo);
+      } catch (error) {
+        failures.push(`${file.name}: ${error.message}`);
+      }
+    }
+    if (state.profileTarget?.id === profile.id) {
+      renderProfilePhotos(profile);
+      renderProfilePage(profile);
+    }
+    if (files.length > remaining) failures.push(`Only ${remaining} more photos fit in your profile grid.`);
+    notice.textContent = failures.length ? failures.join(' ') : 'Photo shared to your profile and feed.';
+    notice.classList.toggle('error', failures.length > 0);
+  } finally {
+    input.value = '';
+    input.disabled = false;
+    addLabel.classList.remove('disabled');
+  }
+}
+
 async function moveProfilePhoto(photoId, offset) {
   const photos = state.profileTarget?.photos || [];
   const index = photos.findIndex(photo => photo.id === photoId);
@@ -222,6 +299,7 @@ async function moveProfilePhoto(photoId, offset) {
     const result = await put('/user/photos/order', { photoIds: reordered.map(photo => photo.id) });
     state.profileTarget.photos = result.photos;
     renderProfilePhotos(state.profileTarget);
+    renderProfilePage(state.profileTarget);
   } catch (error) {
     $('profile-notice').textContent = error.message;
     $('profile-notice').classList.add('error');
@@ -233,6 +311,7 @@ async function removeProfilePhoto(photoId) {
     await deleteRequest(`/user/photos/${encodeURIComponent(photoId)}`);
     state.profileTarget.photos = state.profileTarget.photos.filter(photo => photo.id !== photoId);
     renderProfilePhotos(state.profileTarget);
+    renderProfilePage(state.profileTarget);
     $('profile-notice').textContent = 'Photo removed from your profile.';
     $('profile-notice').classList.remove('error');
   } catch (error) {
@@ -382,9 +461,104 @@ function renderList(container, items, emptyText, renderItem) {
   items.forEach(item => container.appendChild(renderItem(item)));
 }
 
-function setPanel(panelName) {
+function setPanel(panelName, syncParent = true) {
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${panelName}`));
   document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.panel === panelName));
+  if (syncParent && ['chat', 'people', 'feed', 'profile'].includes(panelName) && window.parent !== window) {
+    window.parent.postMessage({ type: 'nymix-social-navigation', panel: panelName }, window.location.origin);
+  }
+  if (panelName === 'feed') loadFeed().catch(error => showNotice(error.message, true));
+}
+
+function renderFeed(posts) {
+  const list = $('feed-list');
+  list.replaceChildren();
+  if (!posts.length) {
+    const empty = document.createElement('p');
+    empty.className = 'feed-empty';
+    empty.textContent = 'No photos yet. Share the first moment with your community.';
+    list.appendChild(empty);
+    return;
+  }
+  posts.forEach(post => {
+    const card = document.createElement('article');
+    card.className = 'card feed-post';
+    card.dataset.postId = post.id;
+    const header = document.createElement('header');
+    header.className = 'feed-post-header';
+    const author = document.createElement('button');
+    author.type = 'button';
+    author.className = 'feed-post-author';
+    const avatar = document.createElement('span');
+    avatar.className = 'feed-post-avatar';
+    setAvatar(avatar, post.author);
+    const name = document.createElement('strong');
+    name.textContent = post.author.name || 'Nymix member';
+    author.append(avatar, name);
+    author.addEventListener('click', () => openProfile(post.author.id));
+    header.appendChild(author);
+    const timestamp = Date.parse(post.createdAt);
+    if (Number.isFinite(timestamp)) {
+      const time = document.createElement('time');
+      time.dateTime = new Date(timestamp).toISOString();
+      time.textContent = formatThreadTime(timestamp);
+      header.appendChild(time);
+    }
+    const image = document.createElement('img');
+    image.className = 'feed-post-image';
+    image.src = post.image;
+    image.alt = post.caption || `Photo shared by ${post.author.name || 'a Nymix member'}`;
+    image.loading = 'lazy';
+    image.addEventListener('error', () => image.remove(), { once: true });
+    const actions = document.createElement('div');
+    actions.className = 'feed-post-actions';
+    const like = document.createElement('button');
+    like.type = 'button';
+    like.className = `feed-like${post.liked ? ' liked' : ''}`;
+    like.setAttribute('aria-pressed', String(Boolean(post.liked)));
+    like.setAttribute('aria-label', post.liked ? 'Unlike photo' : 'Like photo');
+    like.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#heart"></use></svg>';
+    like.addEventListener('click', async () => {
+      like.disabled = true;
+      try {
+        const result = await api(`/user/photos/${encodeURIComponent(post.id)}/like`, { method: 'POST' });
+        post.liked = result.liked;
+        post.likes = result.likes;
+        like.classList.toggle('liked', result.liked);
+        like.setAttribute('aria-pressed', String(result.liked));
+        like.setAttribute('aria-label', result.liked ? 'Unlike photo' : 'Like photo');
+        count.textContent = `${result.likes} ${result.likes === 1 ? 'like' : 'likes'}`;
+      } catch (error) {
+        showNotice(error.message, true);
+      } finally {
+        like.disabled = false;
+      }
+    });
+    const count = document.createElement('strong');
+    count.className = 'feed-like-count';
+    count.textContent = `${Number(post.likes) || 0} ${(Number(post.likes) || 0) === 1 ? 'like' : 'likes'}`;
+    actions.append(like, count);
+    card.append(header, image, actions);
+    if (post.caption) {
+      const caption = document.createElement('p');
+      caption.className = 'feed-post-caption';
+      caption.textContent = post.caption;
+      card.appendChild(caption);
+    }
+    list.appendChild(card);
+  });
+}
+
+async function loadFeed() {
+  if (state.feedLoading) return;
+  state.feedLoading = true;
+  try {
+    const posts = await api('/social/feed');
+    if (!Array.isArray(posts)) throw new Error('Invalid photo feed response');
+    renderFeed(posts);
+  } finally {
+    state.feedLoading = false;
+  }
 }
 
 function renderFriends() {
@@ -1484,7 +1658,10 @@ async function refreshSocial() {
   }
 }
 
-document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setPanel(tab.dataset.panel)));
+document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
+if (tab.dataset.panel === 'profile') openProfile(state.user.id);
+else setPanel(tab.dataset.panel);
+}));
 
 $('discover-from-inbox').addEventListener('click', () => setPanel('people'));
 $('discover-from-empty').addEventListener('click', () => setPanel('people'));
@@ -1541,6 +1718,56 @@ $('sign-out').addEventListener('click', () => {
 });
 
 $('account-profile-button').addEventListener('click', () => openProfile(state.user.id));
+$('feed-refresh').addEventListener('click', () => loadFeed().catch(error => showNotice(error.message, true)));
+$('feed-profile-button').addEventListener('click', () => openProfile(state.user.id));
+$('profile-page-edit').addEventListener('click', () => {
+  if (!state.profileTarget || state.profileTarget.id !== state.user.id) return;
+  $('profile-dialog').showModal();
+});
+$('profile-page-action').addEventListener('click', () => $('profile-action').click());
+$('feed-photo').addEventListener('change', event => {
+  const file = event.currentTarget.files?.[0];
+  if (state.feedPreviewUrl) URL.revokeObjectURL(state.feedPreviewUrl);
+  state.feedPreviewUrl = '';
+  $('feed-preview').hidden = !file;
+  $('feed-submit').disabled = !file;
+  $('feed-form-notice').textContent = '';
+  $('feed-form-notice').classList.remove('error');
+  if (file) {
+    state.feedPreviewUrl = URL.createObjectURL(file);
+    $('feed-preview').src = state.feedPreviewUrl;
+  } else {
+    $('feed-preview').removeAttribute('src');
+  }
+});
+$('feed-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const input = $('feed-photo');
+  const file = input.files?.[0];
+  if (!file) return;
+  const submit = $('feed-submit');
+  const status = $('feed-form-notice');
+  submit.disabled = true;
+  status.textContent = 'Sharing photo…';
+  status.classList.remove('error');
+  try {
+    const image = await compressProfilePhoto(file, 64 * 1024);
+    await post('/user/photos', { image, caption: $('feed-caption').value.trim() });
+    input.value = '';
+    $('feed-caption').value = '';
+    if (state.feedPreviewUrl) URL.revokeObjectURL(state.feedPreviewUrl);
+    state.feedPreviewUrl = '';
+    $('feed-preview').removeAttribute('src');
+    $('feed-preview').hidden = true;
+    status.textContent = 'Photo shared to your profile and feed.';
+    await loadFeed();
+  } catch (error) {
+    status.textContent = error.message;
+    status.classList.add('error');
+  } finally {
+    submit.disabled = !input.files?.length;
+  }
+});
 $('chat-profile-button').addEventListener('click', () => {
   if (state.activeFriend) openProfile(state.activeFriend.id);
 });
@@ -1566,43 +1793,20 @@ $('profile-photo-input').addEventListener('change', async event => {
     input.value = '';
   }
 });
-$('profile-gallery-input').addEventListener('change', async event => {
+$('profile-gallery-input').addEventListener('change', event => {
   const input = event.currentTarget;
-  const files = [...(input.files || [])];
-  if (!files.length || !state.profileTarget || state.profileTarget.id !== state.user.id) return;
-  const remaining = 9 - (state.profileTarget.photos || []).length;
-  const addLabel = $('profile-gallery-add-label');
-  if (remaining <= 0) {
-    $('profile-notice').textContent = 'Your profile photo grid is full. Remove a photo before adding another.';
-    $('profile-notice').classList.add('error');
-    input.value = '';
-    return;
-  }
-  addLabel.textContent = 'Uploading…';
-  addLabel.classList.add('disabled');
-  input.disabled = true;
-  const failures = [];
-  try {
-    for (const file of files.slice(0, remaining)) {
-      try {
-        const image = await compressProfilePhoto(file, 64 * 1024);
-        const photo = await post('/user/photos', { image });
-        state.profileTarget.photos ||= [];
-        state.profileTarget.photos.push(photo);
-      } catch (error) {
-        failures.push(`${file.name}: ${error.message}`);
-      }
-    }
-    renderProfilePhotos(state.profileTarget);
-    if (files.length > remaining) failures.push(`Only ${remaining} more photos fit in your profile grid.`);
-    $('profile-notice').textContent = failures.length ? failures.join(' ') : 'Photos added to your profile.';
-    $('profile-notice').classList.toggle('error', failures.length > 0);
-  } finally {
-    input.value = '';
-    input.disabled = false;
-    addLabel.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> Add photos';
-    addLabel.classList.remove('disabled');
-  }
+  uploadProfilePhotos(input, $('profile-gallery-add-label'), $('profile-notice'))
+    .catch(error => {
+      $('profile-notice').textContent = error.message;
+      $('profile-notice').classList.add('error');
+    });
+});
+$('profile-page-photo-input').addEventListener('change', event => {
+  uploadProfilePhotos(event.currentTarget, $('profile-page-add-label'), $('profile-page-notice'))
+    .catch(error => {
+      $('profile-page-notice').textContent = error.message;
+      $('profile-page-notice').classList.add('error');
+    });
 });
 $('profile-remove-photo').addEventListener('click', () => {
   state.profilePhoto = '';
@@ -1628,6 +1832,7 @@ $('profile-form').addEventListener('submit', async event => {
     localStorage.setItem('nx_user', JSON.stringify(state.user));
     $('account-name').textContent = state.user.name;
     setAvatar($('account-avatar'), state.user);
+    renderProfilePage(state.profileTarget);
     $('profile-display-name').textContent = state.user.name;
     $('profile-notice').textContent = 'Profile updated.';
     $('profile-notice').classList.remove('error');
@@ -1658,6 +1863,8 @@ $('profile-action').addEventListener('click', async () => {
       await post(`/friends/request/${encodeURIComponent(profile.id)}`);
       profile.relation = 'sent';
       button.textContent = 'Request sent';
+      configureProfileAction($('profile-page-action'), profile, false);
+      $('profile-page-notice').textContent = `Friend request sent to ${profile.name}.`;
       showNotice(`Friend request sent to ${profile.name}.`);
       await refreshSocial();
       await refreshSuggestions().catch(error => showNotice(error.message, true));
@@ -1857,18 +2064,22 @@ if (chatListenCard) {
 }
 
 const initialPanel = new URLSearchParams(window.location.search).get('panel');
-if (initialPanel === 'people' || initialPanel === 'chat') setPanel(initialPanel);
+if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed') setPanel(initialPanel, false);
+else if (initialPanel === 'profile') setPanel('profile', false);
 window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || event.source !== window.parent) return;
   if (event.data?.type === 'nymix-social-open-profile') {
-    openProfile(state.user.id);
+    openProfile(state.user.id, false);
     return;
   }
-  if (event.data?.type === 'nymix-social-panel' && ['people', 'chat'].includes(event.data.panel)) {
-    setPanel(event.data.panel);
+  if (event.data?.type === 'nymix-social-panel' && ['people', 'chat', 'feed'].includes(event.data.panel)) {
+    setPanel(event.data.panel, false);
+  } else if (event.data?.type === 'nymix-social-panel' && event.data.panel === 'profile') {
+    openProfile(state.user.id, false);
   }
 });
 window.addEventListener('beforeunload', () => {
+  if (state.feedPreviewUrl) URL.revokeObjectURL(state.feedPreviewUrl);
   state.call.peer?.close();
   state.call.localStream?.getTracks().forEach(track => track.stop());
   state.voiceStream?.getTracks().forEach(track => track.stop());
@@ -1881,6 +2092,7 @@ if (!token() || !state.user || state.user.role !== 'user') {
 } else {
   $('account-name').textContent = state.user.name || state.user.email || 'Member';
     setAvatar($('account-avatar'), state.user);
+  if (initialPanel === 'profile') openProfile(state.user.id, false);
   refreshSocial();
   refreshSuggestions().catch(error => showNotice(error.message, true));
   pollCallSignals().catch(error => showNotice(error.message, true));

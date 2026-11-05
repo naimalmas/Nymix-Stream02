@@ -589,8 +589,8 @@ function renderPlayed() {
 }
 
 // ── Views ─────────────────────────────────────────────
-function showView(name) {
-  const viewName = name === 'add-friend' ? 'messages' : name;
+function showView(name, syncPortal = true) {
+  const viewName = name === 'add-friend' || name === 'feed' || name === 'profile' ? 'messages' : name;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const v = document.getElementById('view-' + viewName);
   if (v) v.classList.add('active');
@@ -601,15 +601,25 @@ function showView(name) {
   const titles = {
     home: "What's hot", discover: 'Discover',
     browse: 'Browse', liked: 'Your Library', radio: 'Radio',
-    messages: 'Messages', 'add-friend': 'Add friend',
+    messages: 'Messages', feed: 'Feed', profile: 'Profile', 'add-friend': 'Add friend',
   };
   $('view-title').textContent = titles[name] || '';
-  if (viewName === 'messages') {
+  if (viewName === 'messages' && syncPortal) {
     $('social-portal')?.contentWindow?.postMessage({
       type: 'nymix-social-panel',
-      panel: name === 'add-friend' ? 'people' : 'chat',
+      panel: name === 'add-friend' ? 'people' : ['feed', 'profile'].includes(name) ? name : 'chat',
     }, window.location.origin);
   }
+}
+
+function setMobileMenuOpen(open) {
+  const app = document.querySelector('.app');
+  const toggle = $('mobile-menu-toggle');
+  if (!app || !toggle) return;
+  app.classList.toggle('mobile-menu-open', open);
+  toggle.setAttribute('aria-expanded', String(open));
+  toggle.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  $('mobile-menu-backdrop').hidden = !open;
 }
 
 // ── User Menu ─────────────────────────────────────────
@@ -645,8 +655,8 @@ function updateUserMenu() {
       avatar.appendChild(image);
     }
     $('profile-view-btn')?.addEventListener('click', () => {
-      showView('messages');
-      $('social-portal')?.contentWindow?.postMessage({ type: 'nymix-social-open-profile' }, window.location.origin);
+      setMobileMenuOpen(false);
+      showView('profile');
     });
   } else {
     sb.innerHTML = `
@@ -694,6 +704,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (event.data?.type === 'nymix-profile-updated' && event.data.user?.id === user()?.id) {
       localStorage.setItem('nx_user', JSON.stringify(event.data.user));
       updateUserMenu();
+    } else if (event.data?.type === 'nymix-social-navigation' &&
+        ['messages', 'people', 'feed', 'profile'].includes(event.data.panel)) {
+      showView(event.data.panel === 'people' ? 'add-friend' : event.data.panel, false);
     }
   });
 
@@ -702,12 +715,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     a.addEventListener('click', event => {
       if (!a.dataset.view) return;
       event.preventDefault();
+      setMobileMenuOpen(false);
       showView(a.dataset.view);
     });
   });
+  $('mobile-menu-toggle')?.addEventListener('click', () => {
+    setMobileMenuOpen($('mobile-menu-toggle').getAttribute('aria-expanded') !== 'true');
+  });
+  $('mobile-menu-close')?.addEventListener('click', () => setMobileMenuOpen(false));
+  $('mobile-menu-backdrop')?.addEventListener('click', () => setMobileMenuOpen(false));
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') setMobileMenuOpen(false);
+  });
   $('social-portal')?.addEventListener('load', () => {
     const activeView = document.querySelector('.nav-link.active')?.dataset.view;
-    if (activeView === 'messages' || activeView === 'add-friend') showView(activeView);
+    if (activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'profile') showView(activeView);
   });
 
   await loadLiked();
@@ -719,7 +741,12 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Search ──
   const inp = $('search-input');
   if (inp) {
-    inp.addEventListener('keydown', e => { if (e.key === 'Enter') search(inp.value); });
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        setMobileMenuOpen(false);
+        search(inp.value);
+      }
+    });
     inp.addEventListener('input', () => {
       clearTimeout(inp._t);
       if (inp.value.trim().length > 2)
