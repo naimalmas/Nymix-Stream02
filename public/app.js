@@ -267,22 +267,39 @@ function playQueue(songs, i) {
 }
 
 // ── Search ────────────────────────────────────────────
+const searchState = {
+  query: '',
+  requestId: 0,
+  nextPageToken: null,
+  results: [],
+  limited: false,
+  loading: false,
+};
+
 async function search(q) {
-  if (!q.trim()) return;
+  const query = q.trim();
+  if (!query) return;
+  searchState.query = query;
+  searchState.requestId++;
+  searchState.nextPageToken = null;
+  searchState.results = [];
+  searchState.limited = false;
+  searchState.loading = false;
+  const requestId = searchState.requestId;
   showView('discover');
-  $('search-heading').textContent = `"${q}"`;
+  $('search-heading').textContent = `"${query}"`;
   $('search-status').textContent  = '';
   $('search-results-grid').innerHTML = `
     <div class="loading-wrap">
       <div class="spinner"></div>
       <span>Searching YouTube...</span>
     </div>`;
+  $('search-results-more').innerHTML = '';
 
   try {
-    const d = await apiFetch(`/search?q=${encodeURIComponent(q)}`);
-    if (d.error) throw new Error(d.error);
-    renderGrid(d.items || [], q);
+    await fetchSearchPage(false, requestId);
   } catch (e) {
+    if (requestId !== searchState.requestId) return;
     $('search-results-grid').innerHTML = `
       <div class="loading-wrap">
         <span style="font-size:36px">⚠️</span>
@@ -291,10 +308,62 @@ async function search(q) {
   }
 }
 
+async function fetchSearchPage(loadMore, requestId) {
+  if (searchState.loading) return;
+  searchState.loading = true;
+  updateSearchMoreButton();
+
+  try {
+    const pageToken = loadMore ? searchState.nextPageToken : null;
+    const pageQuery = `/search?q=${encodeURIComponent(searchState.query)}${pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ''}`;
+    const d = await apiFetch(pageQuery);
+    if (requestId !== searchState.requestId) return;
+    if (d.error) throw new Error(d.error);
+
+    const seenIds = new Set(searchState.results.map(song => song.id));
+    searchState.results.push(...(d.items || []).filter(song => !seenIds.has(song.id)));
+    searchState.nextPageToken = d.nextPageToken || null;
+    searchState.limited = Boolean(d.searchLimited);
+    renderGrid(searchState.results, searchState.query, searchState.limited);
+  } catch (e) {
+    if (requestId !== searchState.requestId) return;
+    if (!loadMore) throw e;
+    $('search-status').textContent = `Couldn't load more results: ${e.message}`;
+  } finally {
+    if (requestId === searchState.requestId) {
+      searchState.loading = false;
+      updateSearchMoreButton();
+    }
+  }
+}
+
+function updateSearchMoreButton() {
+  const container = $('search-results-more');
+  container.innerHTML = '';
+  if (searchState.limited) {
+    container.textContent = 'Showing matching featured songs only. Configure a YouTube API key in Super Admin settings to search all songs.';
+    container.className = 'search-status-text search-limited';
+    return;
+  }
+  container.className = '';
+  if (!searchState.nextPageToken) return;
+
+  const wrap = document.createElement('div');
+  wrap.className = 'search-more-wrap';
+  const button = document.createElement('button');
+  button.className = 'search-more-btn';
+  button.textContent = searchState.loading ? 'Loading...' : 'Load more songs';
+  button.disabled = searchState.loading;
+  button.addEventListener('click', () => fetchSearchPage(true, searchState.requestId));
+  wrap.appendChild(button);
+  container.appendChild(wrap);
+}
+
 function searchTag(tag) { $('search-input').value = tag; search(tag); }
 
-function renderGrid(songs, q) {
+function renderGrid(songs, q, limited = false) {
   $('search-status').textContent = `${songs.length} results for "${q}"`;
+  $('search-status').classList.toggle('search-limited', limited);
   S.queue = songs;
   const grid = $('search-results-grid');
   grid.innerHTML = '';

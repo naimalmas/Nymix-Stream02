@@ -20,6 +20,6 @@ Configure these environment variables for Production, Preview, and Development a
 - `DATABASE_URL`: PostgreSQL connection string. The database role must be allowed to create a table and read/write rows.
 - `JWT_SECRET`: a private, persistent random secret (at least 32 random bytes recommended).
 - `SUPER_ADMIN_PASSWORD`: initial Super Admin password, at least 12 characters.
-- `YOUTUBE_API_KEY`: optional YouTube Data API key for live search. Without it, search uses featured songs.
+- `YOUTUBE_API_KEY`: YouTube Data API key for full search. Search returns up to 50 songs per page with a “Load more songs” button. Without a key, only matching featured songs are available.
 
 Never commit database URLs, API keys, JWT secrets, or live `data/*.json` files. The Super Admin account is seeded once when the database state is first initialized; later deployments do not overwrite existing accounts.

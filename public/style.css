@@ -276,6 +276,14 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
   gap:14px;
 }
+.search-more-wrap { display:flex; justify-content:center; padding:24px 0; }
+.search-more-btn {
+  border:1px solid var(--border); border-radius:20px; padding:10px 20px;
+  background:var(--card-bg); color:var(--text); font:inherit; cursor:pointer;
+}
+.search-more-btn:hover:not(:disabled) { background:var(--card-hover); }
+.search-more-btn:disabled { cursor:wait; opacity:.65; }
+.search-limited { color:#fbbf24; }
 .sg-card {
   background:var(--card-bg); border:1px solid var(--border);
   border-radius:14px; overflow:hidden; cursor:pointer;

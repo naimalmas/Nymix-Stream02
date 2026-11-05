@@ -243,18 +243,37 @@ app.get('/api/auth/me', auth, (req, res) => {
 // GET /api/search?q=...
 app.get('/api/search', async (req, res) => {
   const { q } = req.query;
-  if (!q) return res.status(400).json({ error: 'Query required' });
+  if (typeof q !== 'string' || !q.trim()) return res.status(400).json({ error: 'Query required' });
+  const { pageToken } = req.query;
+  if (pageToken !== undefined && (typeof pageToken !== 'string' || pageToken.length > 500)) {
+    return res.status(400).json({ error: 'Invalid page token' });
+  }
   try {
     const cfg = rd('config.json');
-    const key = cfg.ytApiKey;
-    if (!key) return res.json({ items: rd('config.json').featuredSongs });
+    const key = cfg.ytApiKey || process.env.YOUTUBE_API_KEY;
+    if (!key) {
+      const query = q.trim().toLocaleLowerCase();
+      const items = cfg.featuredSongs.filter(song =>
+        [song.title, song.artist, song.album].some(value => value.toLocaleLowerCase().includes(query)),
+      );
+      return res.json({ items, nextPageToken: null, searchLimited: true });
+    }
 
-    const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q+' song')}&type=video&videoCategoryId=10&maxResults=20&key=${key}`;
+    const params = new URLSearchParams({
+      part: 'snippet',
+      q: `${q} song`,
+      type: 'video',
+      videoCategoryId: '10',
+      maxResults: '50',
+      key,
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+    const url = `https://www.googleapis.com/youtube/v3/search?${params}`;
     const r   = await fetch(url);
     const d   = await r.json();
     if (d.error) throw new Error(d.error.message);
 
-    const songs = d.items.map(it => ({
+    const songs = (d.items || []).map(it => ({
       id:     it.id.videoId,
       title:  it.snippet.title.replace(/\s*[\(\[].*?[\)\]]/g,'').trim(),
       artist: it.snippet.channelTitle.replace(' - Topic','').replace('VEVO','').trim(),
@@ -262,7 +281,7 @@ app.get('/api/search', async (req, res) => {
       dur:    '',
       album:  'YouTube',
     }));
-    res.json({ items: songs });
+    res.json({ items: songs, nextPageToken: d.nextPageToken || null, searchLimited: false });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -592,7 +611,7 @@ app.put('/api/admin/config', superAdminAuth, (req, res) => {
 // GET /api/admin/config
 app.get('/api/admin/config', superAdminAuth, (req, res) => {
   const config = rd('config.json');
-  res.json({ ytApiKeyConfigured: Boolean(config.ytApiKey) });
+  res.json({ ytApiKeyConfigured: Boolean(config.ytApiKey || process.env.YOUTUBE_API_KEY) });
 });
 
 // ── Catch all → serve index.html ─────────────────────
