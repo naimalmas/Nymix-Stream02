@@ -4,6 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nymix Messages</title>
+  <script>if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embedded-portal');</script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -111,8 +112,19 @@
             <div class="conversation-actions" aria-label="Things to do together">
               <button type="button" class="button secondary" id="chat-game-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#gamepad"></use></svg> Play</button>
               <button type="button" class="button secondary" id="chat-listen-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#headphones"></use></svg> Listen</button>
+              <button type="button" class="button secondary" id="chat-call-button" disabled aria-label="Start audio call"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#phone"></use></svg><span class="call-button-label">Call</span></button>
             </div>
           </header>
+          <section class="call-panel" id="call-panel" hidden aria-live="polite">
+            <div class="call-copy"><strong id="call-title">Audio call</strong><span id="call-status"></span></div>
+            <div class="call-actions">
+              <button type="button" class="button primary" id="call-accept" hidden>Join call</button>
+              <button type="button" class="button secondary" id="call-mute" hidden aria-label="Mute microphone"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg></button>
+              <button type="button" class="button danger" id="call-end" hidden aria-label="End call"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#phone-off"></use></svg> End</button>
+              <button type="button" class="button secondary" id="call-decline" hidden>Decline</button>
+            </div>
+            <audio id="remote-audio" autoplay playsinline></audio>
+          </section>
           <div id="chat-activities" class="chat-activities">
             <div id="chat-invites" class="chat-invites"></div>
             <section class="inline-activity inline-game" id="inline-game" hidden>
@@ -151,6 +163,7 @@
           </div>
           <form id="chat-form" class="inline-form message-form">
             <label class="sr-only" for="chat-input">Message</label>
+            <button type="button" class="icon-button record-voice" id="record-voice" disabled aria-label="Record voice message"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg></button>
             <textarea id="chat-input" rows="1" maxlength="1000" placeholder="Message…" disabled></textarea>
             <button class="button send-button" id="chat-send" type="submit" disabled aria-label="Send message"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#send"></use></svg></button>
           </form>

@@ -16,6 +16,26 @@ const state = {
   activeGameFriendId: null,
   chatMessages: [],
   chatAfter: 0,
+  call: {
+    status: 'idle',
+    sessionId: null,
+    friendId: null,
+    peer: null,
+    localStream: null,
+    pendingCandidates: [],
+    outgoingCandidates: [],
+    signalReady: false,
+    muted: false,
+    seenSignals: new Set(),
+    offer: null,
+    timeout: null,
+  },
+  voiceRecorder: null,
+  voiceChunks: [],
+  voiceStream: null,
+  voiceStartedAt: 0,
+  voiceTimeout: null,
+  callSignalError: '',
   youtubeReady: false,
   player: null,
   playerReady: false,
@@ -54,7 +74,8 @@ async function api(path, options = {}) {
   if (response.status === 401) {
     localStorage.removeItem('nx_token');
     localStorage.removeItem('nx_user');
-    window.location.href = '/login.html';
+    if (window.parent !== window) window.top.location.href = '/login.html';
+    else window.location.href = '/login.html';
     throw new Error('Please sign in again.');
   }
   if (!response.ok) throw new Error(data.error || `Request failed (${response.status})`);
@@ -133,7 +154,7 @@ function renderFriends() {
     (state.lastMessages[b.id]?.ts || 0) - (state.lastMessages[a.id]?.ts || 0),
   ).filter(friend =>
     !query || friend.name.toLocaleLowerCase().includes(query) ||
-      state.lastMessages[friend.id]?.text.toLocaleLowerCase().includes(query),
+      (state.lastMessages[friend.id]?.text || '').toLocaleLowerCase().includes(query),
   );
   renderList($('chat-friends'), friends, 'No friends yet. Find people to start a conversation.', friend => {
     const thread = document.createElement('button');
@@ -159,7 +180,7 @@ function renderFriends() {
     }
     const preview = document.createElement('span');
     preview.textContent = lastMessage
-      ? `${lastMessage.from === state.user.id ? 'You: ' : ''}${lastMessage.text}`
+      ? `${lastMessage.from === state.user.id ? 'You: ' : ''}${lastMessage.text || 'Voice message'}`
       : 'Start a conversation';
     copy.append(topline, preview);
     const arrow = document.createElement('span');
@@ -408,6 +429,7 @@ function renderInlineGame(game) {
 }
 
 function renderMessages(container, messages, emptyText) {
+  container.querySelectorAll('audio[data-loaded="true"]').forEach(audio => URL.revokeObjectURL(audio.src));
   container.replaceChildren();
   container.classList.remove('empty-state');
   if (!messages.length) {
@@ -467,10 +489,71 @@ function renderMessages(container, messages, emptyText) {
       container.appendChild(group);
       previousSender = message.from;
     }
+    const item = document.createElement('div');
+    item.className = 'message-item';
     const bubble = document.createElement('div');
     bubble.className = 'message';
-    bubble.textContent = message.text;
-    group.querySelector('.message-group-body').appendChild(bubble);
+    if (message.type === 'audio') {
+      const audio = document.createElement('audio');
+      audio.hidden = true;
+      audio.preload = 'none';
+      audio.dataset.messageId = message.id;
+      audio.dataset.friendId = state.activeFriend.id;
+      const play = document.createElement('button');
+      play.type = 'button';
+      play.className = 'voice-play';
+      play.setAttribute('aria-label', 'Play voice message');
+      play.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg>';
+      play.addEventListener('click', async () => {
+        try {
+          if (!audio.dataset.loaded) {
+            const response = await fetch(`/api/chat/${encodeURIComponent(audio.dataset.friendId)}/${encodeURIComponent(audio.dataset.messageId)}/audio`, {
+              headers: { Authorization: 'Bearer ' + token() },
+            });
+            if (response.status === 401) {
+              localStorage.removeItem('nx_token');
+              localStorage.removeItem('nx_user');
+              window.top.location.href = '/login.html';
+              return;
+            }
+            if (!response.ok) throw new Error('Could not load this voice message.');
+            audio.src = URL.createObjectURL(await response.blob());
+            audio.dataset.loaded = 'true';
+          }
+          if (audio.paused) await audio.play();
+          else audio.pause();
+        } catch (error) { showNotice(error.message, true); }
+      });
+      audio.addEventListener('play', () => {
+        play.setAttribute('aria-label', 'Pause voice message');
+        play.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#pause"></use></svg>';
+      });
+      audio.addEventListener('pause', () => {
+        play.setAttribute('aria-label', 'Play voice message');
+        play.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg>';
+      });
+      const progress = document.createElement('span');
+      progress.className = 'voice-progress';
+      progress.textContent = 'Voice message';
+      const duration = document.createElement('span');
+      duration.className = 'voice-duration';
+      duration.textContent = `${Math.max(1, Math.round(message.duration || 0))} sec`;
+      audio.addEventListener('timeupdate', () => {
+        progress.textContent = `${Math.floor(audio.currentTime)} / ${Math.max(1, Math.round(message.duration || 0))} sec`;
+      });
+      audio.addEventListener('ended', () => {
+        play.setAttribute('aria-label', 'Play voice message');
+        play.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg>';
+        progress.textContent = 'Voice message';
+      });
+      bubble.classList.add('voice-message');
+      bubble.append(play, progress, duration, audio);
+    } else {
+      bubble.textContent = message.text || '';
+    }
+    item.appendChild(bubble);
+    item.appendChild(renderReactions(message));
+    group.querySelector('.message-group-body').appendChild(item);
     const groupBody = group.querySelector('.message-group-body');
     groupBody.querySelector('.message-time')?.remove();
     const time = document.createElement('time');
@@ -480,6 +563,348 @@ function renderMessages(container, messages, emptyText) {
     groupBody.appendChild(time);
   });
   container.scrollTop = container.scrollHeight;
+}
+
+const reactionNames = ['heart', 'laugh', 'thumb-up', 'surprised', 'sad'];
+
+function renderReactions(message) {
+  const wrap = document.createElement('div');
+  wrap.className = 'message-reaction-wrap';
+  const picker = document.createElement('div');
+  picker.className = 'message-reaction-picker';
+  picker.hidden = true;
+  reactionNames.forEach(reaction => {
+    const users = message.reactions?.[reaction] || [];
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `reaction-option${users.includes(state.user.id) ? ' selected' : ''}`;
+    button.setAttribute('aria-label', `React with ${reaction}`);
+    button.title = reaction;
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#${reaction}"></use></svg>`;
+    button.addEventListener('click', async () => {
+      try {
+        const result = await put(`/chat/${encodeURIComponent(state.activeFriend.id)}/${encodeURIComponent(message.id)}/reaction`, { reaction });
+        message.reactions = result.reactions;
+        renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+      } catch (error) { showNotice(error.message, true); }
+    });
+    picker.appendChild(button);
+  });
+  const toggle = document.createElement('button');
+  toggle.type = 'button';
+  toggle.className = 'reaction-toggle';
+  toggle.setAttribute('aria-label', 'Add a reaction');
+  toggle.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#heart"></use></svg>';
+  toggle.addEventListener('click', () => { picker.hidden = !picker.hidden; });
+  wrap.append(toggle, picker);
+
+  const summary = document.createElement('div');
+  summary.className = 'message-reaction-summary';
+  reactionNames.forEach(reaction => {
+    const users = message.reactions?.[reaction] || [];
+    if (!users.length) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `reaction-count${users.includes(state.user.id) ? ' selected' : ''}`;
+    button.setAttribute('aria-label', `${users.length} ${reaction} reaction${users.length === 1 ? '' : 's'}`);
+    button.innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#${reaction}"></use></svg><span>${users.length}</span>`;
+    button.addEventListener('click', async () => {
+      try {
+        const result = await put(`/chat/${encodeURIComponent(state.activeFriend.id)}/${encodeURIComponent(message.id)}/reaction`, { reaction });
+        message.reactions = result.reactions;
+        renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+      } catch (error) { showNotice(error.message, true); }
+    });
+    summary.appendChild(button);
+  });
+  if (summary.childElementCount) wrap.appendChild(summary);
+  return wrap;
+}
+
+function updateCallPanel() {
+  const call = state.call;
+  const active = call.status !== 'idle';
+  const friend = state.friends.find(item => item.id === call.friendId);
+  $('call-panel').hidden = !active;
+  $('call-title').textContent = call.status === 'incoming'
+    ? `${friend?.name || 'Your friend'} is calling`
+    : call.status === 'dialing' ? `Calling ${friend?.name || 'friend'}`
+      : `${friend?.name || 'Friend'} · audio call`;
+  $('call-status').textContent = ({
+    incoming: 'Incoming audio call',
+    dialing: 'Ringing…',
+    connecting: 'Connecting…',
+    active: 'Connected',
+  })[call.status] || '';
+  $('call-accept').hidden = call.status !== 'incoming';
+  $('call-decline').hidden = call.status !== 'incoming';
+  $('call-mute').hidden = call.status !== 'active';
+  $('call-end').hidden = call.status === 'incoming' || call.status === 'idle';
+  $('call-mute').classList.toggle('muted', call.muted);
+  $('call-mute').setAttribute('aria-label', call.muted ? 'Unmute microphone' : 'Mute microphone');
+  $('call-mute').innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#${call.muted ? 'mic-off' : 'mic'}"></use></svg>`;
+  $('chat-call-button').disabled = !state.activeFriend || active;
+}
+
+async function sendCallSignal(type, payload = {}) {
+  const { friendId, sessionId } = state.call;
+  if (!friendId || !sessionId) throw new Error('No active call');
+  await post(`/calls/${encodeURIComponent(friendId)}/signal`, { type, sessionId, ...payload });
+}
+
+async function createCallPeer() {
+  const sessionId = state.call.sessionId;
+  const config = await api('/calls/config');
+  if (state.call.sessionId !== sessionId || state.call.finishing || !state.call.localStream) throw new Error('Audio call was cancelled.');
+  const peer = new RTCPeerConnection({ iceServers: config.iceServers });
+  state.call.peer = peer;
+  state.call.localStream.getTracks().forEach(track => peer.addTrack(track, state.call.localStream));
+  peer.onicecandidate = event => {
+    if (!event.candidate || state.call.peer !== peer) return;
+    const candidate = event.candidate.toJSON();
+    if (!state.call.signalReady) {
+      state.call.outgoingCandidates.push(candidate);
+      return;
+    }
+    sendCallSignal('ice', { candidate }).catch(error => showNotice(error.message, true));
+  };
+  peer.ontrack = event => {
+    $('remote-audio').srcObject = event.streams[0];
+    $('remote-audio').play().catch(() => showNotice('Tap the audio player to hear your friend.'));
+  };
+  peer.onconnectionstatechange = () => {
+    if (state.call.peer !== peer) return;
+    if (peer.connectionState === 'connected') {
+      clearTimeout(state.call.timeout);
+      state.call.status = 'active';
+      updateCallPanel();
+    } else if (peer.connectionState === 'failed') {
+      showNotice('Audio connection failed. Check your network or TURN server settings.', true);
+      finishCall(false);
+    }
+  };
+  return peer;
+}
+
+async function flushCallCandidates() {
+  const candidates = state.call.outgoingCandidates.splice(0);
+  for (const candidate of candidates) await sendCallSignal('ice', { candidate });
+}
+
+async function applyPendingCallCandidates() {
+  const peer = state.call.peer;
+  if (!peer?.remoteDescription) return;
+  const candidates = state.call.pendingCandidates.splice(0);
+  for (const candidate of candidates) await peer.addIceCandidate(candidate);
+}
+
+async function startAudioCall() {
+  if (!state.activeFriend || state.call.status !== 'idle') return;
+  if (!navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === 'undefined') {
+    showNotice('Audio calling is not supported by this browser.', true);
+    return;
+  }
+  try {
+    const sessionId = crypto.randomUUID();
+    state.call = {
+      status: 'dialing', sessionId, friendId: state.activeFriend.id, peer: null,
+      localStream: null, pendingCandidates: [], outgoingCandidates: [], signalReady: false,
+      muted: false, seenSignals: state.call.seenSignals, offer: null, timeout: null,
+    };
+    updateCallPanel();
+    state.call.timeout = setTimeout(() => {
+      if (state.call.sessionId === sessionId && state.call.status === 'dialing') {
+        showNotice('No answer. The audio call ended.');
+        finishCall(true);
+      }
+    }, 60000);
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    if (state.call.sessionId !== sessionId || state.call.finishing) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    state.call.localStream = stream;
+    const peer = await createCallPeer();
+    const offer = await peer.createOffer();
+    await peer.setLocalDescription(offer);
+    await sendCallSignal('offer', { description: peer.localDescription.toJSON() });
+    state.call.signalReady = true;
+    await flushCallCandidates();
+    updateCallPanel();
+  } catch (error) {
+    if (state.call.sessionId === sessionId && !state.call.finishing) {
+      showNotice(error.message || 'Could not start the audio call.', true);
+      finishCall(false);
+    }
+  }
+}
+
+async function acceptAudioCall() {
+  if (state.call.status !== 'incoming' || !state.call.offer) return;
+  if (!navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === 'undefined') {
+    showNotice('Audio calling is not supported by this browser.', true);
+    return;
+  }
+  const sessionId = state.call.sessionId;
+  try {
+    state.call.status = 'connecting';
+    updateCallPanel();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    if (state.call.sessionId !== sessionId || state.call.finishing) {
+      stream.getTracks().forEach(track => track.stop());
+      return;
+    }
+    state.call.localStream = stream;
+    const peer = await createCallPeer();
+    await peer.setRemoteDescription(state.call.offer);
+    await applyPendingCallCandidates();
+    const answer = await peer.createAnswer();
+    await peer.setLocalDescription(answer);
+    await sendCallSignal('answer', { description: peer.localDescription.toJSON() });
+    state.call.signalReady = true;
+    await flushCallCandidates();
+    updateCallPanel();
+  } catch (error) {
+    if (state.call.sessionId === sessionId && !state.call.finishing) {
+      showNotice(error.message || 'Could not join the audio call.', true);
+      finishCall(true);
+    }
+  }
+}
+
+async function finishCall(notifyFriend) {
+  const call = state.call;
+  if (call.finishing) return;
+  call.finishing = true;
+  clearTimeout(call.timeout);
+  if (notifyFriend && call.friendId && call.sessionId) {
+    try { await sendCallSignal('end'); }
+    catch (error) { showNotice(error.message, true); }
+  }
+  call.peer?.close();
+  call.localStream?.getTracks().forEach(track => track.stop());
+  $('remote-audio').pause();
+  $('remote-audio').srcObject = null;
+  state.call = {
+    status: 'idle', sessionId: null, friendId: null, peer: null, localStream: null,
+    pendingCandidates: [], outgoingCandidates: [], signalReady: false, muted: false,
+    seenSignals: call.seenSignals, offer: null, timeout: null,
+  };
+  updateCallPanel();
+}
+
+async function handleCallSignal(signal) {
+  if (state.call.seenSignals.has(signal.id)) return;
+  const friend = state.friends.find(item => item.id === signal.from);
+  if (!friend) return;
+  state.call.seenSignals.add(signal.id);
+  if (state.call.seenSignals.size > 500) state.call.seenSignals.delete(state.call.seenSignals.values().next().value);
+  if (signal.type === 'offer') {
+    if (Date.now() - signal.ts > 90000) {
+      try { await post(`/calls/${encodeURIComponent(friend.id)}/signal`, { type: 'reject', sessionId: signal.sessionId }); }
+      catch (error) { showNotice(error.message, true); }
+      return;
+    }
+    if (state.call.status !== 'idle') {
+      if (state.call.sessionId !== signal.sessionId) {
+        try { await post(`/calls/${encodeURIComponent(friend.id)}/signal`, { type: 'reject', sessionId: signal.sessionId }); }
+        catch (error) { showNotice(error.message, true); }
+      }
+      return;
+    }
+    state.call.friendId = friend.id;
+    state.call.sessionId = signal.sessionId;
+    state.call.status = 'incoming';
+    state.call.offer = signal.description;
+    await selectFriend(friend);
+    updateCallPanel();
+    return;
+  }
+  if (state.call.friendId !== signal.from || state.call.sessionId !== signal.sessionId) return;
+  if (signal.type === 'answer' && state.call.peer && state.call.status === 'dialing') {
+    try {
+      await state.call.peer.setRemoteDescription(signal.description);
+      await applyPendingCallCandidates();
+      state.call.status = 'connecting';
+      updateCallPanel();
+    } catch (error) { showNotice(error.message, true); finishCall(false); }
+  } else if (signal.type === 'ice' && signal.candidate) {
+    try {
+      if (state.call.peer?.remoteDescription) await state.call.peer.addIceCandidate(signal.candidate);
+      else state.call.pendingCandidates.push(signal.candidate);
+    } catch (error) { showNotice(error.message, true); }
+  } else if (signal.type === 'reject' || signal.type === 'end') {
+    await finishCall(false);
+    showNotice(signal.type === 'reject' ? `${friend.name} declined the audio call.` : 'Audio call ended.');
+  }
+}
+
+async function pollCallSignals() {
+  const signals = await api('/calls/signals');
+  state.callSignalError = '';
+  for (const signal of signals) await handleCallSignal(signal);
+}
+
+async function toggleVoiceRecording() {
+  if (state.voiceRecorder?.state === 'recording') {
+    state.voiceRecorder.stop();
+    return;
+  }
+  if (!state.activeFriend || !navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+    showNotice('Voice messages are not supported by this browser.', true);
+    return;
+  }
+  const friendId = state.activeFriend.id;
+  try {
+    state.voiceStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus']
+      .find(type => MediaRecorder.isTypeSupported(type));
+    state.voiceRecorder = mimeType ? new MediaRecorder(state.voiceStream, { mimeType }) : new MediaRecorder(state.voiceStream);
+    state.voiceChunks = [];
+    state.voiceStartedAt = Date.now();
+    state.voiceRecorder.ondataavailable = event => { if (event.data.size) state.voiceChunks.push(event.data); };
+    state.voiceRecorder.onerror = event => showNotice(event.error?.message || 'Voice recording failed.', true);
+    state.voiceRecorder.onstop = async () => {
+      const recorder = state.voiceRecorder;
+      const chunks = state.voiceChunks;
+      const duration = Math.min(60, (Date.now() - state.voiceStartedAt) / 1000);
+      const blob = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+      state.voiceStream?.getTracks().forEach(track => track.stop());
+      state.voiceStream = null;
+      state.voiceRecorder = null;
+      clearTimeout(state.voiceTimeout);
+      $('record-voice').classList.remove('recording');
+      $('record-voice').setAttribute('aria-label', 'Record voice message');
+      if (!blob.size) return;
+      try {
+        const reader = new FileReader();
+        const encoded = await new Promise((resolve, reject) => {
+          reader.onload = () => resolve(String(reader.result).split(',')[1]);
+          reader.onerror = () => reject(new Error('Could not read the recorded voice message.'));
+          reader.readAsDataURL(blob);
+        });
+        const message = await post(`/chat/${encodeURIComponent(friendId)}`, {
+          type: 'audio',
+          audioData: encoded,
+          mimeType: blob.type.split(';')[0],
+          duration,
+        });
+        if (state.activeFriend?.id === friendId) {
+          state.chatMessages.push(message);
+          state.chatAfter = Math.max(state.chatAfter, message.ts);
+          renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+        }
+        state.lastMessages[friendId] = { ...message, text: 'Voice message' };
+        renderFriends();
+      } catch (error) { showNotice(error.message, true); }
+    };
+    state.voiceRecorder.start();
+    $('record-voice').classList.add('recording');
+    $('record-voice').setAttribute('aria-label', 'Stop recording');
+    state.voiceTimeout = setTimeout(() => {
+      if (state.voiceRecorder?.state === 'recording') state.voiceRecorder.stop();
+    }, 60000);
+  } catch (error) { showNotice(error.message || 'Microphone access was denied.', true); }
 }
 
 async function selectFriend(friend) {
@@ -492,8 +917,10 @@ async function selectFriend(friend) {
   $('inbox-layout').classList.add('conversation-open');
   $('chat-input').disabled = false;
   $('chat-send').disabled = false;
+  $('record-voice').disabled = false;
   $('chat-game-button').disabled = false;
   $('chat-listen-button').disabled = false;
+  $('chat-call-button').disabled = state.call.status !== 'idle';
   $('inline-game').hidden = state.activeGameFriendId !== friend.id;
   $('chat-listen-activity').querySelector('.listen-card').hidden = state.activeRoomFriendId !== friend.id;
   setPanel('chat');
@@ -811,6 +1238,21 @@ $('chat-game-button').addEventListener('click', () => {
   if (state.activeFriend) challengeFriend(state.activeFriend);
 });
 
+$('chat-call-button').addEventListener('click', startAudioCall);
+$('call-accept').addEventListener('click', acceptAudioCall);
+$('call-decline').addEventListener('click', async () => {
+  try { await sendCallSignal('reject'); }
+  catch (error) { showNotice(error.message, true); }
+  await finishCall(false);
+});
+$('call-end').addEventListener('click', () => finishCall(true));
+$('call-mute').addEventListener('click', () => {
+  state.call.muted = !state.call.muted;
+  state.call.localStream?.getAudioTracks().forEach(track => { track.enabled = !state.call.muted; });
+  updateCallPanel();
+});
+$('record-voice').addEventListener('click', toggleVoiceRecording);
+
 $('chat-listen-button').addEventListener('click', () => {
   if (!state.activeFriend) return;
   $('chat-song-picker').hidden = false;
@@ -871,6 +1313,7 @@ $('chat-form').addEventListener('submit', async event => {
     state.chatAfter = Math.max(state.chatAfter, message.ts);
     state.lastMessages[state.activeFriend.id] = message;
     $('chat-input').value = '';
+    $('chat-input').style.height = '';
     renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
     renderFriends();
   } catch (error) { showNotice(error.message, true); }
@@ -1025,12 +1468,35 @@ if (chatListenCard) {
   chatListenCard.hidden = true;
 }
 
+const initialPanel = new URLSearchParams(window.location.search).get('panel');
+if (initialPanel === 'people' || initialPanel === 'chat') setPanel(initialPanel);
+window.addEventListener('message', event => {
+  if (event.origin !== window.location.origin || event.source !== window.parent) return;
+  if (event.data?.type === 'nymix-social-panel' && ['people', 'chat'].includes(event.data.panel)) {
+    setPanel(event.data.panel);
+  }
+});
+window.addEventListener('beforeunload', () => {
+  state.call.peer?.close();
+  state.call.localStream?.getTracks().forEach(track => track.stop());
+  state.voiceStream?.getTracks().forEach(track => track.stop());
+});
+updateCallPanel();
+
 if (!token() || !state.user || state.user.role !== 'user') {
-  window.location.href = '/login.html';
+  if (window.parent !== window) window.top.location.href = '/login.html';
+  else window.location.href = '/login.html';
 } else {
   $('account-name').textContent = state.user.name || state.user.email || 'Member';
   $('account-avatar').textContent = (state.user.name || state.user.email || '?').trim().slice(0, 1).toUpperCase();
   refreshSocial();
   refreshSuggestions().catch(error => showNotice(error.message, true));
+  pollCallSignals().catch(error => showNotice(error.message, true));
   setInterval(refreshSocial, 4500);
+  setInterval(() => {
+    pollCallSignals().catch(error => {
+      if (state.callSignalError !== error.message) showNotice(error.message, true);
+      state.callSignalError = error.message;
+    });
+  }, 2000);
 }

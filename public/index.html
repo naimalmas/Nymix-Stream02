@@ -54,9 +54,11 @@
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg> Radio
           <span class="badge-new">new</span>
         </a>
-        <a class="nav-link" href="/social.html">
+        <a class="nav-link" data-view="messages">
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#users"></use></svg> Messages
-          <span class="badge-new">new</span>
+        </a>
+        <a class="nav-link" data-view="add-friend">
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> Add friend
         </a>
       </nav>
 
@@ -165,6 +167,10 @@
       <div class="view" id="view-radio">
         <h1 class="section-big-title"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg> Radio</h1>
         <div class="radio-grid" id="radio-grid"></div>
+      </div>
+
+      <div class="view view-messages" id="view-messages">
+        <iframe id="social-portal" title="Nymix messages and friends" src="/social.html?embed=1&panel=chat"></iframe>
       </div>
 
       <!-- Bottom Player Bar -->

@@ -17,7 +17,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const isVercel = Boolean(process.env.VERCEL);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ── Data Helpers ──────────────────────────────────────
@@ -425,6 +425,7 @@ const getSocialState = () => {
   state.listenRooms ||= [];
   state.games ||= [];
   state.roomMessages ||= {};
+  state.callSignals ||= [];
   return state;
 };
 const randomCode = used => {
@@ -461,7 +462,11 @@ app.get('/api/social/overview', userAuth, (req, res) => {
   const lastMessages = Object.fromEntries(friends.flatMap(friend => {
     const conversation = messages[chatRoomId(req.user.id, friend.id)] || [];
     const latest = conversation[conversation.length - 1];
-    return latest ? [[friend.id, { from: latest.from, text: latest.text, ts: latest.ts }]] : [];
+    return latest ? [[friend.id, {
+      from: latest.from,
+      text: latest.type === 'audio' ? 'Voice message' : latest.text,
+      ts: latest.ts,
+    }]] : [];
   }));
   const rooms = social.listenRooms.filter(room => memberOf(room, req.user.id))
     .map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, members: room.members }));
@@ -607,24 +612,143 @@ app.get('/api/chat/:friendId', userAuth, (req, res) => {
   const msgs = rd('messages.json');
   const room = chatRoomId(req.user.id, req.params.friendId);
   const after = Number(req.query.after) || 0;
-  res.json((msgs[room] || []).filter(message => message.ts > after).slice(-100));
+  res.json((msgs[room] || []).filter(message => message.ts > after).slice(-100).map(message => {
+    if (message.type !== 'audio') return message;
+    const { audioData, ...metadata } = message;
+    return metadata;
+  }));
+});
+
+app.get('/api/chat/:friendId/:messageId/audio', userAuth, (req, res) => {
+  if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
+  const room = chatRoomId(req.user.id, req.params.friendId);
+  const message = (rd('messages.json')[room] || []).find(item => item.id === req.params.messageId && item.type === 'audio');
+  if (!message) return res.status(404).json({ error: 'Voice message not found' });
+  res.set('Cache-Control', 'private, no-store');
+  res.type(message.mimeType).send(Buffer.from(message.audioData, 'base64'));
 });
 
 app.post('/api/chat/:friendId', userAuth, (req, res) => {
   try {
     if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
     const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';
-    if (!text) return res.status(400).json({ error: 'Message cannot be empty' });
-    if (text.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });
+    let messageContent;
+    if (req.body.type === 'audio') {
+      const { audioData, mimeType, duration } = req.body;
+      const allowedTypes = new Set(['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/wav', 'audio/mpeg', 'audio/aac']);
+      if (typeof audioData !== 'string' || audioData.length > 1400000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(audioData)) {
+        return res.status(400).json({ error: 'Voice message is too large or invalid' });
+      }
+      if (!allowedTypes.has(mimeType)) return res.status(400).json({ error: 'Unsupported voice message format' });
+      if (!Number.isFinite(duration) || duration <= 0 || duration > 60) {
+        return res.status(400).json({ error: 'Voice messages must be 60 seconds or shorter' });
+      }
+      const decodedSize = Buffer.from(audioData, 'base64').length;
+      if (!decodedSize || decodedSize > 1024 * 1024) return res.status(400).json({ error: 'Voice message must be 1 MB or smaller' });
+      messageContent = { type: 'audio', audioData, mimeType, duration };
+    } else {
+      if (!text) return res.status(400).json({ error: 'Message cannot be empty' });
+      if (text.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });
+      messageContent = { type: 'text', text };
+    }
     const msgs = rd('messages.json');
     const room = chatRoomId(req.user.id, req.params.friendId);
     if (!msgs[room]) msgs[room] = [];
-    const msg = { id: `m_${crypto.randomUUID()}`, from: req.user.id, fromName: req.user.name, text, ts: Date.now() };
+    const msg = { id: `m_${crypto.randomUUID()}`, from: req.user.id, fromName: req.user.name, ...messageContent, ts: Date.now() };
     msgs[room].push(msg);
     if (msgs[room].length > 300) msgs[room] = msgs[room].slice(-300);
     wd('messages.json', msgs);
+    if (msg.type === 'audio') {
+      const { audioData, ...metadata } = msg;
+      return res.status(201).json(metadata);
+    }
     res.status(201).json(msg);
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.put('/api/chat/:friendId/:messageId/reaction', userAuth, (req, res) => {
+  if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
+  const allowedReactions = new Set(['heart', 'laugh', 'thumb-up', 'surprised', 'sad']);
+  const reaction = req.body.reaction;
+  if (!allowedReactions.has(reaction)) return res.status(400).json({ error: 'Choose a supported reaction' });
+  const messages = rd('messages.json');
+  const room = chatRoomId(req.user.id, req.params.friendId);
+  const message = (messages[room] || []).find(item => item.id === req.params.messageId);
+  if (!message) return res.status(404).json({ error: 'Message not found' });
+  message.reactions ||= {};
+  message.reactions[reaction] ||= [];
+  const current = message.reactions[reaction];
+  const index = current.indexOf(req.user.id);
+  if (index >= 0) current.splice(index, 1);
+  else current.push(req.user.id);
+  if (!current.length) delete message.reactions[reaction];
+  wd('messages.json', messages);
+  res.json({ reactions: message.reactions });
+});
+
+app.get('/api/calls/signals', userAuth, (req, res) => {
+  const social = getSocialState();
+  const cutoff = Date.now() - 15 * 60 * 1000;
+  social.callSignals = social.callSignals.filter(signal => signal.ts >= cutoff).slice(-500);
+  res.json(social.callSignals.filter(signal => signal.to === req.user.id).slice(-100));
+});
+
+app.get('/api/calls/config', userAuth, (req, res) => {
+  const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+  const turnUrls = (process.env.TURN_URLS || process.env.TURN_URL || '').split(',').map(url => url.trim()).filter(Boolean);
+  if (turnUrls.length && process.env.TURN_SECRET) {
+    const expiresAt = Math.floor(Date.now() / 1000) + 3600;
+    const username = `${expiresAt}:${req.user.id}`;
+    const credential = crypto.createHmac('sha1', process.env.TURN_SECRET).update(username).digest('base64');
+    iceServers.push({ urls: turnUrls, username, credential });
+  }
+  res.json({ iceServers });
+});
+
+app.post('/api/calls/:friendId/signal', userAuth, (req, res) => {
+  if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Calls are available to friends only' });
+  const { type, sessionId, description, candidate } = req.body;
+  if (!['offer', 'answer', 'ice', 'reject', 'end'].includes(type)) {
+    return res.status(400).json({ error: 'Invalid call signal' });
+  }
+  if (typeof sessionId !== 'string' || !/^[\w-]{8,80}$/.test(sessionId)) {
+    return res.status(400).json({ error: 'Invalid call session' });
+  }
+  const event = {
+    id: crypto.randomUUID(),
+    from: req.user.id,
+    to: req.params.friendId,
+    type,
+    sessionId,
+    ts: Date.now(),
+  };
+  if (type === 'offer' || type === 'answer') {
+    if (!description || description.type !== type || typeof description.sdp !== 'string' || description.sdp.length > 20000) {
+      return res.status(400).json({ error: 'Invalid call description' });
+    }
+    event.description = { type: description.type, sdp: description.sdp };
+  }
+  if (type === 'ice') {
+    if (candidate !== null && (!candidate || typeof candidate.candidate !== 'string' || candidate.candidate.length > 2048)) {
+      return res.status(400).json({ error: 'Invalid network candidate' });
+    }
+    if (candidate && (
+      (candidate.sdpMid !== undefined && candidate.sdpMid !== null && (typeof candidate.sdpMid !== 'string' || candidate.sdpMid.length > 256)) ||
+      (candidate.sdpMLineIndex !== undefined && candidate.sdpMLineIndex !== null && (!Number.isInteger(candidate.sdpMLineIndex) || candidate.sdpMLineIndex < 0)) ||
+      (candidate.usernameFragment !== undefined && candidate.usernameFragment !== null && (typeof candidate.usernameFragment !== 'string' || candidate.usernameFragment.length > 256))
+    )) return res.status(400).json({ error: 'Invalid network candidate' });
+    event.candidate = candidate === null ? null : {
+      candidate: candidate.candidate,
+      ...(candidate.sdpMid !== undefined ? { sdpMid: candidate.sdpMid } : {}),
+      ...(candidate.sdpMLineIndex !== undefined ? { sdpMLineIndex: candidate.sdpMLineIndex } : {}),
+      ...(candidate.usernameFragment !== undefined ? { usernameFragment: candidate.usernameFragment } : {}),
+    };
+  }
+  const social = getSocialState();
+  social.callSignals = social.callSignals.filter(signal => signal.ts > Date.now() - 15 * 60 * 1000).slice(-499);
+  social.callSignals.push(event);
+  wd('social.json', social);
+  res.status(201).json({ ok: true, id: event.id });
 });
 
 app.get('/api/listen-rooms', userAuth, (req, res) => {

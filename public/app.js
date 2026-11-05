@@ -590,17 +590,26 @@ function renderPlayed() {
 
 // ── Views ─────────────────────────────────────────────
 function showView(name) {
+  const viewName = name === 'add-friend' ? 'messages' : name;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
-  const v = document.getElementById('view-' + name);
+  const v = document.getElementById('view-' + viewName);
   if (v) v.classList.add('active');
+  document.querySelector('.app')?.classList.toggle('social-active', viewName === 'messages');
   document.querySelectorAll('.nav-link').forEach(a =>
     a.classList.toggle('active', a.dataset.view === name)
   );
   const titles = {
     home: "What's hot", discover: 'Discover',
     browse: 'Browse', liked: 'Your Library', radio: 'Radio',
+    messages: 'Messages', 'add-friend': 'Add friend',
   };
   $('view-title').textContent = titles[name] || '';
+  if (viewName === 'messages') {
+    $('social-portal')?.contentWindow?.postMessage({
+      type: 'nymix-social-panel',
+      panel: name === 'add-friend' ? 'people' : 'chat',
+    }, window.location.origin);
+  }
 }
 
 // ── User Menu ─────────────────────────────────────────
@@ -680,6 +689,20 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
 
   updateUserMenu();
+
+  // Register navigation before awaited startup requests so the sidebar stays responsive.
+  document.querySelectorAll('.nav-link').forEach(a => {
+    a.addEventListener('click', event => {
+      if (!a.dataset.view) return;
+      event.preventDefault();
+      showView(a.dataset.view);
+    });
+  });
+  $('social-portal')?.addEventListener('load', () => {
+    const activeView = document.querySelector('.nav-link.active')?.dataset.view;
+    if (activeView === 'messages' || activeView === 'add-friend') showView(activeView);
+  });
+
   await loadLiked();
   await buildPlaylist();
   buildGenres();
@@ -691,11 +714,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cfg = await apiFetch('/admin/config').catch(() => null);
     if (cfg && cfg.ytApiKey && $('api-input')) $('api-input').value = cfg.ytApiKey;
   }
-
-  // ── Nav ──
-  document.querySelectorAll('.nav-link').forEach(a => {
-    a.addEventListener('click', () => showView(a.dataset.view));
-  });
 
   // ── Search ──
   const inp = $('search-input');
