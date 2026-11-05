@@ -15,6 +15,12 @@ const state = {
   activeRoomFriendId: null,
   activeGame: null,
   activeGameFriendId: null,
+  chatPlayback: null,
+  chatPlaybackSignature: '',
+  chatPlayer: null,
+  chatPlayerReady: false,
+  chatPlayerSongId: null,
+  chatPlaybackSyncing: false,
   chatMessages: [],
   chatAfter: 0,
   call: {
@@ -145,7 +151,6 @@ async function openProfile(profileOrId, syncParent = true) {
     const plays = Number(profile.totalPlays) || 0;
     $('profile-meta').textContent = isOwnProfile ? '' : [joined && `Member since ${joined}`, `${plays} ${plays === 1 ? 'play' : 'plays'}`].filter(Boolean).join(' · ');
     $('profile-dashboard').hidden = !isOwnProfile;
-    if (isOwnProfile) await loadProfileDashboard(profile);
     $('profile-gallery-add-label').hidden = !isOwnProfile;
     $('profile-gallery-hint').hidden = !isOwnProfile;
     $('profile-gallery-input').disabled = !isOwnProfile;
@@ -155,6 +160,7 @@ async function openProfile(profileOrId, syncParent = true) {
     configureProfileAction($('profile-page-action'), profile, isOwnProfile);
     renderProfilePage(profile);
     setPanel('profile', syncParent);
+    if (isOwnProfile) loadProfileDashboard(profile);
   } catch (error) {
     showNotice(error.message, true);
   }
@@ -1518,6 +1524,7 @@ async function toggleVoiceRecording() {
 }
 
 async function selectFriend(friend) {
+  syncChatPlayback(null);
   state.activeFriend = friend;
   state.chatMessages = [];
   state.chatAfter = 0;
@@ -1535,6 +1542,7 @@ async function selectFriend(friend) {
   $('chat-listen-activity').querySelector('.listen-card').hidden = state.activeRoomFriendId !== friend.id;
   setPanel('chat');
   await refreshChat(true);
+  await refreshChatPlayback();
   renderFriends();
   renderChatInvites();
 }
@@ -1642,19 +1650,114 @@ function renderSongResults(songs) {
     info.append(title, artist);
     button.append(image, info);
     button.addEventListener('click', async () => {
-      if (state.activeRoom && state.lastRoom?.hostId === state.user.id) {
-        try {
-          await put(`/listen-rooms/${encodeURIComponent(state.activeRoom)}`, { action: 'song', song });
-          await refreshListenRoom();
-          showNotice(`Now playing ${song.title} for the room.`);
-        } catch (error) { showNotice(error.message, true); }
-      } else {
-        if (!state.activeFriend) return showNotice('Choose a friend before starting a listening room.', true);
-        await createListenRoom(song, state.activeFriend.id);
+      button.disabled = true;
+      try {
+        await updateSharedPlayback('song', song);
+        $('chat-song-picker').hidden = true;
+      } catch (error) {
+        showNotice(error.message, true);
+      } finally {
+        button.disabled = false;
       }
     });
     return button;
   });
+}
+
+function ensureChatPlayer(playback) {
+  if (!state.youtubeReady || !window.YT?.Player || state.chatPlayer || !playback?.song?.id) return;
+  state.chatPlayerSongId = playback.song.id;
+  state.chatPlayer = new YT.Player('chat-player', {
+    width: '100%',
+    height: '180',
+    videoId: playback.song.id,
+    playerVars: { autoplay: 0, controls: 0, disablekb: 1, playsinline: 1, rel: 0 },
+    events: {
+      onReady: () => {
+        state.chatPlayerReady = true;
+        if (state.chatPlayback) syncChatPlayback(state.chatPlayback, true);
+      },
+      onAutoplayBlocked: () => {
+        $('chat-playback-enable').hidden = false;
+        $('chat-playback-status').textContent = 'Tap “Tap to listen” to start audio on this device.';
+      },
+      onError: () => showNotice('This YouTube video cannot be played here.', true),
+    },
+  });
+}
+
+function syncChatPlayback(playback, force = false) {
+  if (!playback?.song?.id) {
+    $('chat-playback-card').hidden = true;
+    $('chat-playback-enable').hidden = true;
+    if (state.chatPlayerReady) {
+      try { state.chatPlayer.pauseVideo(); } catch {}
+    }
+    state.chatPlayback = null;
+    state.chatPlaybackSignature = '';
+    return;
+  }
+  state.chatPlayback = playback;
+  $('chat-playback-card').hidden = false;
+  $('chat-playback-title').textContent = playback.song.title;
+  $('chat-playback-status').textContent = playback.playing
+    ? `Playing for you and ${state.activeFriend?.name || 'your friend'}`
+    : 'Paused for both of you.';
+  $('chat-playback-play').disabled = !state.chatPlayerReady;
+  $('chat-playback-pause').disabled = !state.chatPlayerReady;
+  const signature = `${playback.song.id}:${playback.playing}:${playback.updatedAt}`;
+  if (state.chatPlaybackSignature && state.chatPlaybackSignature !== signature) {
+    $('chat-playback-enable').hidden = true;
+  }
+  ensureChatPlayer(playback);
+  if (!state.chatPlayerReady || state.chatPlaybackSyncing) return;
+  const songChanged = state.chatPlayerSongId !== playback.song.id;
+  let drift = Infinity;
+  try { drift = Math.abs((state.chatPlayer.getCurrentTime() || 0) - playback.position); } catch {}
+  if (!force && !songChanged && state.chatPlaybackSignature === signature && (!playback.playing || drift < 4)) return;
+  state.chatPlaybackSyncing = true;
+  state.chatPlaybackSignature = signature;
+  state.chatPlayerSongId = playback.song.id;
+  try {
+    if (songChanged) {
+      if (playback.playing) state.chatPlayer.loadVideoById({ videoId: playback.song.id, startSeconds: playback.position });
+      else state.chatPlayer.cueVideoById({ videoId: playback.song.id, startSeconds: playback.position });
+    } else if (force || drift > 4) {
+      state.chatPlayer.seekTo(playback.position, true);
+    }
+    if (playback.playing) state.chatPlayer.playVideo();
+    else state.chatPlayer.pauseVideo();
+  } catch (error) {
+    console.error('Could not sync chat playback:', error);
+    $('chat-playback-status').textContent = 'Could not sync playback on this device.';
+  }
+  setTimeout(() => { state.chatPlaybackSyncing = false; }, 900);
+}
+
+async function updateSharedPlayback(action, song) {
+  if (!state.activeFriend) throw new Error('Choose a friend before starting shared playback.');
+  const position = action === 'song' ? 0
+    : state.chatPlayerReady ? state.chatPlayer.getCurrentTime() || 0
+      : Number(state.chatPlayback?.position) || 0;
+  const friendId = state.activeFriend.id;
+  if (action === 'song' && song) {
+    syncChatPlayback({ song, playing: true, position: 0, updatedAt: Date.now() }, true);
+  }
+  const result = await put(`/chat/${encodeURIComponent(friendId)}/playback`, {
+    action,
+    ...(song ? { song } : { position }),
+  });
+  if (state.activeFriend?.id === friendId) syncChatPlayback(result.playback, action === 'song');
+}
+
+async function refreshChatPlayback() {
+  if (!state.activeFriend) return;
+  const friendId = state.activeFriend.id;
+  const response = await api(`/chat/${encodeURIComponent(friendId)}/playback`);
+  if (state.activeFriend?.id !== friendId) return;
+  const next = response.playback;
+  const signature = next ? `${next.song.id}:${next.playing}:${next.updatedAt}` : '';
+  syncChatPlayback(next, signature !== state.chatPlaybackSignature);
 }
 
 async function createListenRoom(song, inviteeId = state.activeFriend?.id) {
@@ -1824,7 +1927,7 @@ async function refreshActiveGame() {
       $('game-reset').disabled = true;
       $('game-leave').disabled = true;
       $('inline-game').hidden = true;
-    }
+    } else showNotice(error.message, true);
   }
 }
 
@@ -1833,7 +1936,10 @@ async function refreshSocial() {
   state.refreshBusy = true;
   try {
     await refreshOverview();
-    if (state.activeFriend) await refreshChat();
+    if (state.activeFriend) {
+      await refreshChat();
+      await refreshChatPlayback();
+    }
     if (state.activeRoom) await refreshListenRoom();
     if (state.activeGame) await refreshActiveGame();
   } catch (error) {
@@ -1878,6 +1984,36 @@ $('chat-listen-button').addEventListener('click', () => {
   if (!state.activeFriend) return;
   $('chat-song-picker').hidden = false;
   $('song-search').focus();
+});
+
+$('chat-playback-play').addEventListener('click', async () => {
+  if (!state.chatPlayback) return;
+  try {
+    state.chatPlayer.playVideo();
+    $('chat-playback-enable').hidden = true;
+    await updateSharedPlayback('play');
+  } catch (error) {
+    showNotice(error.message, true);
+    refreshChatPlayback().catch(refreshError => showNotice(refreshError.message, true));
+  }
+});
+
+$('chat-playback-pause').addEventListener('click', async () => {
+  if (!state.chatPlayback) return;
+  try {
+    state.chatPlayer.pauseVideo();
+    await updateSharedPlayback('pause');
+  } catch (error) { showNotice(error.message, true); }
+});
+
+$('chat-playback-enable').addEventListener('click', () => {
+  if (!state.chatPlayback || !state.chatPlayerReady) return;
+  try {
+    state.chatPlayer.seekTo(state.chatPlayback.position, true);
+    if (state.chatPlayback.playing) state.chatPlayer.playVideo();
+    $('chat-playback-enable').hidden = true;
+    $('chat-playback-status').textContent = `Playing for you and ${state.activeFriend?.name || 'your friend'}`;
+  } catch (error) { showNotice(error.message, true); }
 });
 
 $('chat-song-close').addEventListener('click', () => {
@@ -2246,6 +2382,7 @@ $('game-leave').addEventListener('click', async () => {
 window.onYouTubeIframeAPIReady = () => {
   state.youtubeReady = true;
   if (state.lastRoom) ensureRoomPlayer(state.lastRoom);
+  if (state.chatPlayback) ensureChatPlayer(state.chatPlayback);
 };
 
 const chatListenCard = document.querySelector('#panel-listen .listen-card');

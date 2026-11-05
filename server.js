@@ -593,6 +593,7 @@ const getSocialState = () => {
   state.listenRooms ||= [];
   state.games ||= [];
   state.roomMessages ||= {};
+  state.chatPlayback ||= {};
   state.callSignals ||= [];
   return state;
 };
@@ -790,6 +791,53 @@ app.delete('/api/friends/:id', userAuth, (req, res) => {
 //  CHAT
 // ══════════════════════════════════════════════════════
 function chatRoomId(a, b) { return [a, b].sort().join(':'); }
+
+function currentChatPlayback(playback) {
+  if (!playback) return null;
+  return {
+    ...playback,
+    position: playback.position + (playback.playing ? (Date.now() - playback.stateChangedAt) / 1000 : 0),
+  };
+}
+
+app.get('/api/chat/:friendId/playback', userAuth, (req, res) => {
+  if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Shared playback is available to friends only' });
+  const playback = getSocialState().chatPlayback[chatRoomId(req.user.id, req.params.friendId)];
+  res.json({ playback: playback && Date.now() - playback.updatedAt < 24 * 60 * 60 * 1000 ? currentChatPlayback(playback) : null });
+});
+
+app.put('/api/chat/:friendId/playback', userAuth, (req, res) => {
+  if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Shared playback is available to friends only' });
+  const social = getSocialState();
+  const roomId = chatRoomId(req.user.id, req.params.friendId);
+  const action = req.body.action;
+  if (!['song', 'play', 'pause', 'seek'].includes(action)) return res.status(400).json({ error: 'Invalid playback action' });
+  let playback = social.chatPlayback[roomId];
+  if (action === 'song') {
+    if (!validSong(req.body.song)) return res.status(400).json({ error: 'Choose a valid song first' });
+    playback = {
+      song: cleanSong(req.body.song),
+      playing: true,
+      position: 0,
+      stateChangedAt: Date.now(),
+    };
+  } else {
+    if (!playback) return res.status(404).json({ error: 'Choose a song to start shared playback' });
+    const position = Number(req.body.position);
+    if (!Number.isFinite(position) || position < 0 || position > 86400) {
+      return res.status(400).json({ error: 'Invalid playback position' });
+    }
+    const currentPosition = playback.position + (playback.playing ? (Date.now() - playback.stateChangedAt) / 1000 : 0);
+    playback.position = action === 'pause' || action === 'seek' ? position : currentPosition;
+    playback.playing = action === 'play';
+    playback.stateChangedAt = Date.now();
+  }
+  playback.updatedAt = Date.now();
+  playback.updatedBy = req.user.id;
+  social.chatPlayback[roomId] = playback;
+  wd('social.json', social);
+  res.json({ playback: currentChatPlayback(playback) });
+});
 
 app.get('/api/chat/:friendId', userAuth, (req, res) => {
   if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
