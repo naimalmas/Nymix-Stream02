@@ -3,6 +3,8 @@ const state = {
   user: JSON.parse(localStorage.getItem('nx_user') || 'null'),
   friends: [],
   requests: [],
+  gameInvites: [],
+  suggestions: [],
   rooms: [],
   games: [],
   activeFriend: null,
@@ -17,6 +19,8 @@ const state = {
   playbackSignature: '',
   playbackSyncing: false,
   refreshBusy: false,
+  searchTimer: null,
+  searchSequence: 0,
   noticeTimer: null,
 };
 
@@ -104,25 +108,28 @@ function setPanel(panelName) {
 
 function renderFriends() {
   $('friend-count').textContent = String(state.friends.length);
-  renderList($('friends-list'), state.friends, 'Your accepted friends will appear here.', friend =>
+  renderList($('friends-list'), state.friends, 'Your friends will show up here.', friend =>
     makePerson(friend, [
-      makeButton('Chat', () => selectFriend(friend)),
+      makeButton('Message', () => selectFriend(friend), 'primary'),
+      makeButton('Play', () => challengeFriend(friend)),
       makeButton('Remove', async () => {
         if (!confirm(`Remove ${friend.name} from your friends?`)) return;
         try {
           await deleteRequest(`/friends/${encodeURIComponent(friend.relationId)}`);
           showNotice('Friend removed.');
           await refreshOverview();
+          await refreshSuggestions();
         } catch (error) { showNotice(error.message, true); }
       }, 'danger'),
     ]),
   );
   renderList($('chat-friends'), state.friends, 'Add a friend to start chatting.', friend =>
-    makePerson(friend, [makeButton(state.activeFriend?.id === friend.id ? 'Selected' : 'Message', () => selectFriend(friend))]),
+    makePerson(friend, [makeButton(state.activeFriend?.id === friend.id ? 'Selected' : 'Message', () => selectFriend(friend), 'primary')]),
   );
 }
 
 function renderRequests() {
+  $('request-count').textContent = String(state.requests.filter(request => request.direction === 'incoming').length);
   renderList($('requests-list'), state.requests, 'No pending requests.', request => {
     const actions = request.direction === 'incoming'
       ? [
@@ -131,6 +138,8 @@ function renderRequests() {
               await put(`/friends/${encodeURIComponent(request.id)}`, { status: 'accepted' });
               showNotice(`You and ${request.name} are now friends.`);
               await refreshOverview();
+              await refreshSuggestions();
+              if ($('user-search').value.trim().length >= 2) await searchUsers($('user-search').value.trim());
             } catch (error) { showNotice(error.message, true); }
           }),
           makeButton('Decline', async () => {
@@ -145,22 +154,108 @@ function renderRequests() {
   });
 }
 
-function renderSearchResults(users) {
-  renderList($('search-results'), users, 'No matching users found.', profile => {
+function renderUserCards(container, users, emptyText) {
+  renderList(container, users, emptyText, profile => {
+    const card = document.createElement('article');
+    card.className = 'user-card';
+    const top = document.createElement('div');
+    top.className = 'user-card-top';
+    const avatar = document.createElement('span');
+    avatar.className = 'profile-avatar';
+    avatar.textContent = (profile.name || '?').trim().slice(0, 1).toUpperCase();
+    const copy = document.createElement('div');
+    copy.className = 'profile-copy';
+    const name = document.createElement('h3');
+    name.className = 'profile-name';
+    name.textContent = profile.name || 'Nymix member';
+    const hint = document.createElement('p');
+    hint.className = 'profile-hint';
+    hint.textContent = profile.mutualFriends
+      ? `${profile.mutualFriends} mutual ${profile.mutualFriends === 1 ? 'friend' : 'friends'}`
+      : profile.relation === 'friends' ? 'In your circle' : 'Nymix member';
+    copy.append(name, hint);
+    top.append(avatar, copy);
+    const actions = document.createElement('div');
+    actions.className = 'profile-actions';
     let action;
-    if (profile.relation === 'friends') action = makeButton('Friends', () => selectFriend(profile));
-    else if (profile.relation === 'sent') action = makeButton('Request sent', () => {}, 'secondary');
-    else if (profile.relation === 'received') action = makeButton('Respond below', () => setPanel('people'), 'secondary');
-    else action = makeButton('Add friend', async () => {
+    if (profile.relation === 'friends') {
+      action = makeButton('Message', () => selectFriend(profile), 'primary');
+      actions.append(action, makeButton('Play', () => challengeFriend(profile)));
+    } else if (profile.relation === 'sent') {
+      action = makeButton('Request sent', () => {}, 'secondary');
+      actions.append(action);
+    } else if (profile.relation === 'received') {
+      action = makeButton('View request', () => $('requests-list').scrollIntoView({ behavior: 'smooth', block: 'center' }), 'secondary');
+      actions.append(action);
+    } else action = makeButton('Add friend', async () => {
       try {
         await post(`/friends/request/${encodeURIComponent(profile.id)}`);
         showNotice(`Friend request sent to ${profile.name}.`);
-        $('user-search-form').requestSubmit();
         await refreshOverview();
+        await refreshSuggestions();
+        if ($('user-search').value.trim().length >= 2) await searchUsers($('user-search').value.trim());
       } catch (error) { showNotice(error.message, true); }
-    });
-    return makePerson(profile, [action]);
+    }, 'primary');
+    if (profile.relation === 'none') actions.append(action);
+    card.append(top, actions);
+    return card;
   });
+}
+
+function renderSearchResults(users) {
+  $('search-card').hidden = false;
+  $('suggestions-card').hidden = true;
+  renderUserCards($('search-results'), users, 'No matching people found. Try another name or email.');
+}
+
+function renderSuggestions() {
+  $('suggestion-count').textContent = String(state.suggestions.length);
+  renderUserCards($('suggestions-list'), state.suggestions, 'You’re all caught up. Try searching for someone by name or email.');
+}
+
+function renderGameInvites() {
+  const card = $('game-invites-card');
+  card.hidden = state.gameInvites.length === 0;
+  renderList($('game-invites-list'), state.gameInvites, '', invite => {
+    const row = document.createElement('div');
+    row.className = 'invite-item';
+    const title = document.createElement('strong');
+    title.textContent = `${invite.hostName} challenged you`;
+    const detail = document.createElement('span');
+    detail.textContent = 'Tic-tac-toe · your move to accept';
+    const actions = document.createElement('div');
+    actions.className = 'invite-actions';
+    actions.append(
+      makeButton('Accept', async () => {
+        try {
+          const game = await post(`/games/${encodeURIComponent(invite.code)}/join`);
+          state.activeGame = game.code;
+          setPanel('games');
+          renderGame(game);
+          await refreshOverview();
+        } catch (error) { showNotice(error.message, true); }
+      }, 'primary'),
+      makeButton('Decline', async () => {
+        try {
+          await post(`/games/${encodeURIComponent(invite.code)}/decline`);
+          await refreshOverview();
+        } catch (error) { showNotice(error.message, true); }
+      }),
+    );
+    row.append(title, detail, actions);
+    return row;
+  });
+}
+
+async function challengeFriend(friend) {
+  try {
+    const game = await post('/games', { inviteeId: friend.id });
+    state.activeGame = game.code;
+    setPanel('games');
+    renderGame(game);
+    await refreshOverview();
+    showNotice(`Tic-tac-toe invite sent to ${friend.name}.`);
+  } catch (error) { showNotice(error.message, true); }
 }
 
 function renderMessages(container, messages, emptyText) {
@@ -211,12 +306,35 @@ async function refreshOverview() {
   const data = await api('/social/overview');
   state.friends = data.friends;
   state.requests = data.requests;
+  state.gameInvites = data.gameInvites || [];
   state.rooms = data.rooms;
   state.games = data.games;
   renderFriends();
   renderRequests();
+  renderGameInvites();
   renderRooms();
   renderGames();
+}
+
+async function refreshSuggestions() {
+  state.suggestions = await api('/users/suggestions');
+  renderSuggestions();
+}
+
+async function searchUsers(query) {
+  const sequence = ++state.searchSequence;
+  if (query.length < 2) {
+    $('search-card').hidden = true;
+    $('suggestions-card').hidden = false;
+    $('search-results').replaceChildren();
+    return;
+  }
+  try {
+    const users = await api(`/users/search?q=${encodeURIComponent(query)}`);
+    if (sequence === state.searchSequence && $('user-search').value.trim() === query) renderSearchResults(users);
+  } catch (error) {
+    if (sequence === state.searchSequence) showNotice(error.message, true);
+  }
 }
 
 function renderRooms() {
@@ -388,7 +506,9 @@ async function openGame(code) {
 }
 
 function renderGame(game) {
-  $('game-title').textContent = game.members.map(member => `${member.name} (${member.symbol})`).join(' vs ') || 'Tic-tac-toe';
+  const players = game.members.map(member => `${member.name} (${member.symbol})`);
+  if (game.invitedUserName) players.push(`${game.invitedUserName} (O)`);
+  $('game-title').textContent = players.join(' vs ') || 'Tic-tac-toe';
   $('game-code-display').textContent = `Room code: ${game.code}`;
   const status = game.status === 'waiting' ? 'Waiting for a friend to join…'
     : game.status === 'draw' ? 'It’s a draw!'
@@ -458,9 +578,23 @@ $('sign-out').addEventListener('click', () => {
 $('user-search-form').addEventListener('submit', async event => {
   event.preventDefault();
   const query = $('user-search').value.trim();
-  if (query.length < 2) return showNotice('Enter at least 2 characters to search.', true);
-  try { renderSearchResults(await api(`/users/search?q=${encodeURIComponent(query)}`)); }
-  catch (error) { showNotice(error.message, true); }
+  if (query.length < 2) return showNotice('Type at least 2 characters to search.', true);
+  clearTimeout(state.searchTimer);
+  await searchUsers(query);
+});
+
+$('user-search').addEventListener('input', () => {
+  clearTimeout(state.searchTimer);
+  const query = $('user-search').value.trim();
+  state.searchTimer = setTimeout(() => searchUsers(query), 260);
+});
+
+$('clear-search').addEventListener('click', () => {
+  $('user-search').value = '';
+  $('search-card').hidden = true;
+  $('suggestions-card').hidden = false;
+  $('search-results').replaceChildren();
+  $('user-search').focus();
 });
 
 $('chat-form').addEventListener('submit', async event => {
@@ -607,6 +741,8 @@ if (!token() || !state.user || state.user.role !== 'user') {
   window.location.href = '/login.html';
 } else {
   $('account-name').textContent = state.user.name || state.user.email || 'Member';
+  $('account-avatar').textContent = (state.user.name || state.user.email || '?').trim().slice(0, 1).toUpperCase();
   refreshSocial();
+  refreshSuggestions().catch(error => showNotice(error.message, true));
   setInterval(refreshSocial, 4500);
 }

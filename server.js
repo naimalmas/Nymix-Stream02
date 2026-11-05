@@ -402,7 +402,39 @@ app.get('/api/social/overview', userAuth, (req, res) => {
     .map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, members: room.members }));
   const games = social.games.filter(game => memberOf(game, req.user.id) && game.status !== 'closed')
     .map(game => ({ code: game.code, hostName: game.hostName, status: game.status, members: game.members }));
-  res.json({ friends, requests, rooms, games });
+  const gameInvites = social.games.filter(game =>
+    game.invitedUserId === req.user.id && game.status === 'waiting' && game.createdAt > Date.now() - 86400000 &&
+    areFriends(game.hostId, req.user.id),
+  ).map(game => ({ code: game.code, hostName: game.hostName, createdAt: game.createdAt }));
+  res.json({ friends, requests, rooms, games, gameInvites });
+});
+
+app.get('/api/users/suggestions', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const relations = rd('friends.json');
+  const accepted = relations.filter(relation => relation.status === 'accepted');
+  const friendsByUser = new Map();
+  accepted.forEach(relation => {
+    if (!friendsByUser.has(relation.user1)) friendsByUser.set(relation.user1, new Set());
+    if (!friendsByUser.has(relation.user2)) friendsByUser.set(relation.user2, new Set());
+    friendsByUser.get(relation.user1).add(relation.user2);
+    friendsByUser.get(relation.user2).add(relation.user1);
+  });
+  const myFriends = friendsByUser.get(req.user.id) || new Set();
+  const connected = new Set(relations
+    .filter(relation => relation.user1 === req.user.id || relation.user2 === req.user.id)
+    .map(relation => relation.user1 === req.user.id ? relation.user2 : relation.user1));
+  const suggestions = users
+    .filter(account => account.id !== req.user.id && !account.banned && account.role === 'user' && !connected.has(account.id))
+    .map(account => {
+      const friendIds = friendsByUser.get(account.id) || new Set();
+      const mutualFriends = [...myFriends].filter(id => friendIds.has(id)).length;
+      return { ...safeProfile(account), relation: 'none', mutualFriends, createdAt: account.createdAt || '' };
+    })
+    .sort((a, b) => b.mutualFriends - a.mutualFriends || String(b.createdAt).localeCompare(String(a.createdAt)))
+    .slice(0, 12)
+    .map(({ createdAt, ...profile }) => profile);
+  res.json(suggestions);
 });
 
 app.get('/api/users/search', userAuth, (req, res) => {
@@ -640,11 +672,24 @@ app.post('/api/games', userAuth, (req, res) => {
   const social = getSocialState();
   social.games = social.games.filter(game => Date.now() - game.createdAt < 7 * 86400000);
   if (social.games.length >= 300) return res.status(429).json({ error: 'There are too many active games; try again later' });
+  const invitee = req.body.inviteeId
+    ? rd('users.json').find(account => account.id === req.body.inviteeId && account.role === 'user' && !account.banned)
+    : null;
+  if (req.body.inviteeId && !invitee) return res.status(404).json({ error: 'Friend not found' });
+  if (invitee && !areFriends(req.user.id, invitee.id)) {
+    return res.status(403).json({ error: 'You must be friends before sending a game challenge' });
+  }
+  if (invitee && social.games.some(game =>
+    game.hostId === req.user.id && game.invitedUserId === invitee.id && game.status === 'waiting',
+  )) {
+    return res.status(409).json({ error: 'You already have a pending game challenge for this friend' });
+  }
   const code = randomCode(new Set(social.games.map(game => game.code)));
   const game = {
     code,
     hostId: req.user.id,
     hostName: req.user.name,
+    ...(invitee ? { invitedUserId: invitee.id, invitedUserName: invitee.name } : {}),
     members: [{ id: req.user.id, name: req.user.name, symbol: 'X' }],
     board: Array(9).fill(null),
     turn: req.user.id,
@@ -664,12 +709,28 @@ app.post('/api/games/:code/join', userAuth, (req, res) => {
   if (game.hostId !== req.user.id && !areFriends(game.hostId, req.user.id)) {
     return res.status(403).json({ error: 'You must be friends with the host to join' });
   }
+  if (game.invitedUserId && game.invitedUserId !== req.user.id) {
+    return res.status(403).json({ error: 'This game challenge was sent to someone else' });
+  }
   if (memberOf(game, req.user.id)) return res.json(game);
   if (game.status !== 'waiting' || game.members.length >= 2) return res.status(409).json({ error: 'Game is full or already started' });
   game.members.push({ id: req.user.id, name: req.user.name, symbol: 'O' });
   game.status = 'playing';
+  delete game.invitedUserId;
+  delete game.invitedUserName;
   wd('social.json', social);
   res.json(game);
+});
+
+app.post('/api/games/:code/decline', userAuth, (req, res) => {
+  const social = getSocialState();
+  const game = social.games.find(item => item.code === req.params.code.toUpperCase());
+  if (!game || game.invitedUserId !== req.user.id || game.status !== 'waiting') {
+    return res.status(404).json({ error: 'Game challenge not found' });
+  }
+  social.games = social.games.filter(item => item.code !== game.code);
+  wd('social.json', social);
+  res.json({ ok: true });
 });
 
 app.get('/api/games/:code', userAuth, (req, res) => {

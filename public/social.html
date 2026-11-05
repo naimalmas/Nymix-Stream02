@@ -4,54 +4,89 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nymix Social</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/social.css" />
   <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/">Nymix <span>Social</span></a>
+    <a class="brand" href="/" aria-label="Nymix home"><span class="brand-icon" aria-hidden="true">♫</span><span>Nymix <span class="brand-social">Social</span></span></a>
     <nav aria-label="Social features">
-      <button class="tab active" data-panel="people">People</button>
-      <button class="tab" data-panel="chat">Chat</button>
-      <button class="tab" data-panel="listen">Listen together</button>
-      <button class="tab" data-panel="games">Games</button>
+      <button class="tab active" data-panel="people"><span aria-hidden="true">✦</span> Discover</button>
+      <button class="tab" data-panel="chat"><span aria-hidden="true">▤</span> Messages</button>
+      <button class="tab" data-panel="listen"><span aria-hidden="true">♫</span> Listen together</button>
+      <button class="tab" data-panel="games"><span aria-hidden="true">▦</span> Games</button>
     </nav>
     <div class="account">
+      <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
       <span id="account-name"></span>
       <button class="button secondary" id="sign-out">Sign out</button>
     </div>
   </header>
 
   <main>
-    <div class="page-heading">
-      <div>
-        <p class="eyebrow">YOUR MUSIC, TOGETHER</p>
-        <h1>Friends, chat & play</h1>
-      </div>
-      <div class="sync-indicator"><span class="online-dot"></span> Updates every few seconds</div>
-    </div>
     <p class="notice" id="notice" role="status" aria-live="polite"></p>
 
     <section class="panel active" id="panel-people">
-      <div class="columns">
-        <article class="card">
-          <div class="card-heading"><div><p class="eyebrow">DISCOVER</p><h2>Find people</h2></div></div>
-          <form id="user-search-form" class="inline-form">
-            <label class="sr-only" for="user-search">Search by name or email</label>
-            <input id="user-search" autocomplete="off" placeholder="Search name or email…" minlength="2" />
-            <button class="button" type="submit">Search</button>
-          </form>
-          <div id="search-results" class="stack empty-state">Search for a friend by name or email.</div>
-        </article>
-        <article class="card">
-          <div class="card-heading"><div><p class="eyebrow">YOUR PEOPLE</p><h2>Friends</h2></div><span class="count" id="friend-count">0</span></div>
-          <div id="friends-list" class="stack empty-state">Your accepted friends will appear here.</div>
-        </article>
+      <section class="discover-hero" aria-labelledby="discover-title">
+        <div class="hero-copy">
+          <p class="eyebrow">YOUR PEOPLE, YOUR PLAYLIST</p>
+          <h1 id="discover-title">Find your people.</h1>
+          <p>Meet music lovers, start a conversation, or challenge a friend to a quick game.</p>
+        </div>
+        <div class="hero-decoration" aria-hidden="true"><span>♫</span><i></i><b></b></div>
+        <form id="user-search-form" class="discover-search" role="search">
+          <span class="search-icon" aria-hidden="true">⌕</span>
+          <label class="sr-only" for="user-search">Search people by name or email</label>
+          <input id="user-search" type="search" autocomplete="off" placeholder="Search by name or email…" minlength="2" aria-controls="search-results" />
+          <button class="button" type="submit">Find people</button>
+        </form>
+        <p class="search-hint">Suggestions are people you haven’t connected with yet.</p>
+      </section>
+
+      <div class="discover-layout">
+        <div class="discover-main">
+          <article class="card discovery-card" id="search-card" hidden>
+            <div class="card-heading">
+              <div><p class="eyebrow">PEOPLE SEARCH</p><h2>Search results</h2></div>
+              <button type="button" class="text-button" id="clear-search">Clear</button>
+            </div>
+            <div id="search-results" class="discovery-grid" aria-live="polite"></div>
+          </article>
+          <article class="card discovery-card" id="suggestions-card">
+            <div class="card-heading suggestion-heading">
+              <div><p class="eyebrow">A GOOD PLACE TO START</p><h2>People you may know</h2><p class="section-caption">Fresh faces and friends of friends, picked for you.</p></div>
+              <span class="count" id="suggestion-count">0</span>
+            </div>
+            <div id="suggestions-list" class="discovery-grid" aria-live="polite">
+              <p class="discovery-empty">Finding people for you…</p>
+            </div>
+          </article>
+        </div>
+
+        <aside class="discover-sidebar" aria-label="Your social activity">
+          <article class="card side-card">
+            <div class="card-heading">
+              <div><p class="eyebrow">YOUR CIRCLE</p><h2>Friends</h2></div>
+              <span class="count" id="friend-count">0</span>
+            </div>
+            <div id="friends-list" class="stack friend-stack"></div>
+          </article>
+          <article class="card side-card">
+            <div class="card-heading">
+              <div><p class="eyebrow">SAY HELLO</p><h2>Friend requests</h2></div>
+              <span class="count" id="request-count">0</span>
+            </div>
+            <div id="requests-list" class="stack"></div>
+          </article>
+          <article class="card side-card" id="game-invites-card" hidden>
+            <div class="card-heading"><div><p class="eyebrow">YOUR TURN?</p><h2>Game invites</h2></div></div>
+            <div id="game-invites-list" class="stack"></div>
+          </article>
+        </aside>
       </div>
-      <article class="card">
-        <div class="card-heading"><div><p class="eyebrow">CONNECTIONS</p><h2>Friend requests</h2></div></div>
-        <div id="requests-list" class="stack empty-state">No pending requests.</div>
-      </article>
     </section>
 
     <section class="panel" id="panel-chat">
