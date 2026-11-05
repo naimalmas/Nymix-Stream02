@@ -28,6 +28,8 @@ const S = {
   repeat: false,
   volume: 80,
   liked: [],
+  notifications: [],
+  notificationsBusy: false,
 };
 
 // ── Auth Guard ────────────────────────────────────────
@@ -693,12 +695,107 @@ function timeAgo(ts) {
   return Math.floor(d / 86400) + ' days ago';
 }
 
+function renderNotifications(items) {
+  const list = $('notification-list');
+  const badge = $('notification-count');
+  S.notifications = items;
+  badge.hidden = items.length === 0;
+  badge.textContent = items.length > 99 ? '99+' : String(items.length);
+  list.replaceChildren();
+  if (!items.length) {
+    const empty = document.createElement('p');
+    empty.className = 'notification-empty';
+    empty.textContent = 'You’re all caught up.';
+    list.appendChild(empty);
+    return;
+  }
+  items.forEach(item => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'notification-item';
+    const title = document.createElement('strong');
+    title.textContent = item.title;
+    const body = document.createElement('span');
+    body.textContent = item.body;
+    const timestamp = document.createElement('span');
+    timestamp.textContent = timeAgo(item.createdAt);
+    button.append(title, body, timestamp);
+    button.addEventListener('click', () => openNotification(item));
+    list.appendChild(button);
+  });
+}
+
+async function refreshNotifications() {
+  if (S.notificationsBusy || document.hidden || !token()) return;
+  S.notificationsBusy = true;
+  try {
+    const response = await fetch(`${API}/notifications`, {
+      headers: { Authorization: `Bearer ${token()}` },
+      cache: 'no-store',
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Notifications failed (${response.status})`);
+    if (!Array.isArray(data.notifications)) throw new Error('Invalid notifications response');
+    renderNotifications(data.notifications);
+    $('notification-live-status').textContent = `Live · updated ${new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  } catch (error) {
+    $('notification-live-status').textContent = 'Could not refresh';
+    $('notification-list').replaceChildren();
+    const message = document.createElement('p');
+    message.className = 'notification-empty';
+    message.textContent = error.message;
+    $('notification-list').appendChild(message);
+  } finally {
+    S.notificationsBusy = false;
+  }
+}
+
+function openNotification(item) {
+  $('notification-panel').hidden = true;
+  $('notification-toggle').setAttribute('aria-expanded', 'false');
+  if (item.type === 'friend') {
+    setMobileMenuOpen(false);
+    showView('add-friend');
+    return;
+  }
+  if (!item.friendId) return;
+  setMobileMenuOpen(false);
+  showView('messages');
+  $('social-portal')?.contentWindow?.postMessage({
+    type: 'nymix-social-open-chat',
+    friendId: item.friendId,
+  }, window.location.origin);
+}
+
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
   // Must be logged in
   if (!requireAuth()) return;
 
   updateUserMenu();
+  $('notification-toggle').addEventListener('click', () => {
+    const open = $('notification-panel').hidden;
+    $('notification-panel').hidden = !open;
+    $('notification-toggle').setAttribute('aria-expanded', String(open));
+    if (open) refreshNotifications();
+  });
+  document.addEventListener('click', event => {
+    if (!$('notification-wrap').contains(event.target)) {
+      $('notification-panel').hidden = true;
+      $('notification-toggle').setAttribute('aria-expanded', 'false');
+    }
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+      $('notification-panel').hidden = true;
+      $('notification-toggle').setAttribute('aria-expanded', 'false');
+    }
+  });
+  refreshNotifications();
+  setInterval(refreshNotifications, 4000);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshNotifications();
+  });
   window.addEventListener('message', event => {
     if (event.origin !== window.location.origin || event.source !== $('social-portal')?.contentWindow) return;
     if (event.data?.type === 'nymix-profile-updated' && event.data.user?.id === user()?.id) {

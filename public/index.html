@@ -111,6 +111,18 @@
         <button class="nav-arrow" id="btn-back" aria-label="Go back"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-left"></use></svg></button>
         <button class="nav-arrow" id="btn-fwd" aria-label="Go forward"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg></button>
         <div class="view-title" id="view-title">What's hot</div>
+        <div class="notification-wrap" id="notification-wrap">
+          <button type="button" class="notification-toggle" id="notification-toggle" aria-label="Notifications" aria-expanded="false" aria-controls="notification-panel">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg>
+            <span class="notification-count" id="notification-count" hidden></span>
+          </button>
+          <section class="notification-panel" id="notification-panel" aria-label="Notifications" hidden>
+            <div class="notification-heading"><strong>Notifications</strong><span id="notification-live-status">Live updates</span></div>
+            <div class="notification-list" id="notification-list" aria-live="polite">
+              <p class="notification-empty">Checking for updates…</p>
+            </div>
+          </section>
+        </div>
       </div>
 
       <!-- Home View -->

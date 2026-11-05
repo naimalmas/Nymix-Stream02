@@ -594,6 +594,7 @@ const getSocialState = () => {
   state.games ||= [];
   state.roomMessages ||= {};
   state.chatPlayback ||= {};
+  state.notificationReads ||= {};
   state.callSignals ||= [];
   return state;
 };
@@ -650,6 +651,98 @@ app.get('/api/social/overview', userAuth, (req, res) => {
     areFriends(room.hostId, req.user.id),
   ).map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, createdAt: room.createdAt }));
   res.json({ friends, requests, rooms, games, gameInvites, roomInvites, lastMessages });
+});
+
+app.get('/api/notifications', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const relations = rd('friends.json');
+  const social = getSocialState();
+  const messages = rd('messages.json');
+  const notifications = [];
+  const friends = relations
+    .filter(relation => relation.status === 'accepted' && (relation.user1 === req.user.id || relation.user2 === req.user.id))
+    .map(relation => {
+      const friendId = relation.user1 === req.user.id ? relation.user2 : relation.user1;
+      const account = users.find(user => user.id === friendId && !user.banned);
+      return account ? { id: friendId, name: account.name } : null;
+    }).filter(Boolean);
+
+  relations.filter(relation => relation.status === 'pending' && relation.user2 === req.user.id).forEach(relation => {
+    const account = users.find(user => user.id === relation.user1 && !user.banned);
+    if (account) notifications.push({
+      id: `friend:${relation.id}`,
+      type: 'friend',
+      title: 'Friend request',
+      body: `${account.name} sent you a friend request`,
+      createdAt: relation.createdAt,
+    });
+  });
+
+  social.games.filter(game =>
+    game.invitedUserId === req.user.id && game.status === 'waiting' &&
+    game.createdAt > Date.now() - 86400000 && areFriends(game.hostId, req.user.id),
+  ).forEach(game => notifications.push({
+    id: `game:${game.code}`,
+    type: 'game',
+    title: 'Game invitation',
+    body: `${game.hostName} invited you to play`,
+    friendId: game.hostId,
+    code: game.code,
+    createdAt: game.createdAt,
+  }));
+
+  social.listenRooms.filter(room =>
+    room.invitedUserId === req.user.id && room.createdAt > Date.now() - 86400000 &&
+    areFriends(room.hostId, req.user.id),
+  ).forEach(room => notifications.push({
+    id: `room:${room.code}`,
+    type: 'room',
+    title: 'Listening invitation',
+    body: `${room.hostName} invited you to listen to ${room.song?.title || 'a song'}`,
+    friendId: room.hostId,
+    code: room.code,
+    createdAt: room.createdAt,
+  }));
+
+  const readByFriend = social.notificationReads[req.user.id] || {};
+  friends.forEach(friend => {
+    const conversation = messages[chatRoomId(req.user.id, friend.id)] || [];
+    const latestIncoming = [...conversation].reverse().find(message => message.from === friend.id);
+    if (latestIncoming && latestIncoming.ts > (Number(readByFriend[friend.id]) || 0)) {
+      const body = latestIncoming.type === 'audio' ? 'Sent you a voice message'
+        : latestIncoming.type === 'photo' ? 'Shared a photo with you'
+          : latestIncoming.text;
+      notifications.push({
+        id: `message:${friend.id}:${latestIncoming.id}`,
+        type: 'message',
+        title: friend.name,
+        body,
+        friendId: friend.id,
+        createdAt: latestIncoming.ts,
+      });
+    }
+  });
+
+  notifications.sort((a, b) => b.createdAt - a.createdAt);
+  res.json({ notifications: notifications.slice(0, 50) });
+});
+
+app.post('/api/notifications/read/:friendId', userAuth, (req, res) => {
+  const friendId = req.params.friendId;
+  if (!areFriends(req.user.id, friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
+  const room = chatRoomId(req.user.id, friendId);
+  const latestIncoming = [...(rd('messages.json')[room] || [])].reverse()
+    .find(message => message.from === friendId);
+  if (latestIncoming) {
+    const social = getSocialState();
+    social.notificationReads[req.user.id] ||= {};
+    social.notificationReads[req.user.id][friendId] = Math.max(
+      Number(social.notificationReads[req.user.id][friendId]) || 0,
+      latestIncoming.ts,
+    );
+    wd('social.json', social);
+  }
+  res.json({ ok: true });
 });
 
 app.get('/api/users/suggestions', userAuth, (req, res) => {

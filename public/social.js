@@ -51,6 +51,10 @@ const state = {
   reelsLoaded: false,
   reelsLazyObserver: null,
   reelsPageObserver: null,
+  reelsVisibilityObserver: null,
+  reelPlayers: new Map(),
+  reelsVisibleRatios: new Map(),
+  activeReelPlayer: null,
   reelsObservedEnd: null,
   callSignalError: '',
   youtubeReady: false,
@@ -484,6 +488,7 @@ function setPanel(panelName, syncParent = true) {
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${panelName}`));
   document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.panel === panelName));
   document.body.classList.toggle('reels-active', panelName === 'reels');
+  if (panelName !== 'reels') pauseActiveReel();
   if (syncParent && ['chat', 'people', 'feed', 'profile'].includes(panelName) && window.parent !== window) {
     window.parent.postMessage({ type: 'nymix-social-navigation', panel: panelName }, window.location.origin);
   }
@@ -631,6 +636,17 @@ async function loadReels(reset = false, append = false) {
   const status = $('reels-status');
   const more = $('reels-more');
   if (reset) {
+    pauseActiveReel();
+    state.reelsLazyObserver?.disconnect();
+    state.reelsVisibilityObserver?.disconnect();
+    state.reelsVisibleRatios.clear();
+    state.reelsLazyObserver = null;
+    state.reelsVisibilityObserver = null;
+    state.reelPlayers.forEach(player => {
+      try { player.destroy(); }
+      catch (error) { console.error('Could not release a Reel player:', error); }
+    });
+    state.reelPlayers.clear();
     if (state.reelsPageObserver && state.reelsObservedEnd) state.reelsPageObserver.unobserve(state.reelsObservedEnd);
     state.reelsObservedEnd = null;
     state.reelsNextPageToken = null;
@@ -643,9 +659,11 @@ async function loadReels(reset = false, append = false) {
       entries.forEach(entry => {
         if (!entry.isIntersecting) return;
         const player = entry.target;
+        if (!player.dataset.src) return;
         player.src = player.dataset.src;
         player.removeAttribute('data-src');
         state.reelsLazyObserver.unobserve(player);
+        if (state.activeReelPlayer === player) initializeReelPlayer(player);
       });
     }, { root: list, rootMargin: '100% 0px' });
     state.reelsPageObserver ||= new IntersectionObserver(entries => {
@@ -654,6 +672,15 @@ async function loadReels(reset = false, append = false) {
       state.reelsObservedEnd = null;
       loadReels(false, true);
     }, { root: list, rootMargin: '100% 0px' });
+    state.reelsVisibilityObserver ||= new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        state.reelsVisibleRatios.set(entry.target, entry.isIntersecting ? entry.intersectionRatio : 0);
+      });
+      const active = [...state.reelsVisibleRatios.entries()]
+        .filter(([, ratio]) => ratio >= 0.45)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || null;
+      setActiveReel(active?.querySelector('.reel-player') || null);
+    }, { root: list, threshold: [0, 0.25, 0.45, 0.65, 0.85, 1] });
   }
   state.reelsLoading = true;
   status.classList.remove('error');
@@ -668,7 +695,7 @@ async function loadReels(reset = false, append = false) {
       card.className = 'reel-card';
       const player = document.createElement('iframe');
       player.className = 'reel-player';
-      player.dataset.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reel.id)}?playsinline=1&rel=0`;
+      player.dataset.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reel.id)}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&playsinline=1&rel=0`;
       player.title = `${reel.title} — ${reel.channel}`;
       player.loading = 'lazy';
       player.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
@@ -688,6 +715,7 @@ async function loadReels(reset = false, append = false) {
       details.append(title, channel, link);
       card.append(player, details);
       list.appendChild(card);
+      if (state.reelsVisibilityObserver) state.reelsVisibilityObserver.observe(card);
       if (state.reelsLazyObserver) state.reelsLazyObserver.observe(player);
       else {
         player.src = player.dataset.src;
@@ -711,6 +739,59 @@ async function loadReels(reset = false, append = false) {
   } finally {
     state.reelsLoading = false;
   }
+}
+
+function initializeReelPlayer(iframe) {
+  if (!state.youtubeReady || !window.YT?.Player || !iframe.src || state.reelPlayers.has(iframe)) return;
+  const player = new YT.Player(iframe, {
+    events: {
+      onReady: event => {
+        if (state.activeReelPlayer === iframe && document.body.classList.contains('reels-active')) {
+          event.target.playVideo();
+        }
+      },
+      onAutoplayBlocked: event => {
+        if (state.activeReelPlayer === iframe) {
+          event.target.mute();
+          event.target.playVideo();
+          $('reels-status').textContent = 'Playing muted because of your browser settings. Use the player controls to turn sound on.';
+        }
+      },
+    },
+  });
+  state.reelPlayers.set(iframe, player);
+}
+
+function setActiveReel(iframe) {
+  if (iframe === state.activeReelPlayer) return;
+  pauseActiveReel();
+  state.activeReelPlayer = iframe;
+  if (!iframe || !document.body.classList.contains('reels-active')) return;
+  if (!iframe.src && iframe.dataset.src) {
+    iframe.src = iframe.dataset.src;
+    iframe.removeAttribute('data-src');
+    state.reelsLazyObserver?.unobserve(iframe);
+  }
+  initializeReelPlayer(iframe);
+  const player = state.reelPlayers.get(iframe);
+  if (!player) return;
+  try {
+    player.playVideo();
+  } catch (error) {
+    console.error('Could not start the active Reel:', error);
+    $('reels-status').textContent = 'Could not start this video. Tap to try again.';
+  }
+}
+
+function pauseActiveReel() {
+  const iframe = state.activeReelPlayer;
+  if (!iframe) return;
+  const player = state.reelPlayers.get(iframe);
+  if (player) {
+    try { player.pauseVideo(); }
+    catch (error) { console.error('Could not pause the previous Reel:', error); }
+  }
+  state.activeReelPlayer = null;
 }
 
 async function loadFeed() {
@@ -1549,8 +1630,10 @@ async function selectFriend(friend) {
 
 async function refreshChat(initial = false) {
   if (!state.activeFriend) return;
+  const friendId = state.activeFriend.id;
   const after = initial ? 0 : Math.max(0, state.chatAfter - 1);
-  const messages = await api(`/chat/${encodeURIComponent(state.activeFriend.id)}?after=${after}`);
+  const messages = await api(`/chat/${encodeURIComponent(friendId)}?after=${after}`);
+  if (state.activeFriend?.id !== friendId) return;
   const knownMessages = new Map(state.chatMessages.map(message => [message.id, message]));
   let changed = false;
   messages.forEach(message => {
@@ -1569,6 +1652,10 @@ async function refreshChat(initial = false) {
       text: latest.type === 'audio' ? 'Voice message' : latest.type === 'photo' ? 'Photo' : latest.text,
     };
     renderFriends();
+  }
+  if ((initial || changed) && state.chatMessages.some(message => message.from === friendId)) {
+    try { await post(`/notifications/read/${encodeURIComponent(friendId)}`); }
+    catch (error) { showNotice(error.message, true); }
   }
 }
 
@@ -2383,6 +2470,7 @@ window.onYouTubeIframeAPIReady = () => {
   state.youtubeReady = true;
   if (state.lastRoom) ensureRoomPlayer(state.lastRoom);
   if (state.chatPlayback) ensureChatPlayer(state.chatPlayback);
+  if (state.activeReelPlayer) initializeReelPlayer(state.activeReelPlayer);
 };
 
 const chatListenCard = document.querySelector('#panel-listen .listen-card');
@@ -2398,6 +2486,16 @@ window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || event.source !== window.parent) return;
   if (event.data?.type === 'nymix-social-open-profile') {
     openProfile(state.user.id, false);
+    return;
+  }
+  if (event.data?.type === 'nymix-social-open-chat' && typeof event.data.friendId === 'string') {
+    const openChat = async () => {
+      if (!state.friends.length) await refreshOverview();
+      const friend = state.friends.find(item => item.id === event.data.friendId);
+      if (!friend) throw new Error('This friend is no longer available.');
+      await selectFriend(friend);
+    };
+    openChat().catch(error => showNotice(error.message, true));
     return;
   }
   if (event.data?.type === 'nymix-social-panel' && ['people', 'chat', 'feed', 'reels'].includes(event.data.panel)) {
