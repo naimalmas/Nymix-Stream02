@@ -581,7 +581,7 @@ app.get('/api/social/overview', userAuth, (req, res) => {
     const latest = conversation[conversation.length - 1];
     return latest ? [[friend.id, {
       from: latest.from,
-      text: latest.type === 'audio' ? 'Voice message' : latest.text,
+      text: latest.type === 'audio' ? 'Voice message' : latest.type === 'photo' ? 'Photo' : latest.text,
       ts: latest.ts,
     }]] : [];
   }));
@@ -743,12 +743,35 @@ function chatRoomId(a, b) { return [a, b].sort().join(':'); }
 app.get('/api/chat/:friendId', userAuth, (req, res) => {
   if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
   const msgs = rd('messages.json');
+  const users = rd('users.json');
+  const photos = new Map(users.flatMap(account =>
+    (Array.isArray(account.photos) ? account.photos : []).map(photo => [photo.id, { photo, account }]),
+  ));
   const room = chatRoomId(req.user.id, req.params.friendId);
   const after = Number(req.query.after) || 0;
-  res.json((msgs[room] || []).filter(message => message.ts > after).slice(-100).map(message => {
-    if (message.type !== 'audio') return message;
-    const { audioData, ...metadata } = message;
-    return metadata;
+  const conversation = msgs[room] || [];
+  const changedPhotos = conversation.filter(message => message.type === 'photo' && !photos.has(message.photoId));
+  const recentMessages = conversation.filter(message => message.ts > after).slice(-100);
+  const selectedMessages = [...new Map([...changedPhotos, ...recentMessages].map(message => [message.id, message])).values()]
+    .sort((a, b) => a.ts - b.ts);
+  res.json(selectedMessages.map(message => {
+    if (message.type === 'audio') {
+      const { audioData, ...metadata } = message;
+      return metadata;
+    }
+    if (message.type === 'photo') {
+      const owner = photos.get(message.photoId);
+      return {
+        ...message,
+        photo: owner ? {
+          id: owner.photo.id,
+          image: owner.photo.image,
+          caption: owner.photo.caption || '',
+          author: safeProfile(owner.account),
+        } : null,
+      };
+    }
+    return message;
   }));
 });
 
@@ -779,6 +802,17 @@ app.post('/api/chat/:friendId', userAuth, (req, res) => {
       const decodedSize = Buffer.from(audioData, 'base64').length;
       if (!decodedSize || decodedSize > 1024 * 1024) return res.status(400).json({ error: 'Voice message must be 1 MB or smaller' });
       messageContent = { type: 'audio', audioData, mimeType, duration };
+    } else if (req.body.type === 'photo') {
+      const photoId = req.body.photoId;
+      if (typeof photoId !== 'string' || !/^[a-f\d]{24}$/i.test(photoId)) {
+        return res.status(400).json({ error: 'Choose a valid photo to share' });
+      }
+      const owner = rd('users.json').find(account =>
+        !account.banned && account.role === 'user' &&
+        (Array.isArray(account.photos) ? account.photos : []).some(photo => photo.id === photoId),
+      );
+      if (!owner) return res.status(404).json({ error: 'Photo not found' });
+      messageContent = { type: 'photo', photoId };
     } else {
       if (!text) return res.status(400).json({ error: 'Message cannot be empty' });
       if (text.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });

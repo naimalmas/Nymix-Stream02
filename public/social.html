@@ -346,6 +346,16 @@
       </footer>
     </form>
   </dialog>
+  <dialog class="photo-share-dialog" id="photo-share-dialog" aria-labelledby="photo-share-title">
+    <section>
+      <header class="photo-share-header">
+        <div><p class="eyebrow">SEND TO A FRIEND</p><h2 id="photo-share-title">Share photo</h2></div>
+        <button type="button" class="icon-button" id="photo-share-close" aria-label="Close share dialog"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
+      </header>
+      <div class="photo-share-friends" id="photo-share-friends"></div>
+      <p class="photo-share-notice" id="photo-share-notice" role="status" aria-live="polite"></p>
+    </section>
+  </dialog>
   <script src="/social.js"></script>
 </body>
 </html>

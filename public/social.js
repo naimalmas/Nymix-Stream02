@@ -194,6 +194,11 @@ function renderProfilePage(profile) {
       caption.textContent = photo.caption;
       tile.appendChild(caption);
     }
+    if (profile.id === state.user.id) {
+      const remove = makeButton('Delete photo', () => removeProfilePhoto(photo.id), 'secondary');
+      remove.classList.add('profile-page-photo-delete');
+      tile.appendChild(remove);
+    }
     $('profile-page-grid').appendChild(tile);
   });
 }
@@ -307,16 +312,18 @@ async function moveProfilePhoto(photoId, offset) {
 }
 
 async function removeProfilePhoto(photoId) {
+  if (!window.confirm('Delete this photo from your profile and feed?')) return;
   try {
     await deleteRequest(`/user/photos/${encodeURIComponent(photoId)}`);
-    state.profileTarget.photos = state.profileTarget.photos.filter(photo => photo.id !== photoId);
-    renderProfilePhotos(state.profileTarget);
-    renderProfilePage(state.profileTarget);
-    $('profile-notice').textContent = 'Photo removed from your profile.';
-    $('profile-notice').classList.remove('error');
+    if (state.profileTarget?.id === state.user.id) {
+      state.profileTarget.photos = (state.profileTarget.photos || []).filter(photo => photo.id !== photoId);
+      renderProfilePhotos(state.profileTarget);
+      renderProfilePage(state.profileTarget);
+    }
+    await loadFeed();
+    showNotice('Photo deleted from your profile and feed.');
   } catch (error) {
-    $('profile-notice').textContent = error.message;
-    $('profile-notice').classList.add('error');
+    showNotice(error.message, true);
   }
 }
 
@@ -537,7 +544,14 @@ function renderFeed(posts) {
     const count = document.createElement('strong');
     count.className = 'feed-like-count';
     count.textContent = `${Number(post.likes) || 0} ${(Number(post.likes) || 0) === 1 ? 'like' : 'likes'}`;
-    actions.append(like, count);
+    const share = makeButton('Share', () => openPhotoShare(post), 'secondary');
+    share.classList.add('feed-share');
+    actions.append(like, count, share);
+    if (post.author?.id === state.user.id) {
+      const remove = makeButton('Delete', () => removeProfilePhoto(post.id), 'secondary');
+      remove.classList.add('feed-delete');
+      actions.appendChild(remove);
+    }
     card.append(header, image, actions);
     if (post.caption) {
       const caption = document.createElement('p');
@@ -547,6 +561,54 @@ function renderFeed(posts) {
     }
     list.appendChild(card);
   });
+}
+
+function openPhotoShare(photoPost) {
+  const dialog = $('photo-share-dialog');
+  const friends = $('photo-share-friends');
+  const notice = $('photo-share-notice');
+  friends.replaceChildren();
+  notice.textContent = '';
+  notice.classList.remove('error');
+  if (!state.friends.length) {
+    notice.textContent = 'Add a friend before sharing photos in messages.';
+  }
+  state.friends.forEach(friend => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'photo-share-friend';
+    const avatar = document.createElement('span');
+    avatar.className = 'photo-share-avatar';
+    setAvatar(avatar, friend);
+    const name = document.createElement('strong');
+    name.textContent = friend.name;
+    button.append(avatar, name);
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      try {
+        const message = await post(`/chat/${encodeURIComponent(friend.id)}`, { type: 'photo', photoId: photoPost.id });
+        const sharedMessage = {
+          ...message,
+          photo: { id: photoPost.id, image: photoPost.image, caption: photoPost.caption || '', author: photoPost.author },
+        };
+        state.lastMessages[friend.id] = { ...sharedMessage, text: 'Photo' };
+        if (state.activeFriend?.id === friend.id) {
+          state.chatMessages.push(sharedMessage);
+          state.chatAfter = Math.max(state.chatAfter, sharedMessage.ts);
+          renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+        }
+        renderFriends();
+        dialog.close();
+        showNotice(`Photo shared with ${friend.name}.`);
+      } catch (error) {
+        notice.textContent = error.message;
+        notice.classList.add('error');
+        button.disabled = false;
+      }
+    });
+    friends.appendChild(button);
+  });
+  dialog.showModal();
 }
 
 async function loadFeed() {
@@ -981,6 +1043,25 @@ function renderMessages(container, messages, emptyText) {
       });
       bubble.classList.add('voice-message');
       bubble.append(play, progress, duration, audio);
+    } else if (message.type === 'photo') {
+      if (message.photo?.image) {
+        const image = document.createElement('img');
+        image.className = 'message-photo';
+        image.src = message.photo.image;
+        image.alt = message.photo.caption || `Photo from ${message.photo.author?.name || 'a friend'}`;
+        image.loading = 'lazy';
+        bubble.classList.add('photo-message');
+        bubble.appendChild(image);
+        if (message.photo.caption) {
+          const caption = document.createElement('span');
+          caption.className = 'message-photo-caption';
+          caption.textContent = message.photo.caption;
+          bubble.appendChild(caption);
+        }
+      } else {
+        bubble.classList.add('photo-unavailable');
+        bubble.textContent = 'Photo unavailable';
+      }
     } else {
       bubble.textContent = message.text || '';
     }
@@ -1366,15 +1447,23 @@ async function refreshChat(initial = false) {
   if (!state.activeFriend) return;
   const after = initial ? 0 : Math.max(0, state.chatAfter - 1);
   const messages = await api(`/chat/${encodeURIComponent(state.activeFriend.id)}?after=${after}`);
-  const seen = new Set(state.chatMessages.map(message => message.id));
-  const newMessages = messages.filter(message => !seen.has(message.id));
-  state.chatMessages.push(...newMessages);
+  const knownMessages = new Map(state.chatMessages.map(message => [message.id, message]));
+  let changed = false;
+  messages.forEach(message => {
+    const previous = knownMessages.get(message.id);
+    if (!previous || (message.type === 'photo' && previous.photo?.image !== message.photo?.image)) changed = true;
+    knownMessages.set(message.id, message);
+  });
+  state.chatMessages = [...knownMessages.values()];
   state.chatMessages.sort((a, b) => a.ts - b.ts);
   state.chatAfter = Math.max(state.chatAfter, ...state.chatMessages.map(message => message.ts), 0);
-  if (initial || newMessages.length) {
+  if (initial || changed) {
     renderMessages($('chat-messages'), state.chatMessages, `This is the beginning of your conversation with ${state.activeFriend.name}.`);
     const latest = state.chatMessages[state.chatMessages.length - 1];
-    if (latest) state.lastMessages[state.activeFriend.id] = latest;
+    if (latest) state.lastMessages[state.activeFriend.id] = {
+      ...latest,
+      text: latest.type === 'audio' ? 'Voice message' : latest.type === 'photo' ? 'Photo' : latest.text,
+    };
     renderFriends();
   }
 }
@@ -1775,6 +1864,10 @@ $('profile-close').addEventListener('click', () => $('profile-dialog').close());
 $('profile-cancel').addEventListener('click', () => $('profile-dialog').close());
 $('profile-dialog').addEventListener('click', event => {
   if (event.target === $('profile-dialog')) $('profile-dialog').close();
+});
+$('photo-share-close').addEventListener('click', () => $('photo-share-dialog').close());
+$('photo-share-dialog').addEventListener('click', event => {
+  if (event.target === $('photo-share-dialog')) $('photo-share-dialog').close();
 });
 $('profile-photo-input').addEventListener('change', async event => {
   const input = event.currentTarget;

@@ -101,6 +101,8 @@ h3 { font-size: 14px; margin: 0 0 12px; }
 .feed-post-header time { margin-left: auto; color: var(--muted); font-size: 10px; white-space: nowrap; }
 .feed-post-image { display: block; width: 100%; max-height: min(68vh, 680px); aspect-ratio: 1 / 1; object-fit: cover; background: rgba(0,0,0,.2); }
 .feed-post-actions { display: flex; align-items: center; gap: 9px; padding: 9px 13px 0; }
+.feed-post-actions .feed-share, .feed-post-actions .feed-delete { min-height: 30px; padding: 6px 10px; font-size: 10px; }
+.feed-post-actions .feed-delete { margin-left: auto; color: #ff9aa5; }
 .feed-like { display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--text); cursor: pointer; transition: transform .15s ease,color .15s ease; }
 .feed-like:hover { transform: scale(1.12); }
 .feed-like .ui-icon { width: 23px; height: 23px; }
@@ -137,6 +139,7 @@ h3 { font-size: 14px; margin: 0 0 12px; }
 .profile-page-tile > img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .2s ease; }
 .profile-page-tile:hover > img { transform: scale(1.025); }
 .profile-page-tile > p { position: absolute; right: 0; bottom: 0; left: 0; margin: 0; padding: 24px 9px 8px; overflow: hidden; background: linear-gradient(transparent,rgba(0,0,0,.75)); color: white; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.profile-page-photo-delete { position: absolute; top: 7px; right: 7px; padding: 6px 9px; border-color: rgba(255,255,255,.2); background: rgba(12,8,21,.78); color: #ffb0b8; font-size: 10px; backdrop-filter: blur(7px); }
 .profile-page > .feed-empty { margin-top: 0; border: 0; border-radius: 0; padding: 35px 12px; }
 .discover-hero {
   isolation: isolate;
@@ -388,6 +391,10 @@ input:disabled { opacity: .55; }
 .message-item { position: relative; display: grid; justify-items: start; gap: 1px; min-width: 0; }
 .message-group.mine .message-item { justify-items: end; }
 .message { width: fit-content; max-width: 100%; padding: 9px 13px; border-radius: 18px; background: #262230; color: #f7f4fb; font-size: 13px; line-height: 1.5; overflow-wrap: anywhere; white-space: pre-wrap; }
+.message.photo-message { display: grid; gap: 6px; width: min(280px,70vw); padding: 6px; overflow: hidden; white-space: normal; }
+.message-photo { display: block; width: 100%; max-height: 320px; border-radius: 13px; object-fit: cover; }
+.message-photo-caption { padding: 0 5px 3px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.message.photo-unavailable { color: #d3cadf; font-style: italic; }
 .message-group.theirs .message { border-bottom-left-radius: 5px; }
 .message-group.mine .message { align-self: flex-end; border-bottom-right-radius: 5px; background: linear-gradient(140deg,#8650df,#a05be9); color: white; }
 .message-time { margin: 2px 6px 7px; color: #8f859c; font-size: 9px; }
@@ -419,6 +426,21 @@ input:disabled { opacity: .55; }
 .welcome-avatar { display: grid; place-items: center; width: 76px; height: 76px; margin-bottom: 20px; border: 1px solid rgba(194,154,255,.42); border-radius: 50%; color: var(--purple-light); }
 .welcome-avatar .ui-icon { width: 34px; height: 34px; }
 .profile-dialog { width: min(620px, calc(100vw - 24px)); max-height: min(850px, calc(100dvh - 24px)); padding: 0; overflow: auto; border: 1px solid rgba(194,154,255,.22); border-radius: 20px; background: linear-gradient(145deg,#1d1729,#110d1b); color: var(--text); box-shadow: 0 24px 80px rgba(0,0,0,.55); }
+.photo-share-dialog { width: min(420px,calc(100vw - 24px)); max-height: min(620px,calc(100dvh - 24px)); padding: 0; overflow: auto; border: 1px solid rgba(194,154,255,.22); border-radius: 18px; background: linear-gradient(145deg,#1d1729,#110d1b); color: var(--text); box-shadow: 0 24px 80px rgba(0,0,0,.55); }
+.photo-share-dialog::backdrop { background: rgba(5,3,10,.78); backdrop-filter: blur(7px); }
+.photo-share-dialog > section { display: grid; gap: 13px; padding: 18px; }
+.photo-share-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.photo-share-header .eyebrow { margin-bottom: 4px; }
+.photo-share-header h2 { margin: 0; font-size: 18px; }
+.photo-share-friends { display: grid; max-height: 360px; gap: 5px; overflow: auto; }
+.photo-share-friend { display: flex; align-items: center; gap: 10px; padding: 8px; border: 1px solid transparent; border-radius: 10px; background: rgba(255,255,255,.04); color: var(--text); text-align: left; cursor: pointer; }
+.photo-share-friend:hover:not(:disabled) { border-color: var(--border); background: rgba(255,255,255,.08); }
+.photo-share-friend:disabled { opacity: .55; cursor: wait; }
+.photo-share-avatar { position: relative; display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 36px; overflow: hidden; border-radius: 50%; background: linear-gradient(140deg,#b06aff,#5939a6); }
+.photo-share-avatar .avatar-image { position: absolute; }
+.photo-share-friend strong { font-size: 12px; }
+.photo-share-notice { min-height: 15px; margin: 0; color: var(--muted); font-size: 11px; }
+.photo-share-notice.error { color: var(--red); }
 .profile-dialog::backdrop { background: rgba(5,3,10,.78); backdrop-filter: blur(7px); }
 .profile-form { display: grid; gap: 17px; padding: 22px; }
 .profile-dialog-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
