@@ -137,6 +137,10 @@ async function openProfile(profileOrId) {
     $('profile-meta').textContent = isOwnProfile ? '' : [joined && `Member since ${joined}`, `${plays} ${plays === 1 ? 'play' : 'plays'}`].filter(Boolean).join(' · ');
     $('profile-dashboard').hidden = !isOwnProfile;
     if (isOwnProfile) await loadProfileDashboard(profile);
+    $('profile-gallery-add-label').hidden = !isOwnProfile;
+    $('profile-gallery-hint').hidden = !isOwnProfile;
+    $('profile-gallery-input').disabled = !isOwnProfile;
+    renderProfilePhotos(profile);
     const action = $('profile-action');
     action.hidden = isOwnProfile || profile.relation === 'sent';
     if (!isOwnProfile && profile.relation === 'received') {
@@ -153,6 +157,87 @@ async function openProfile(profileOrId) {
     $('profile-dialog').showModal();
   } catch (error) {
     showNotice(error.message, true);
+  }
+}
+
+function renderProfilePhotos(profile) {
+  const photos = Array.isArray(profile.photos) ? profile.photos : [];
+  const grid = $('profile-photo-grid');
+  grid.replaceChildren();
+  $('profile-photo-count').textContent = `${photos.length} ${photos.length === 1 ? 'photo' : 'photos'}`;
+  $('profile-gallery-empty').hidden = photos.length > 0;
+  $('profile-gallery-empty').textContent = profile.id === state.user.id
+    ? 'Your profile photos will appear here.'
+    : 'No photos shared yet.';
+  photos.forEach((photo, index) => {
+    const tile = document.createElement('article');
+    tile.className = 'profile-photo-tile';
+    const image = document.createElement('img');
+    image.src = photo.image;
+    image.alt = photo.caption || `${profile.name}'s photo ${index + 1}`;
+    image.loading = 'lazy';
+    tile.appendChild(image);
+    if (photo.caption) {
+      const caption = document.createElement('p');
+      caption.className = 'profile-photo-caption';
+      caption.textContent = photo.caption;
+      tile.appendChild(caption);
+    }
+    if (profile.id === state.user.id) {
+      const controls = document.createElement('div');
+      controls.className = 'profile-photo-controls-grid';
+      const move = (offset, label) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'profile-photo-control';
+        button.textContent = offset < 0 ? '←' : '→';
+        button.setAttribute('aria-label', label);
+        button.title = label;
+        button.disabled = index + offset < 0 || index + offset >= photos.length;
+        button.addEventListener('click', () => moveProfilePhoto(photo.id, offset));
+        return button;
+      };
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'profile-photo-control remove';
+      remove.textContent = '×';
+      remove.setAttribute('aria-label', 'Remove photo from profile');
+      remove.title = 'Remove photo';
+      remove.addEventListener('click', () => removeProfilePhoto(photo.id));
+      controls.append(move(-1, 'Move photo left'), move(1, 'Move photo right'), remove);
+      tile.appendChild(controls);
+    }
+    grid.appendChild(tile);
+  });
+}
+
+async function moveProfilePhoto(photoId, offset) {
+  const photos = state.profileTarget?.photos || [];
+  const index = photos.findIndex(photo => photo.id === photoId);
+  const nextIndex = index + offset;
+  if (index < 0 || nextIndex < 0 || nextIndex >= photos.length) return;
+  const reordered = [...photos];
+  [reordered[index], reordered[nextIndex]] = [reordered[nextIndex], reordered[index]];
+  try {
+    const result = await put('/user/photos/order', { photoIds: reordered.map(photo => photo.id) });
+    state.profileTarget.photos = result.photos;
+    renderProfilePhotos(state.profileTarget);
+  } catch (error) {
+    $('profile-notice').textContent = error.message;
+    $('profile-notice').classList.add('error');
+  }
+}
+
+async function removeProfilePhoto(photoId) {
+  try {
+    await deleteRequest(`/user/photos/${encodeURIComponent(photoId)}`);
+    state.profileTarget.photos = state.profileTarget.photos.filter(photo => photo.id !== photoId);
+    renderProfilePhotos(state.profileTarget);
+    $('profile-notice').textContent = 'Photo removed from your profile.';
+    $('profile-notice').classList.remove('error');
+  } catch (error) {
+    $('profile-notice').textContent = error.message;
+    $('profile-notice').classList.add('error');
   }
 }
 
@@ -234,7 +319,7 @@ async function loadProfileDashboard(profile) {
   }
 }
 
-async function compressProfilePhoto(file) {
+async function compressProfilePhoto(file, maxBytes = 128 * 1024) {
   if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 10 * 1024 * 1024) {
     throw new Error('Choose a JPG, PNG, WebP or GIF image under 10 MB.');
   }
@@ -249,9 +334,9 @@ async function compressProfilePhoto(file) {
     if (!context) throw new Error('Could not process this image.');
     const crop = Math.min(bitmap.width, bitmap.height);
     context.drawImage(bitmap, (bitmap.width - crop) / 2, (bitmap.height - crop) / 2, crop, crop, 0, 0, size, size);
-    for (const quality of [0.8, 0.68, 0.55, 0.42]) {
+    for (const quality of [0.8, 0.68, 0.55, 0.42, 0.3]) {
       const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
-      if (blob && blob.size <= 128 * 1024) {
+      if (blob && blob.size <= maxBytes) {
         return await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(reader.result);
@@ -263,7 +348,7 @@ async function compressProfilePhoto(file) {
   } finally {
     bitmap.close();
   }
-  throw new Error('This image is too large to use as a profile photo (maximum 128 KB after compression).');
+  throw new Error(`This image is too large after compression (maximum ${Math.floor(maxBytes / 1024)} KB).`);
 }
 
 function makePerson(profile, actions = []) {
@@ -1479,6 +1564,44 @@ $('profile-photo-input').addEventListener('change', async event => {
     $('profile-notice').classList.add('error');
   } finally {
     input.value = '';
+  }
+});
+$('profile-gallery-input').addEventListener('change', async event => {
+  const input = event.currentTarget;
+  const files = [...(input.files || [])];
+  if (!files.length || !state.profileTarget || state.profileTarget.id !== state.user.id) return;
+  const remaining = 9 - (state.profileTarget.photos || []).length;
+  const addLabel = $('profile-gallery-add-label');
+  if (remaining <= 0) {
+    $('profile-notice').textContent = 'Your profile photo grid is full. Remove a photo before adding another.';
+    $('profile-notice').classList.add('error');
+    input.value = '';
+    return;
+  }
+  addLabel.textContent = 'Uploading…';
+  addLabel.classList.add('disabled');
+  input.disabled = true;
+  const failures = [];
+  try {
+    for (const file of files.slice(0, remaining)) {
+      try {
+        const image = await compressProfilePhoto(file, 64 * 1024);
+        const photo = await post('/user/photos', { image });
+        state.profileTarget.photos ||= [];
+        state.profileTarget.photos.push(photo);
+      } catch (error) {
+        failures.push(`${file.name}: ${error.message}`);
+      }
+    }
+    renderProfilePhotos(state.profileTarget);
+    if (files.length > remaining) failures.push(`Only ${remaining} more photos fit in your profile grid.`);
+    $('profile-notice').textContent = failures.length ? failures.join(' ') : 'Photos added to your profile.';
+    $('profile-notice').classList.toggle('error', failures.length > 0);
+  } finally {
+    input.value = '';
+    input.disabled = false;
+    addLabel.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> Add photos';
+    addLabel.classList.remove('disabled');
   }
 });
 $('profile-remove-photo').addEventListener('click', () => {

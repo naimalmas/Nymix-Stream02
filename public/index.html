@@ -83,7 +83,7 @@
             <div class="user-name">Naim Almas</div>
             <div class="user-plan">Premium member</div>
           </div>
-          <button class="settings-btn" id="settings-btn" aria-label="Settings"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#settings"></use></svg></button>
+          <button class="user-menu-button" id="profile-view-btn" title="Profile & dashboard" aria-label="Profile and dashboard"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg></button>
         </div>
       </div>
     </aside>
@@ -250,23 +250,6 @@
         </div>
       </div>
     </aside>
-  </div>
-
-  <!-- Settings Modal -->
-  <div class="modal-bg hidden" id="modal-bg">
-    <div class="modal-box">
-      <div class="modal-top">
-        <h3><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#settings"></use></svg> Settings</h3>
-        <button id="modal-close" aria-label="Close settings"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
-      </div>
-      <div class="modal-content">
-        <label>YouTube API Key</label>
-        <input type="password" id="api-input" placeholder="Paste a new YouTube API key" autocomplete="off" />
-        <div class="api-msg" id="api-msg"></div>
-        <button class="save-btn" id="save-btn">Save Key</button>
-        <p class="modal-hint"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#lightbulb"></use></svg> console.cloud.google.com <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg> YouTube Data API v3 <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg> Create Credentials</p>
-      </div>
-    </div>
   </div>
 
   <script src="app.js"></script>

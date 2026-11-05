@@ -393,6 +393,19 @@ app.get('/api/user/history', auth, (req, res) => {
   res.json(plays.filter(p => p.userId === req.user.id).reverse().slice(0, 50));
 });
 
+function validProfileImage(dataUrl, maxBytes) {
+  const photo = typeof dataUrl === 'string'
+    ? /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(dataUrl)
+    : null;
+  if (!photo) return false;
+  const image = Buffer.from(photo[2], 'base64');
+  if (image.length > maxBytes || image.toString('base64').replace(/=+$/, '') !== photo[2].replace(/=+$/, '')) return false;
+  const imageType = image.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ? 'jpeg'
+    : image.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ? 'png'
+      : image.toString('ascii', 0, 4) === 'RIFF' && image.toString('ascii', 8, 12) === 'WEBP' ? 'webp' : '';
+  return imageType === photo[1];
+}
+
 app.put('/api/user/profile', auth, async (req, res) => {
   try {
     const { name, avatar, bio } = req.body;
@@ -405,16 +418,8 @@ app.put('/api/user/profile', auth, async (req, res) => {
     if (avatar !== undefined && typeof avatar !== 'string') {
       return res.status(400).json({ error: 'Invalid profile photo' });
     }
-    if (avatar) {
-      const photo = /^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(avatar);
-      const image = photo ? Buffer.from(photo[1], 'base64') : null;
-      const imageType = image?.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ? 'jpeg'
-        : image?.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ? 'png'
-          : image?.toString('ascii', 0, 4) === 'RIFF' && image.toString('ascii', 8, 12) === 'WEBP' ? 'webp' : '';
-      if (!photo || image.length > 128 * 1024 || image.toString('base64').replace(/=+$/, '') !== photo[1].replace(/=+$/, '') ||
-          imageType !== photo[0].match(/^data:image\/(jpeg|png|webp);/)[1]) {
-        return res.status(400).json({ error: 'Profile photo must be a JPEG, PNG or WebP image under 128 KB' });
-      }
+    if (avatar && !validProfileImage(avatar, 128 * 1024)) {
+      return res.status(400).json({ error: 'Profile photo must be a JPEG, PNG or WebP image under 128 KB' });
     }
     const users = rd('users.json');
     const u = users.find(u => u.id === req.user.id);
@@ -425,6 +430,61 @@ app.put('/api/user/profile', auth, async (req, res) => {
     wd('users.json', users);
     res.json({ ok: true, user: { id: u.id, name: u.name, email: u.email, role: u.role, avatar: u.avatar || '', bio: u.bio || '' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/user/photos', userAuth, (req, res) => {
+  const { image, caption = '' } = req.body;
+  if (!validProfileImage(image, 64 * 1024)) {
+    return res.status(400).json({ error: 'Photo must be a JPEG, PNG or WebP image under 64 KB' });
+  }
+  if (typeof caption !== 'string' || caption.trim().length > 150) {
+    return res.status(400).json({ error: 'Photo captions must be 150 characters or fewer' });
+  }
+  const users = rd('users.json');
+  const account = users.find(user => user.id === req.user.id);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+  account.photos ||= [];
+  if (account.photos.length >= 9) return res.status(409).json({ error: 'Your profile photo grid is full. Remove a photo before adding another.' });
+  const photo = {
+    id: crypto.randomBytes(12).toString('hex'),
+    image,
+    caption: caption.trim(),
+    createdAt: new Date().toISOString(),
+  };
+  account.photos.push(photo);
+  wd('users.json', users);
+  res.status(201).json({ ...photo });
+});
+
+app.delete('/api/user/photos/:photoId', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const account = users.find(user => user.id === req.user.id);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+  account.photos ||= [];
+  const index = account.photos.findIndex(photo => photo.id === req.params.photoId);
+  if (index < 0) return res.status(404).json({ error: 'Photo not found' });
+  account.photos.splice(index, 1);
+  wd('users.json', users);
+  res.json({ ok: true });
+});
+
+app.put('/api/user/photos/order', userAuth, (req, res) => {
+  const { photoIds } = req.body;
+  if (!Array.isArray(photoIds) || photoIds.length > 9 || photoIds.some(id => typeof id !== 'string') ||
+      new Set(photoIds).size !== photoIds.length) {
+    return res.status(400).json({ error: 'Invalid photo order' });
+  }
+  const users = rd('users.json');
+  const account = users.find(user => user.id === req.user.id);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+  account.photos ||= [];
+  if (photoIds.length !== account.photos.length || photoIds.some(id => !account.photos.some(photo => photo.id === id))) {
+    return res.status(400).json({ error: 'Photo order must include every profile photo exactly once' });
+  }
+  const photosById = new Map(account.photos.map(photo => [photo.id, photo]));
+  account.photos = photoIds.map(id => photosById.get(id));
+  wd('users.json', users);
+  res.json({ photos: account.photos });
 });
 
 // ══════════════════════════════════════════════════════
@@ -538,6 +598,7 @@ app.get('/api/users/:userId/profile', userAuth, (req, res) => {
   res.json({
     ...safeProfile(account),
     bio: account.bio || '',
+    photos: Array.isArray(account.photos) ? account.photos : [],
     createdAt: account.createdAt || '',
     totalPlays: account.totalPlays || 0,
     relation: relation?.status === 'accepted' ? 'friends'

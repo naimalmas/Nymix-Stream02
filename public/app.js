@@ -629,7 +629,6 @@ function updateUserMenu() {
           ${u.role === 'admin'
             ? `<button onclick="window.open('/admin/','_blank')" title="Admin" class="user-menu-button">${iconSvg('shield')}</button>` : ''}
           <button title="Profile & dashboard" aria-label="Profile and dashboard" id="profile-view-btn" class="user-menu-button">${iconSvg('user')}</button>
-          <button title="Settings" id="settings-btn" class="user-menu-button">${iconSvg('settings')}</button>
           <button onclick="logout()" title="Logout" class="user-menu-button">${iconSvg('close')}</button>
         </div>
       </div>`;
@@ -665,21 +664,6 @@ function logout() {
   localStorage.removeItem('nx_token');
   localStorage.removeItem('nx_user');
   window.location.href = '/login.html';
-}
-
-// ── Settings ──────────────────────────────────────────
-async function saveSettings() {
-  const k = $('api-input').value.trim();
-  if (!k) return;
-  if (token()) {
-    await apiFetch('/admin/config', {
-      method: 'PUT',
-      body: JSON.stringify({ ytApiKey: k }),
-    }).catch(() => {});
-  }
-  $('api-msg').textContent = 'Saved!';
-  $('api-msg').className   = 'api-msg ok';
-  setTimeout(() => $('modal-bg').classList.add('hidden'), 800);
 }
 
 // ── Helpers ───────────────────────────────────────────
@@ -732,12 +716,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   buildRadio();
   renderPlayed();
 
-  // Load API config
-  if (token()) {
-    const cfg = await apiFetch('/admin/config').catch(() => null);
-    if (cfg && cfg.ytApiKey && $('api-input')) $('api-input').value = cfg.ytApiKey;
-  }
-
   // ── Search ──
   const inp = $('search-input');
   if (inp) {
@@ -787,14 +765,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ── Show all ──
   // ── See all played ──
   $('see-all-btn').addEventListener('click', () => showView('liked'));
-
-  // ── Settings Modal ──
-  $('settings-btn').addEventListener('click', () => $('modal-bg').classList.remove('hidden'));
-  $('modal-close').addEventListener('click',  () => $('modal-bg').classList.add('hidden'));
-  $('modal-bg').addEventListener('click', e => {
-    if (e.target === $('modal-bg')) $('modal-bg').classList.add('hidden');
-  });
-  $('save-btn').addEventListener('click', saveSettings);
 
   // ── Keyboard Shortcuts ──
   document.addEventListener('keydown', e => {

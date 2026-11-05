@@ -255,8 +255,20 @@
       <label class="profile-field" for="profile-bio">About<textarea id="profile-bio" maxlength="160" rows="3" placeholder="A little about you…"></textarea></label>
       <p class="profile-meta" id="profile-meta"></p>
       <p class="notice profile-notice" id="profile-notice" role="status" aria-live="polite"></p>
+      <section class="profile-gallery" aria-label="Profile photos">
+        <header class="profile-gallery-header">
+          <div><h3>Photos</h3><span class="profile-photo-count" id="profile-photo-count">0 photos</span></div>
+          <label class="button secondary profile-gallery-add" id="profile-gallery-add-label" for="profile-gallery-input">
+            <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> Add photos
+          </label>
+          <input class="sr-only" id="profile-gallery-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple />
+        </header>
+        <div class="profile-photo-grid" id="profile-photo-grid"></div>
+        <p class="profile-gallery-empty" id="profile-gallery-empty">Your profile photos will appear here.</p>
+        <p class="profile-photo-hint" id="profile-gallery-hint">Add up to 9 photos. Use the arrows to arrange your grid.</p>
+      </section>
       <section class="profile-dashboard" id="profile-dashboard" hidden aria-label="Your listening dashboard">
-        <h3>Your listening dashboard</h3>
+        <h3>Your listening</h3>
         <div class="profile-stats">
           <div><span>Liked songs</span><strong id="profile-liked-count">0</strong></div>
           <div><span>Total plays</span><strong id="profile-play-count">0</strong></div>
