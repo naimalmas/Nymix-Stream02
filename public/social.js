@@ -43,6 +43,9 @@ const state = {
   reelsLoading: false,
   reelsNextPageToken: null,
   reelsLoaded: false,
+  reelsLazyObserver: null,
+  reelsPageObserver: null,
+  reelsObservedEnd: null,
   callSignalError: '',
   youtubeReady: false,
   player: null,
@@ -474,6 +477,7 @@ function renderList(container, items, emptyText, renderItem) {
 function setPanel(panelName, syncParent = true) {
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${panelName}`));
   document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.panel === panelName));
+  document.body.classList.toggle('reels-active', panelName === 'reels');
   if (syncParent && ['chat', 'people', 'feed', 'profile'].includes(panelName) && window.parent !== window) {
     window.parent.postMessage({ type: 'nymix-social-navigation', panel: panelName }, window.location.origin);
   }
@@ -621,11 +625,30 @@ async function loadReels(reset = false, append = false) {
   const status = $('reels-status');
   const more = $('reels-more');
   if (reset) {
+    if (state.reelsPageObserver && state.reelsObservedEnd) state.reelsPageObserver.unobserve(state.reelsObservedEnd);
+    state.reelsObservedEnd = null;
     state.reelsNextPageToken = null;
     state.reelsLoaded = false;
     list.replaceChildren();
   }
   if (state.reelsLoaded && !reset && !append) return;
+  if ('IntersectionObserver' in window) {
+    state.reelsLazyObserver ||= new IntersectionObserver(entries => {
+      entries.forEach(entry => {
+        if (!entry.isIntersecting) return;
+        const player = entry.target;
+        player.src = player.dataset.src;
+        player.removeAttribute('data-src');
+        state.reelsLazyObserver.unobserve(player);
+      });
+    }, { root: list, rootMargin: '100% 0px' });
+    state.reelsPageObserver ||= new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting) || state.reelsLoading) return;
+      if (state.reelsObservedEnd) state.reelsPageObserver.unobserve(state.reelsObservedEnd);
+      state.reelsObservedEnd = null;
+      loadReels(false, true);
+    }, { root: list, rootMargin: '100% 0px' });
+  }
   state.reelsLoading = true;
   status.classList.remove('error');
   status.textContent = 'Loading Reels…';
@@ -639,7 +662,7 @@ async function loadReels(reset = false, append = false) {
       card.className = 'reel-card';
       const player = document.createElement('iframe');
       player.className = 'reel-player';
-      player.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reel.id)}?playsinline=1&rel=0`;
+      player.dataset.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reel.id)}?playsinline=1&rel=0`;
       player.title = `${reel.title} — ${reel.channel}`;
       player.loading = 'lazy';
       player.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
@@ -659,13 +682,22 @@ async function loadReels(reset = false, append = false) {
       details.append(title, channel, link);
       card.append(player, details);
       list.appendChild(card);
+      if (state.reelsLazyObserver) state.reelsLazyObserver.observe(player);
+      else {
+        player.src = player.dataset.src;
+        player.removeAttribute('data-src');
+      }
     });
     state.reelsNextPageToken = data.nextPageToken || null;
     state.reelsLoaded = true;
     status.textContent = data.items.length
       ? 'Recent YouTube Shorts selected for this community.'
       : list.childElementCount ? '' : 'No matching Shorts found yet. Try another topic in Super Admin settings.';
-    more.hidden = !state.reelsNextPageToken;
+    more.hidden = !state.reelsNextPageToken || Boolean(state.reelsPageObserver);
+    if (state.reelsNextPageToken && state.reelsPageObserver && list.lastElementChild) {
+      state.reelsObservedEnd = list.lastElementChild;
+      state.reelsPageObserver.observe(state.reelsObservedEnd);
+    }
   } catch (error) {
     status.textContent = error.message;
     status.classList.add('error');
