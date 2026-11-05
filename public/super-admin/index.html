@@ -90,11 +90,17 @@
         </div>
       </section>
       <section id="platform" class="panel" style="margin-top:14px;max-width:700px">
-        <div class="panel-head"><h2>YouTube search configuration</h2></div>
+        <div class="panel-head"><h2>YouTube and Reels settings</h2></div>
         <form id="key-form" class="form">
           <label>API key<input id="api-key" type="password" autocomplete="new-password" placeholder="Enter a key to replace the saved key" /></label>
           <button class="btn" type="submit">Save key</button>
           <div id="key-status" role="status"></div>
+        </form>
+        <form id="reels-form" class="form" style="margin-top:18px">
+          <label>Reels topic<input id="reels-query" type="text" maxlength="100" required placeholder="music #shorts" /></label>
+          <div class="sub">The Reels feed automatically searches recent, embeddable YouTube Shorts matching this topic. YouTube API quota applies.</div>
+          <button class="btn" type="submit">Save Reels topic</button>
+          <div class="message" id="reels-status" role="status"></div>
         </form>
       </section>
     </main>
@@ -143,6 +149,7 @@ async function loadAdmins(){
 async function loadKeyStatus(){
   const data=await api('/admin/config');
   document.getElementById('key-status').textContent=data.ytApiKeyConfigured?'A key is configured':'No key configured';
+  document.getElementById('reels-query').value=data.ytReelsQuery||'music #shorts';
 }
 async function loadAll(){
   try{await Promise.all([loadOverview(),loadAdmins(),loadKeyStatus()]);}
@@ -164,6 +171,15 @@ document.getElementById('key-form').addEventListener('submit',async event=>{
   if(!key){showMessage(status,'Enter an API key first',true);return;}
   try{await api('/admin/config',{method:'PUT',body:JSON.stringify({ytApiKey:key})});document.getElementById('api-key').value='';showMessage(status,'API key saved');}
   catch(error){showMessage(status,error.message,true);}
+});
+document.getElementById('reels-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const topic=document.getElementById('reels-query').value.trim();
+  const status=document.getElementById('reels-status');
+  try{
+    await api('/admin/config',{method:'PUT',body:JSON.stringify({ytReelsQuery:topic})});
+    showMessage(status,'Reels topic saved');
+  }catch(error){showMessage(status,error.message,true);}
 });
 async function setAdminStatus(id,banned){
   try{await api(`/super-admin/admins/${encodeURIComponent(id)}`,{method:'PUT',body:JSON.stringify({banned})});await loadAll();}

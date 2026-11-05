@@ -524,6 +524,57 @@ app.get('/api/social/feed', userAuth, (req, res) => {
   res.json(posts);
 });
 
+const reelsCache = new Map();
+app.get('/api/social/reels', userAuth, async (req, res) => {
+  const pageToken = typeof req.query.pageToken === 'string' ? req.query.pageToken : '';
+  if (pageToken.length > 500) return res.status(400).json({ error: 'Invalid page token' });
+  try {
+    const config = rd('config.json');
+    const query = String(config.ytReelsQuery || 'music #shorts').trim().slice(0, 100);
+    const cacheKey = `${query}:${pageToken}`;
+    const cached = reelsCache.get(cacheKey);
+    if (cached && cached.expiresAt > Date.now()) return res.json(cached.data);
+    const key = process.env.YOUTUBE_API_KEY || config.ytApiKey;
+    if (!key) return res.status(503).json({ error: 'YouTube API key is required to load Reels. Ask the Super Admin to configure it.' });
+    const params = new URLSearchParams({
+      part: 'snippet',
+      q: query.toLocaleLowerCase().includes('#shorts') ? query : `${query} #shorts`,
+      type: 'video',
+      videoDuration: 'short',
+      videoEmbeddable: 'true',
+      order: 'date',
+      maxResults: '15',
+      key,
+    });
+    if (pageToken) params.set('pageToken', pageToken);
+    const response = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+    const data = await response.json();
+    if (!response.ok || data.error) {
+      throw new Error(data.error?.message || 'Could not load YouTube Shorts');
+    }
+    const result = {
+      items: (data.items || []).flatMap(item => {
+        const id = item.id?.videoId;
+        if (typeof id !== 'string' || !/^[\w-]{11}$/.test(id)) return [];
+        return [{
+          id,
+          title: String(item.snippet?.title || 'YouTube Short').slice(0, 200),
+          channel: String(item.snippet?.channelTitle || 'YouTube creator').slice(0, 120),
+          publishedAt: item.snippet?.publishedAt || '',
+          thumbnail: item.snippet?.thumbnails?.high?.url || item.snippet?.thumbnails?.medium?.url || '',
+        }];
+      }),
+      nextPageToken: data.nextPageToken || null,
+    };
+    if (reelsCache.size >= 100) reelsCache.delete(reelsCache.keys().next().value);
+    reelsCache.set(cacheKey, { data: result, expiresAt: Date.now() + 10 * 60 * 1000 });
+    res.json(result);
+  } catch (error) {
+    console.error('YouTube Reels request failed:', error.message);
+    res.status(502).json({ error: 'Unable to load YouTube Reels right now. Please try again later.' });
+  }
+});
+
 // ══════════════════════════════════════════════════════
 //  FRIENDS
 // ══════════════════════════════════════════════════════
@@ -1241,6 +1292,7 @@ app.get('/api/admin/config', superAdminAuth, (req, res) => {
   const config = rd('config.json');
   res.json({
     ytApiKeyConfigured: Boolean(process.env.YOUTUBE_API_KEY || config.ytApiKey),
+    ytReelsQuery: config.ytReelsQuery || 'music #shorts',
     featuredSongs: config.featuredSongs,
   });
 });
@@ -1249,6 +1301,13 @@ app.put('/api/admin/config', superAdminAuth, (req, res) => {
   const cfg = rd('config.json');
   if (req.body.ytApiKey) cfg.ytApiKey = req.body.ytApiKey;
   if (req.body.featuredSongs) cfg.featuredSongs = req.body.featuredSongs;
+  if (req.body.ytReelsQuery !== undefined) {
+    if (typeof req.body.ytReelsQuery !== 'string' || !req.body.ytReelsQuery.trim() || req.body.ytReelsQuery.trim().length > 100) {
+      return res.status(400).json({ error: 'Reels topic must be between 1 and 100 characters' });
+    }
+    cfg.ytReelsQuery = req.body.ytReelsQuery.trim();
+    reelsCache.clear();
+  }
   wd('config.json', cfg);
   res.json({ ok: true });
 });

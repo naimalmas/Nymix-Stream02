@@ -112,6 +112,20 @@ h3 { font-size: 14px; margin: 0 0 12px; }
 .feed-like-count { font-size: 11px; }
 .feed-post-caption { margin: 0; padding: 6px 15px 15px; color: #e4ddec; font-size: 12px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .feed-empty { margin: 0; padding: 24px; border: 1px dashed var(--border); border-radius: 14px; color: var(--muted); text-align: center; font-size: 12px; }
+.panel.active.reels-panel { display: flex; width: min(100%, 900px); min-height: 0; flex-direction: column; gap: 12px; margin: 0 auto; }
+.reels-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.reels-heading h1 { margin-bottom: 5px; font-size: clamp(26px,4vw,36px); }
+.reels-heading p:last-child { margin: 0; color: var(--muted); font-size: 12px; }
+.reels-status { min-height: 18px; margin: 0; color: var(--muted); font-size: 12px; }
+.reels-status.error { color: var(--red); }
+.reels-feed { display: grid; max-height: calc(100dvh - 200px); min-height: 300px; gap: 18px; overflow-y: auto; overscroll-behavior: contain; scroll-snap-type: y mandatory; }
+.reel-card { display: flex; min-height: 0; flex-direction: column; align-items: center; gap: 8px; scroll-snap-align: start; scroll-snap-stop: always; }
+.reel-player { display: block; width: min(100%,360px); height: min(68dvh,640px); min-height: 280px; aspect-ratio: 9 / 16; border: 0; border-radius: 16px; background: #000; }
+.reel-details { display: grid; width: min(100%,360px); gap: 2px; padding: 0 4px; }
+.reel-details strong { overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.reel-details span, .reel-details a { color: var(--muted); font-size: 10px; }
+.reel-details a { width: fit-content; color: var(--purple-light); text-decoration: none; }
+.reels-more { align-self: center; }
 .feed-sidebar { position: sticky; top: 16px; }
 .feed-sidebar h2 { margin-bottom: 8px; }
 .feed-sidebar .button { margin-top: 6px; }

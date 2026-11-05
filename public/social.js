@@ -40,6 +40,9 @@ const state = {
   profilePhoto: '',
   feedPreviewUrl: '',
   feedLoading: false,
+  reelsLoading: false,
+  reelsNextPageToken: null,
+  reelsLoaded: false,
   callSignalError: '',
   youtubeReady: false,
   player: null,
@@ -475,6 +478,7 @@ function setPanel(panelName, syncParent = true) {
     window.parent.postMessage({ type: 'nymix-social-navigation', panel: panelName }, window.location.origin);
   }
   if (panelName === 'feed') loadFeed().catch(error => showNotice(error.message, true));
+  if (panelName === 'reels') loadReels().catch(error => showNotice(error.message, true));
 }
 
 function renderFeed(posts) {
@@ -609,6 +613,66 @@ function openPhotoShare(photoPost) {
     friends.appendChild(button);
   });
   dialog.showModal();
+}
+
+async function loadReels(reset = false, append = false) {
+  if (state.reelsLoading) return;
+  const list = $('reels-feed');
+  const status = $('reels-status');
+  const more = $('reels-more');
+  if (reset) {
+    state.reelsNextPageToken = null;
+    state.reelsLoaded = false;
+    list.replaceChildren();
+  }
+  if (state.reelsLoaded && !reset && !append) return;
+  state.reelsLoading = true;
+  status.classList.remove('error');
+  status.textContent = 'Loading Reels…';
+  more.hidden = true;
+  try {
+    const path = `/social/reels${state.reelsNextPageToken ? `?pageToken=${encodeURIComponent(state.reelsNextPageToken)}` : ''}`;
+    const data = await api(path);
+    if (!Array.isArray(data.items)) throw new Error('Invalid Reels feed response');
+    data.items.forEach(reel => {
+      const card = document.createElement('article');
+      card.className = 'reel-card';
+      const player = document.createElement('iframe');
+      player.className = 'reel-player';
+      player.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reel.id)}?playsinline=1&rel=0`;
+      player.title = `${reel.title} — ${reel.channel}`;
+      player.loading = 'lazy';
+      player.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
+      player.referrerPolicy = 'strict-origin-when-cross-origin';
+      player.allowFullscreen = true;
+      const details = document.createElement('div');
+      details.className = 'reel-details';
+      const title = document.createElement('strong');
+      title.textContent = reel.title;
+      const channel = document.createElement('span');
+      channel.textContent = reel.channel;
+      const link = document.createElement('a');
+      link.href = `https://www.youtube.com/shorts/${encodeURIComponent(reel.id)}`;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      link.textContent = 'Open on YouTube';
+      details.append(title, channel, link);
+      card.append(player, details);
+      list.appendChild(card);
+    });
+    state.reelsNextPageToken = data.nextPageToken || null;
+    state.reelsLoaded = true;
+    status.textContent = data.items.length
+      ? 'Recent YouTube Shorts selected for this community.'
+      : list.childElementCount ? '' : 'No matching Shorts found yet. Try another topic in Super Admin settings.';
+    more.hidden = !state.reelsNextPageToken;
+  } catch (error) {
+    status.textContent = error.message;
+    status.classList.add('error');
+    more.hidden = !state.reelsNextPageToken;
+  } finally {
+    state.reelsLoading = false;
+  }
 }
 
 async function loadFeed() {
@@ -1808,6 +1872,8 @@ $('sign-out').addEventListener('click', () => {
 
 $('account-profile-button').addEventListener('click', () => openProfile(state.user.id));
 $('feed-refresh').addEventListener('click', () => loadFeed().catch(error => showNotice(error.message, true)));
+$('reels-refresh').addEventListener('click', () => loadReels(true));
+$('reels-more').addEventListener('click', () => loadReels(false, true));
 $('feed-profile-button').addEventListener('click', () => openProfile(state.user.id));
 $('profile-page-edit').addEventListener('click', () => {
   if (!state.profileTarget || state.profileTarget.id !== state.user.id) return;
@@ -2157,7 +2223,7 @@ if (chatListenCard) {
 }
 
 const initialPanel = new URLSearchParams(window.location.search).get('panel');
-if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed') setPanel(initialPanel, false);
+if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed' || initialPanel === 'reels') setPanel(initialPanel, false);
 else if (initialPanel === 'profile') setPanel('profile', false);
 window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || event.source !== window.parent) return;
@@ -2165,7 +2231,7 @@ window.addEventListener('message', event => {
     openProfile(state.user.id, false);
     return;
   }
-  if (event.data?.type === 'nymix-social-panel' && ['people', 'chat', 'feed'].includes(event.data.panel)) {
+  if (event.data?.type === 'nymix-social-panel' && ['people', 'chat', 'feed', 'reels'].includes(event.data.panel)) {
     setPanel(event.data.panel, false);
   } else if (event.data?.type === 'nymix-social-panel' && event.data.panel === 'profile') {
     openProfile(state.user.id, false);

@@ -18,6 +18,7 @@
       <button class="tab active" data-panel="chat"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#list"></use></svg> Messages</button>
       <button class="tab" data-panel="people"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Discover</button>
       <button class="tab" data-panel="feed"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#album"></use></svg> Feed</button>
+      <button class="tab" data-panel="reels"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg> Reels</button>
       <button class="tab" data-panel="profile"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg> Profile</button>
     </nav>
     <div class="account">
@@ -88,6 +89,16 @@
           <button type="button" class="button secondary" id="feed-profile-button">View your profile</button>
         </aside>
       </div>
+    </section>
+
+    <section class="panel reels-panel" id="panel-reels">
+      <header class="reels-heading">
+        <div><p class="eyebrow">YOUTUBE SHORTS</p><h1>Reels</h1><p>Recent short videos from YouTube, shown with the official player.</p></div>
+        <button type="button" class="button secondary" id="reels-refresh">Refresh</button>
+      </header>
+      <p class="reels-status" id="reels-status" role="status" aria-live="polite">Loading Reels…</p>
+      <div class="reels-feed" id="reels-feed"></div>
+      <button type="button" class="button secondary reels-more" id="reels-more" hidden>Load more</button>
     </section>
 
     <section class="panel" id="panel-people">

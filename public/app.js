@@ -590,7 +590,7 @@ function renderPlayed() {
 
 // ── Views ─────────────────────────────────────────────
 function showView(name, syncPortal = true) {
-  const viewName = name === 'add-friend' || name === 'feed' || name === 'profile' ? 'messages' : name;
+  const viewName = name === 'add-friend' || name === 'feed' || name === 'reels' || name === 'profile' ? 'messages' : name;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const v = document.getElementById('view-' + viewName);
   if (v) v.classList.add('active');
@@ -601,13 +601,13 @@ function showView(name, syncPortal = true) {
   const titles = {
     home: "What's hot", discover: 'Discover',
     browse: 'Browse', liked: 'Your Library', radio: 'Radio',
-    messages: 'Messages', feed: 'Feed', profile: 'Profile', 'add-friend': 'Add friend',
+    messages: 'Messages', feed: 'Feed', reels: 'Reels', profile: 'Profile', 'add-friend': 'Add friend',
   };
   $('view-title').textContent = titles[name] || '';
   if (viewName === 'messages' && syncPortal) {
     $('social-portal')?.contentWindow?.postMessage({
       type: 'nymix-social-panel',
-      panel: name === 'add-friend' ? 'people' : ['feed', 'profile'].includes(name) ? name : 'chat',
+      panel: name === 'add-friend' ? 'people' : ['feed', 'reels', 'profile'].includes(name) ? name : 'chat',
     }, window.location.origin);
   }
 }
@@ -705,7 +705,7 @@ document.addEventListener('DOMContentLoaded', async () => {
       localStorage.setItem('nx_user', JSON.stringify(event.data.user));
       updateUserMenu();
     } else if (event.data?.type === 'nymix-social-navigation' &&
-        ['messages', 'people', 'feed', 'profile'].includes(event.data.panel)) {
+        ['messages', 'people', 'feed', 'reels', 'profile'].includes(event.data.panel)) {
       showView(event.data.panel === 'people' ? 'add-friend' : event.data.panel, false);
     }
   });
@@ -729,7 +729,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('social-portal')?.addEventListener('load', () => {
     const activeView = document.querySelector('.nav-link.active')?.dataset.view;
-    if (activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'profile') showView(activeView);
+    if (activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'reels' || activeView === 'profile') showView(activeView);
   });
 
   await loadLiked();
