@@ -12,8 +12,8 @@ const fetch    = require('node-fetch');
 const { AsyncLocalStorage } = require('async_hooks');
 const { Pool } = require('pg');
 
-const app  = express();
-const PORT = 3000;
+const app = express();
+const PORT = Number(process.env.PORT) || 3000;
 const isVercel = Boolean(process.env.VERCEL);
 
 app.use(cors());
@@ -23,21 +23,30 @@ app.use(express.static(path.join(__dirname, 'public')));
 // ── Data Helpers ──────────────────────────────────────
 const dataDir = path.join(__dirname, 'data');
 if (!isVercel) fs.mkdirSync(dataDir, { recursive: true });
-const dp  = f  => path.join(dataDir, f);
+const dp = file => path.join(dataDir, file);
 const requestState = new AsyncLocalStorage();
-const rd = f => {
+const rd = file => {
   const state = requestState.getStore();
-  return state ? state[f] : JSON.parse(fs.readFileSync(dp(f), 'utf8'));
+  return state ? state[file] : JSON.parse(fs.readFileSync(dp(file), 'utf8'));
 };
-const wd = (f, data) => {
+const wd = (file, value) => {
   const state = requestState.getStore();
-  if (state) state[f] = data;
-  else fs.writeFileSync(dp(f), JSON.stringify(data, null, 2));
+  if (state) state[file] = value;
+  else fs.writeFileSync(dp(file), JSON.stringify(value, null, 2));
 };
 
 if (!isVercel) {
-  [['config.json', 'config.example.json'], ['users.json', 'users.example.json'], ['liked.json', 'liked.example.json'], ['plays.json', 'plays.example.json']]
-    .forEach(([file, example]) => { if (!fs.existsSync(dp(file))) fs.copyFileSync(dp(example), dp(file)); });
+  [
+    ['config.json', 'config.example.json'],
+    ['users.json', 'users.example.json'],
+    ['liked.json', 'liked.example.json'],
+    ['plays.json', 'plays.example.json'],
+    ['friends.json', 'friends.example.json'],
+    ['messages.json', 'messages.example.json'],
+    ['social.json', 'social.example.json'],
+  ].forEach(([file, example]) => {
+    if (!fs.existsSync(dp(file))) fs.copyFileSync(dp(example), dp(file));
+  });
 }
 
 if (isVercel && !process.env.JWT_SECRET) throw new Error('JWT_SECRET must be configured in Vercel');
@@ -80,23 +89,38 @@ async function initializeDatabase() {
         config jsonb NOT NULL,
         users jsonb NOT NULL,
         liked jsonb NOT NULL,
-        plays jsonb NOT NULL
+        plays jsonb NOT NULL,
+        friends jsonb NOT NULL DEFAULT '[]'::jsonb,
+        messages jsonb NOT NULL DEFAULT '{}'::jsonb,
+        social jsonb NOT NULL DEFAULT '{"listenRooms":[],"games":[],"roomMessages":{}}'::jsonb
       )`);
+      await database.query("ALTER TABLE nymix_state ADD COLUMN IF NOT EXISTS friends jsonb NOT NULL DEFAULT '[]'::jsonb");
+      await database.query("ALTER TABLE nymix_state ADD COLUMN IF NOT EXISTS messages jsonb NOT NULL DEFAULT '{}'::jsonb");
+      await database.query("ALTER TABLE nymix_state ADD COLUMN IF NOT EXISTS social jsonb NOT NULL DEFAULT '{\"listenRooms\":[],\"games\":[],\"roomMessages\":{}}'::jsonb");
       const existing = await database.query('SELECT id FROM nymix_state WHERE id = 1');
       if (existing.rowCount) return;
       if (!process.env.SUPER_ADMIN_PASSWORD || process.env.SUPER_ADMIN_PASSWORD.length < 12) {
         throw new Error('SUPER_ADMIN_PASSWORD (at least 12 characters) must be configured in Vercel');
       }
-      const seed = name => JSON.parse(fs.readFileSync(path.join(dataDir, name), 'utf8'));
+      const seed = name => JSON.parse(fs.readFileSync(dp(name), 'utf8'));
       const config = seed('config.example.json');
       if (process.env.YOUTUBE_API_KEY) config.ytApiKey = process.env.YOUTUBE_API_KEY;
       const users = seed('users.example.json');
       const superAdmin = users.find(user => user.id === 'admin_001');
+      if (!superAdmin) throw new Error('Super Admin seed account is missing');
       superAdmin.role = 'super_admin';
       superAdmin.password = await bcrypt.hash(process.env.SUPER_ADMIN_PASSWORD, 10);
       await database.query(
-        'INSERT INTO nymix_state (id, config, users, liked, plays) VALUES (1, $1::jsonb, $2::jsonb, $3::jsonb, $4::jsonb) ON CONFLICT (id) DO NOTHING',
-        [JSON.stringify(config), JSON.stringify(users), JSON.stringify(seed('liked.example.json')), JSON.stringify(seed('plays.example.json'))],
+        'INSERT INTO nymix_state (id, config, users, liked, plays, friends, messages, social) VALUES (1, $1::jsonb, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, $6::jsonb, $7::jsonb) ON CONFLICT (id) DO NOTHING',
+        [
+          JSON.stringify(config),
+          JSON.stringify(users),
+          JSON.stringify(seed('liked.example.json')),
+          JSON.stringify(seed('plays.example.json')),
+          JSON.stringify(seed('friends.example.json')),
+          JSON.stringify(seed('messages.example.json')),
+          JSON.stringify(seed('social.example.json')),
+        ],
       );
     })();
   }
@@ -110,13 +134,16 @@ async function persistentState(req, res, next) {
     await initializeDatabase();
     client = await database.connect();
     await client.query('BEGIN');
-    const result = await client.query('SELECT config, users, liked, plays FROM nymix_state WHERE id = 1 FOR UPDATE');
+    const result = await client.query('SELECT config, users, liked, plays, friends, messages, social FROM nymix_state WHERE id = 1 FOR UPDATE');
     if (!result.rowCount) throw new Error('Application database state is not initialized');
     const state = {
       'config.json': result.rows[0].config,
       'users.json': result.rows[0].users,
       'liked.json': result.rows[0].liked,
       'plays.json': result.rows[0].plays,
+      'friends.json': result.rows[0].friends,
+      'messages.json': result.rows[0].messages,
+      'social.json': result.rows[0].social,
     };
     let finished = false;
     const sendJson = res.json.bind(res);
@@ -126,8 +153,16 @@ async function persistentState(req, res, next) {
       (async () => {
         try {
           await client.query(
-            'UPDATE nymix_state SET config = $1::jsonb, users = $2::jsonb, liked = $3::jsonb, plays = $4::jsonb WHERE id = 1',
-            [JSON.stringify(state['config.json']), JSON.stringify(state['users.json']), JSON.stringify(state['liked.json']), JSON.stringify(state['plays.json'])],
+            'UPDATE nymix_state SET config = $1::jsonb, users = $2::jsonb, liked = $3::jsonb, plays = $4::jsonb, friends = $5::jsonb, messages = $6::jsonb, social = $7::jsonb WHERE id = 1',
+            [
+              JSON.stringify(state['config.json']),
+              JSON.stringify(state['users.json']),
+              JSON.stringify(state['liked.json']),
+              JSON.stringify(state['plays.json']),
+              JSON.stringify(state['friends.json']),
+              JSON.stringify(state['messages.json']),
+              JSON.stringify(state['social.json']),
+            ],
           );
           await client.query('COMMIT');
           sendJson(body);
@@ -172,46 +207,33 @@ const roleAuth = (...roles) => (req, res, next) => auth(req, res, () => {
   next();
 });
 const userAuth = roleAuth('user');
-const adminAuth = roleAuth('admin', 'super_admin');
+const adminAuth = (req, res, next) => auth(req, res, () => {
+  if (!['admin', 'super_admin'].includes(req.user.role)) return res.status(403).json({ error: 'Admin only' });
+  next();
+});
 const superAdminAuth = roleAuth('super_admin');
 
 // ══════════════════════════════════════════════════════
-//  AUTH ROUTES
+//  AUTH
 // ══════════════════════════════════════════════════════
-
-// POST /api/auth/register
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password } = req.body;
     if (!name || !email || !password) return res.status(400).json({ error: 'All fields required' });
-
     const users = rd('users.json');
     if (users.find(u => u.email === email)) return res.status(409).json({ error: 'Email already exists' });
-
     const hash = await bcrypt.hash(password, 10);
-    const user = {
-      id: 'u_' + Date.now(),
-      name, email,
-      password: hash,
-      role: 'user',
-      avatar: '',
-      createdAt: new Date().toISOString(),
-      banned: false,
-      totalPlays: 0,
-    };
+    const user = { id: 'u_' + Date.now(), name, email, password: hash, role: 'user', avatar: '', createdAt: new Date().toISOString(), banned: false, totalPlays: 0, bio: '' };
     users.push(user);
     wd('users.json', users);
-
     const liked = rd('liked.json');
     liked[user.id] = [];
     wd('liked.json', liked);
-
     const token = jwt.sign({ id: user.id, name, email, role: 'user' }, SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user.id, name, email, role: 'user', avatar: '' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// POST /api/auth/login
 app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -219,28 +241,22 @@ app.post('/api/auth/login', async (req, res) => {
     const user  = users.find(u => u.email === email);
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     if (user.banned) return res.status(403).json({ error: 'Account banned' });
-
-    const ok = await bcrypt.compare(password, user.password);
-    if (!ok) return res.status(401).json({ error: 'Invalid credentials' });
-
+    if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: user.id, name: user.name, email, role: user.role }, SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user.id, name: user.name, email, role: user.role, avatar: user.avatar } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/auth/me
 app.get('/api/auth/me', auth, (req, res) => {
   const users = rd('users.json');
   const user  = users.find(u => u.id === req.user.id);
   if (!user) return res.status(404).json({ error: 'Not found' });
-  res.json({ id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, createdAt: user.createdAt, totalPlays: user.totalPlays });
+  res.json({ id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar, createdAt: user.createdAt, totalPlays: user.totalPlays, bio: user.bio || '' });
 });
 
 // ══════════════════════════════════════════════════════
-//  MUSIC ROUTES
+//  MUSIC
 // ══════════════════════════════════════════════════════
-
-// GET /api/search?q=...
 app.get('/api/search', async (req, res) => {
   const { q } = req.query;
   if (typeof q !== 'string' || !q.trim()) return res.status(400).json({ error: 'Query required' });
@@ -250,7 +266,7 @@ app.get('/api/search', async (req, res) => {
   }
   try {
     const cfg = rd('config.json');
-    const key = cfg.ytApiKey || process.env.YOUTUBE_API_KEY;
+    const key = process.env.YOUTUBE_API_KEY || cfg.ytApiKey;
     if (!key) {
       const query = q.trim().toLocaleLowerCase();
       const items = cfg.featuredSongs.filter(song =>
@@ -258,7 +274,6 @@ app.get('/api/search', async (req, res) => {
       );
       return res.json({ items, nextPageToken: null, searchLimited: true });
     }
-
     const params = new URLSearchParams({
       part: 'snippet',
       q: `${q} song`,
@@ -268,280 +283,501 @@ app.get('/api/search', async (req, res) => {
       key,
     });
     if (pageToken) params.set('pageToken', pageToken);
-    const url = `https://www.googleapis.com/youtube/v3/search?${params}`;
-    const r   = await fetch(url);
-    const d   = await r.json();
+    const r = await fetch(`https://www.googleapis.com/youtube/v3/search?${params}`);
+    const d = await r.json();
     if (d.error) throw new Error(d.error.message);
-
     const songs = (d.items || []).map(it => ({
       id:     it.id.videoId,
       title:  it.snippet.title.replace(/\s*[\(\[].*?[\)\]]/g,'').trim(),
       artist: it.snippet.channelTitle.replace(' - Topic','').replace('VEVO','').trim(),
       thumb:  it.snippet.thumbnails.medium?.url,
-      dur:    '',
-      album:  'YouTube',
+      dur: '',
+      album: 'YouTube',
     }));
     res.json({ items: songs, nextPageToken: d.nextPageToken || null, searchLimited: false });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// GET /api/songs  → featured playlist
-app.get('/api/songs', (req, res) => {
-  const cfg = rd('config.json');
-  res.json(cfg.featuredSongs);
-});
+app.get('/api/songs', (req, res) => res.json(rd('config.json').featuredSongs));
 
-// POST /api/play  → start a listening session
-app.post('/api/play', userAuth, (req, res) => {
+app.post('/api/play', auth, (req, res) => {
   try {
     const { songId, songTitle, songArtist, thumb } = req.body;
-    if (!songId || !songTitle) return res.status(400).json({ error: 'Song ID and title required' });
     const plays = rd('plays.json');
-    const now = Date.now();
-    const sessionId = crypto.randomBytes(16).toString('hex');
-    plays.push({
-      sessionId, userId: req.user.id, userName: req.user.name,
-      songId, songTitle, songArtist, thumb, timestamp: now,
-      startedAt: now, lastHeartbeatAt: now, durationSeconds: 0, stoppedAt: null,
-    });
+    plays.push({ userId: req.user.id, userName: req.user.name, songId, songTitle, songArtist, thumb, timestamp: Date.now() });
     wd('plays.json', plays);
-
-    // Increment user totalPlays
     const users = rd('users.json');
     const u = users.find(u => u.id === req.user.id);
-    if (u) { u.totalPlays = (u.totalPlays||0)+1; wd('users.json', users); }
-
-    res.json({ ok: true, sessionId });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
-
-// PATCH /api/play/:sessionId  → account for playback time and stop a session
-app.patch('/api/play/:sessionId', userAuth, (req, res) => {
-  try {
-    const plays = rd('plays.json');
-    const session = plays.find(p => p.sessionId === req.params.sessionId && p.userId === req.user.id);
-    if (!session) return res.status(404).json({ error: 'Playback session not found' });
-    if (session.stoppedAt) return res.json({ ok: true });
-
-    const now = Date.now();
-    const previous = session.lastHeartbeatAt || session.startedAt || session.timestamp;
-    session.durationSeconds = (session.durationSeconds || 0) + Math.min(30, Math.max(0, (now - previous) / 1000));
-    session.lastHeartbeatAt = now;
-    if (req.body.stopped) session.stoppedAt = now;
-    wd('plays.json', plays);
+    if (u) { u.totalPlays = (u.totalPlays || 0) + 1; wd('users.json', users); }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ══════════════════════════════════════════════════════
-//  USER ROUTES
+//  USER
 // ══════════════════════════════════════════════════════
-
-// GET /api/user/liked
-app.get('/api/user/liked', userAuth, (req, res) => {
+app.get('/api/user/liked', auth, (req, res) => {
   const liked = rd('liked.json');
   res.json(liked[req.user.id] || []);
 });
 
-// POST /api/user/liked/:songId  → toggle like
-app.post('/api/user/liked/:songId', userAuth, (req, res) => {
+app.post('/api/user/liked/:songId', auth, (req, res) => {
   const liked = rd('liked.json');
   if (!liked[req.user.id]) liked[req.user.id] = [];
   const idx = liked[req.user.id].findIndex(s => s.id === req.params.songId);
-  if (idx >= 0) {
-    liked[req.user.id].splice(idx, 1);
-    wd('liked.json', liked);
-    res.json({ liked: false });
-  } else {
-    liked[req.user.id].unshift({ ...req.body, likedAt: Date.now() });
-    wd('liked.json', liked);
-    res.json({ liked: true });
-  }
+  if (idx >= 0) { liked[req.user.id].splice(idx, 1); wd('liked.json', liked); res.json({ liked: false }); }
+  else { liked[req.user.id].unshift({ ...req.body, likedAt: Date.now() }); wd('liked.json', liked); res.json({ liked: true }); }
 });
 
-// GET /api/user/history
-app.get('/api/user/history', userAuth, (req, res) => {
+app.get('/api/user/history', auth, (req, res) => {
   const plays = rd('plays.json');
-  const mine  = plays.filter(p => p.userId === req.user.id).reverse().slice(0, 50);
-  res.json(mine);
+  res.json(plays.filter(p => p.userId === req.user.id).reverse().slice(0, 50));
 });
 
-// PUT /api/user/profile
-app.put('/api/user/profile', userAuth, async (req, res) => {
+app.put('/api/user/profile', auth, async (req, res) => {
   try {
-    const { name, avatar } = req.body;
+    const { name, avatar, bio } = req.body;
     const users = rd('users.json');
     const u = users.find(u => u.id === req.user.id);
-    if (!u) return res.status(404).json({ error: 'User not found' });
+    if (!u) return res.status(404).json({ error: 'Not found' });
     if (name)   u.name   = name;
     if (avatar !== undefined) u.avatar = avatar;
+    if (bio !== undefined)    u.bio    = bio;
     wd('users.json', users);
-    res.json({ ok: true, name: u.name, avatar: u.avatar });
+    res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 // ══════════════════════════════════════════════════════
-//  ADMIN ROUTES
+//  FRIENDS
 // ══════════════════════════════════════════════════════
 
-app.get('/api/super-admin/overview', superAdminAuth, (req, res) => {
+const safeProfile = user => ({ id: user.id, name: user.name, avatar: user.avatar || '' });
+const getFriendship = (friends, first, second) => friends.find(relation =>
+  (relation.user1 === first && relation.user2 === second) ||
+  (relation.user1 === second && relation.user2 === first),
+);
+const areFriends = (first, second) => rd('friends.json').some(relation =>
+  relation.status === 'accepted' &&
+  ((relation.user1 === first && relation.user2 === second) || (relation.user1 === second && relation.user2 === first)),
+);
+const getSocialState = () => {
+  const state = rd('social.json');
+  state.listenRooms ||= [];
+  state.games ||= [];
+  state.roomMessages ||= {};
+  return state;
+};
+const randomCode = used => {
+  let code;
+  do { code = crypto.randomBytes(4).toString('hex').toUpperCase(); } while (used.has(code));
+  return code;
+};
+const validSong = song => song && /^[\w-]{11}$/.test(song.id) && typeof song.title === 'string' && song.title.trim().length <= 160;
+const cleanSong = song => ({
+  id: song.id,
+  title: song.title.trim(),
+  artist: String(song.artist || 'YouTube').trim().slice(0, 120),
+  thumb: `https://img.youtube.com/vi/${song.id}/mqdefault.jpg`,
+});
+const memberOf = (room, userId) => room.members.some(member => member.id === userId);
+
+app.get('/api/social/overview', userAuth, (req, res) => {
   const users = rd('users.json');
-  const plays = rd('plays.json');
-  res.json({
-    users: users.filter(user => user.role === 'user').length,
-    admins: users.filter(user => user.role === 'admin').length,
-    plays: plays.length,
-    bannedUsers: users.filter(user => user.role === 'user' && user.banned).length,
-  });
+  const relations = rd('friends.json');
+  const friends = relations.filter(relation => relation.status === 'accepted' && (relation.user1 === req.user.id || relation.user2 === req.user.id))
+    .map(relation => {
+      const friendId = relation.user1 === req.user.id ? relation.user2 : relation.user1;
+      const account = users.find(user => user.id === friendId && !user.banned);
+      return account ? { ...safeProfile(account), relationId: relation.id } : null;
+    }).filter(Boolean);
+  const requests = relations.filter(relation => relation.status === 'pending' && (relation.user1 === req.user.id || relation.user2 === req.user.id))
+    .map(relation => {
+      const incoming = relation.user2 === req.user.id;
+      const account = users.find(user => user.id === (incoming ? relation.user1 : relation.user2));
+      return account ? { ...safeProfile(account), id: relation.id, direction: incoming ? 'incoming' : 'outgoing' } : null;
+    }).filter(Boolean);
+  const social = getSocialState();
+  const rooms = social.listenRooms.filter(room => memberOf(room, req.user.id))
+    .map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, members: room.members }));
+  const games = social.games.filter(game => memberOf(game, req.user.id) && game.status !== 'closed')
+    .map(game => ({ code: game.code, hostName: game.hostName, status: game.status, members: game.members }));
+  res.json({ friends, requests, rooms, games });
 });
 
-app.get('/api/super-admin/admins', superAdminAuth, (req, res) => {
-  res.json(rd('users.json').filter(user => user.role === 'admin').map(user => ({
-    id: user.id, name: user.name, email: user.email, role: user.role,
-    createdAt: user.createdAt, banned: user.banned,
-  })));
+app.get('/api/users/search', userAuth, (req, res) => {
+  const query = typeof req.query.q === 'string' ? req.query.q.trim().toLocaleLowerCase() : '';
+  if (query.length < 2) return res.json([]);
+  const users = rd('users.json');
+  const friends = rd('friends.json');
+  const results = users
+    .filter(account => account.id !== req.user.id && !account.banned && account.role === 'user' &&
+      (String(account.name || '').toLocaleLowerCase().includes(query) || String(account.email || '').toLocaleLowerCase().includes(query)))
+    .slice(0, 20)
+    .map(account => {
+      const relation = getFriendship(friends, req.user.id, account.id);
+      return {
+        ...safeProfile(account),
+        relation: relation?.status === 'accepted' ? 'friends'
+          : relation?.status === 'pending' ? (relation.user1 === req.user.id ? 'sent' : 'received')
+            : 'none',
+        requestId: relation?.status === 'pending' && relation.user2 === req.user.id ? relation.id : null,
+      };
+    });
+  res.json(results);
 });
 
-app.post('/api/super-admin/admins', superAdminAuth, async (req, res) => {
+app.get('/api/friends', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const list = rd('friends.json')
+    .filter(relation => relation.status === 'accepted' && (relation.user1 === req.user.id || relation.user2 === req.user.id))
+    .map(relation => {
+      const friendId = relation.user1 === req.user.id ? relation.user2 : relation.user1;
+      const account = users.find(user => user.id === friendId && !user.banned);
+      return account ? { ...safeProfile(account), relationId: relation.id } : null;
+    })
+    .filter(Boolean);
+  res.json(list);
+});
+
+app.get('/api/friends/requests', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const requests = rd('friends.json').filter(relation =>
+    relation.status === 'pending' && (relation.user1 === req.user.id || relation.user2 === req.user.id),
+  ).map(relation => {
+    const incoming = relation.user2 === req.user.id;
+    const account = users.find(user => user.id === (incoming ? relation.user1 : relation.user2));
+    return account ? { ...safeProfile(account), id: relation.id, direction: incoming ? 'incoming' : 'outgoing' } : null;
+  }).filter(Boolean);
+  res.json(requests);
+});
+
+app.post('/api/friends/request/:toId', userAuth, (req, res) => {
+  const target = rd('users.json').find(account => account.id === req.params.toId && account.role === 'user' && !account.banned);
+  if (!target) return res.status(404).json({ error: 'User not found' });
+  if (target.id === req.user.id) return res.status(400).json({ error: 'You cannot add yourself' });
+  const friends = rd('friends.json');
+  const existing = getFriendship(friends, req.user.id, target.id);
+  if (existing) return res.status(409).json({ error: existing.status === 'accepted' ? 'Already friends' : 'A request already exists' });
+  const relation = {
+    id: `fr_${crypto.randomUUID()}`,
+    user1: req.user.id,
+    user1Name: req.user.name,
+    user2: target.id,
+    status: 'pending',
+    createdAt: Date.now(),
+  };
+  friends.push(relation);
+  wd('friends.json', friends);
+  res.status(201).json({ ok: true, requestId: relation.id });
+});
+
+app.put('/api/friends/:id', userAuth, (req, res) => {
+  if (!['accepted', 'rejected'].includes(req.body.status)) {
+    return res.status(400).json({ error: 'Status must be accepted or rejected' });
+  }
+  const friends = rd('friends.json');
+  const index = friends.findIndex(relation => relation.id === req.params.id);
+  if (index < 0 || friends[index].user2 !== req.user.id || friends[index].status !== 'pending') {
+    return res.status(404).json({ error: 'Friend request not found' });
+  }
+  if (req.body.status === 'rejected') friends.splice(index, 1);
+  else friends[index].status = 'accepted';
+  wd('friends.json', friends);
+  res.json({ ok: true });
+});
+
+app.delete('/api/friends/:id', userAuth, (req, res) => {
+  const friends = rd('friends.json');
+  const relation = friends.find(item => item.id === req.params.id && item.status === 'accepted' &&
+    (item.user1 === req.user.id || item.user2 === req.user.id));
+  if (!relation) return res.status(404).json({ error: 'Friendship not found' });
+  wd('friends.json', friends.filter(item => item.id !== relation.id));
+  res.json({ ok: true });
+});
+
+// ══════════════════════════════════════════════════════
+//  CHAT
+// ══════════════════════════════════════════════════════
+function chatRoomId(a, b) { return [a, b].sort().join(':'); }
+
+app.get('/api/chat/:friendId', userAuth, (req, res) => {
+  if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
+  const msgs = rd('messages.json');
+  const room = chatRoomId(req.user.id, req.params.friendId);
+  const after = Number(req.query.after) || 0;
+  res.json((msgs[room] || []).filter(message => message.ts > after).slice(-100));
+});
+
+app.post('/api/chat/:friendId', userAuth, (req, res) => {
   try {
-    const name = String(req.body.name || '').trim();
-    const email = String(req.body.email || '').trim().toLowerCase();
-    const password = String(req.body.password || '');
-    if (!name || !email || password.length < 8) return res.status(400).json({ error: 'Name, email, and a password of at least 8 characters are required' });
-
-    const users = rd('users.json');
-    if (users.some(user => user.email.toLowerCase() === email)) return res.status(409).json({ error: 'Email already exists' });
-    const admin = {
-      id: 'a_' + crypto.randomBytes(12).toString('hex'), name, email,
-      password: await bcrypt.hash(password, 10), role: 'admin', avatar: '',
-      createdAt: new Date().toISOString(), banned: false, totalPlays: 0,
-    };
-    users.push(admin);
-    wd('users.json', users);
-    res.status(201).json({ id: admin.id, name, email, role: admin.role, createdAt: admin.createdAt, banned: false });
+    if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Chat is available to friends only' });
+    const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';
+    if (!text) return res.status(400).json({ error: 'Message cannot be empty' });
+    if (text.length > 1000) return res.status(400).json({ error: 'Message must be 1000 characters or fewer' });
+    const msgs = rd('messages.json');
+    const room = chatRoomId(req.user.id, req.params.friendId);
+    if (!msgs[room]) msgs[room] = [];
+    const msg = { id: `m_${crypto.randomUUID()}`, from: req.user.id, fromName: req.user.name, text, ts: Date.now() };
+    msgs[room].push(msg);
+    if (msgs[room].length > 300) msgs[room] = msgs[room].slice(-300);
+    wd('messages.json', msgs);
+    res.status(201).json(msg);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-app.put('/api/super-admin/admins/:id', superAdminAuth, (req, res) => {
-  const users = rd('users.json');
-  const admin = users.find(user => user.id === req.params.id && user.role === 'admin');
-  if (!admin) return res.status(404).json({ error: 'Admin not found' });
-  if (typeof req.body.banned !== 'boolean') return res.status(400).json({ error: 'Banned status is required' });
-  admin.banned = req.body.banned;
-  wd('users.json', users);
+app.get('/api/listen-rooms', userAuth, (req, res) => {
+  const rooms = getSocialState().listenRooms.filter(room => room.members.some(member => member.id === req.user.id));
+  res.json(rooms.map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, members: room.members })));
+});
+
+app.post('/api/listen-rooms', userAuth, (req, res) => {
+  if (!validSong(req.body.song)) return res.status(400).json({ error: 'Choose a valid song first' });
+  const social = getSocialState();
+  social.listenRooms = social.listenRooms.filter(room => Date.now() - room.createdAt < 86400000);
+  if (social.listenRooms.length >= 100) return res.status(429).json({ error: 'There are too many active listening rooms; try again later' });
+  const used = new Set(social.listenRooms.map(room => room.code));
+  const room = {
+    code: randomCode(used),
+    hostId: req.user.id,
+    hostName: req.user.name,
+    song: cleanSong(req.body.song),
+    playing: false,
+    position: 0,
+    stateChangedAt: Date.now(),
+    members: [{ id: req.user.id, name: req.user.name }],
+    createdAt: Date.now(),
+  };
+  social.listenRooms.push(room);
+  wd('social.json', social);
+  res.status(201).json(room);
+});
+
+app.post('/api/listen-rooms/:code/join', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.listenRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room) return res.status(404).json({ error: 'Listening room not found' });
+  if (room.hostId !== req.user.id && !areFriends(room.hostId, req.user.id)) {
+    return res.status(403).json({ error: 'You must be friends with the host to join' });
+  }
+  if (!memberOf(room, req.user.id)) {
+    if (room.members.length >= 10) return res.status(409).json({ error: 'Listening room is full' });
+    room.members.push({ id: req.user.id, name: req.user.name });
+    wd('social.json', social);
+  }
+  res.json(room);
+});
+
+app.get('/api/listen-rooms/:code', userAuth, (req, res) => {
+  const room = getSocialState().listenRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !memberOf(room, req.user.id)) return res.status(404).json({ error: 'Listening room not found' });
+  const position = room.position + (room.playing ? (Date.now() - room.stateChangedAt) / 1000 : 0);
+  const messages = getSocialState().roomMessages[room.code] || [];
+  res.json({ ...room, position, messages: messages.slice(-50) });
+});
+
+app.put('/api/listen-rooms/:code', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.listenRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || room.hostId !== req.user.id) return res.status(404).json({ error: 'Listening room not found' });
+  const action = req.body.action;
+  if (!['play', 'pause', 'seek', 'song'].includes(action)) return res.status(400).json({ error: 'Invalid room action' });
+  const currentPosition = room.position + (room.playing ? (Date.now() - room.stateChangedAt) / 1000 : 0);
+  if (action === 'song') {
+    if (!validSong(req.body.song)) return res.status(400).json({ error: 'Choose a valid song' });
+    room.song = cleanSong(req.body.song);
+    room.position = 0;
+    room.playing = true;
+  } else {
+    const position = Number(req.body.position);
+    if (!Number.isFinite(position) || position < 0 || position > 86400) {
+      return res.status(400).json({ error: 'Invalid playback position' });
+    }
+    room.position = action === 'pause' ? position : action === 'seek' ? position : currentPosition;
+    room.playing = action === 'play';
+  }
+  room.stateChangedAt = Date.now();
+  wd('social.json', social);
   res.json({ ok: true });
 });
 
-app.delete('/api/super-admin/admins/:id', superAdminAuth, (req, res) => {
-  const users = rd('users.json');
-  if (!users.some(user => user.id === req.params.id && user.role === 'admin')) return res.status(404).json({ error: 'Admin not found' });
-  wd('users.json', users.filter(user => user.id !== req.params.id));
-  const liked = rd('liked.json');
-  delete liked[req.params.id];
-  wd('liked.json', liked);
+app.post('/api/listen-rooms/:code/chat', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.listenRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !memberOf(room, req.user.id)) return res.status(404).json({ error: 'Listening room not found' });
+  const text = typeof req.body.text === 'string' ? req.body.text.trim() : '';
+  if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters' });
+  const messages = social.roomMessages[room.code] || [];
+  const message = { id: `m_${crypto.randomUUID()}`, from: req.user.id, fromName: req.user.name, text, ts: Date.now() };
+  messages.push(message);
+  social.roomMessages[room.code] = messages.slice(-100);
+  wd('social.json', social);
+  res.status(201).json(message);
+});
+
+app.delete('/api/listen-rooms/:code', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.listenRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !memberOf(room, req.user.id)) return res.status(404).json({ error: 'Listening room not found' });
+  if (room.hostId === req.user.id) {
+    social.listenRooms = social.listenRooms.filter(item => item.code !== room.code);
+    delete social.roomMessages[room.code];
+  } else {
+    room.members = room.members.filter(member => member.id !== req.user.id);
+  }
+  wd('social.json', social);
   res.json({ ok: true });
 });
 
-// GET /api/admin/stats
+const ticTacToeWins = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [0, 3, 6], [1, 4, 7], [2, 5, 8], [0, 4, 8], [2, 4, 6]];
+
+app.get('/api/games', userAuth, (req, res) => {
+  const games = getSocialState().games.filter(game => game.members.some(member => member.id === req.user.id) && game.status !== 'closed');
+  res.json(games.map(game => ({ code: game.code, hostName: game.hostName, status: game.status, members: game.members })));
+});
+
+app.post('/api/games', userAuth, (req, res) => {
+  const social = getSocialState();
+  social.games = social.games.filter(game => Date.now() - game.createdAt < 7 * 86400000);
+  if (social.games.length >= 300) return res.status(429).json({ error: 'There are too many active games; try again later' });
+  const code = randomCode(new Set(social.games.map(game => game.code)));
+  const game = {
+    code,
+    hostId: req.user.id,
+    hostName: req.user.name,
+    members: [{ id: req.user.id, name: req.user.name, symbol: 'X' }],
+    board: Array(9).fill(null),
+    turn: req.user.id,
+    winner: null,
+    status: 'waiting',
+    createdAt: Date.now(),
+  };
+  social.games.push(game);
+  wd('social.json', social);
+  res.status(201).json(game);
+});
+
+app.post('/api/games/:code/join', userAuth, (req, res) => {
+  const social = getSocialState();
+  const game = social.games.find(item => item.code === req.params.code.toUpperCase() && item.status !== 'closed');
+  if (!game) return res.status(404).json({ error: 'Game not found' });
+  if (game.hostId !== req.user.id && !areFriends(game.hostId, req.user.id)) {
+    return res.status(403).json({ error: 'You must be friends with the host to join' });
+  }
+  if (memberOf(game, req.user.id)) return res.json(game);
+  if (game.status !== 'waiting' || game.members.length >= 2) return res.status(409).json({ error: 'Game is full or already started' });
+  game.members.push({ id: req.user.id, name: req.user.name, symbol: 'O' });
+  game.status = 'playing';
+  wd('social.json', social);
+  res.json(game);
+});
+
+app.get('/api/games/:code', userAuth, (req, res) => {
+  const game = getSocialState().games.find(item => item.code === req.params.code.toUpperCase() && item.status !== 'closed');
+  if (!game || !memberOf(game, req.user.id)) return res.status(404).json({ error: 'Game not found' });
+  res.json(game);
+});
+
+app.post('/api/games/:code/moves', userAuth, (req, res) => {
+  const social = getSocialState();
+  const game = social.games.find(item => item.code === req.params.code.toUpperCase() && item.status !== 'closed');
+  const index = req.body.index;
+  if (!game || !memberOf(game, req.user.id)) return res.status(404).json({ error: 'Game not found' });
+  if (game.status !== 'playing') return res.status(409).json({ error: 'Game is not in progress' });
+  if (!Number.isInteger(index) || index < 0 || index > 8) return res.status(400).json({ error: 'Invalid move' });
+  if (game.turn !== req.user.id) return res.status(409).json({ error: 'It is not your turn' });
+  if (game.board[index] !== null) return res.status(409).json({ error: 'That square is already taken' });
+  const player = game.members.find(member => member.id === req.user.id);
+  game.board[index] = player.symbol;
+  const winningLine = ticTacToeWins.find(([a, b, c]) => game.board[a] && game.board[a] === game.board[b] && game.board[a] === game.board[c]);
+  if (winningLine) {
+    game.winner = req.user.id;
+    game.winningLine = winningLine;
+    game.status = 'done';
+  } else if (game.board.every(Boolean)) {
+    game.status = 'draw';
+  } else {
+    game.turn = game.members.find(member => member.id !== req.user.id).id;
+  }
+  wd('social.json', social);
+  res.json(game);
+});
+
+app.post('/api/games/:code/reset', userAuth, (req, res) => {
+  const social = getSocialState();
+  const game = social.games.find(item => item.code === req.params.code.toUpperCase());
+  if (!game || game.hostId !== req.user.id) return res.status(404).json({ error: 'Game not found' });
+  if (game.members.length !== 2) return res.status(409).json({ error: 'Wait for another player before restarting' });
+  game.board = Array(9).fill(null);
+  game.turn = game.hostId;
+  game.winner = null;
+  delete game.winningLine;
+  game.status = 'playing';
+  wd('social.json', social);
+  res.json(game);
+});
+
+app.delete('/api/games/:code', userAuth, (req, res) => {
+  const social = getSocialState();
+  const game = social.games.find(item => item.code === req.params.code.toUpperCase());
+  if (!game || !memberOf(game, req.user.id)) return res.status(404).json({ error: 'Game not found' });
+  if (game.hostId === req.user.id) {
+    social.games = social.games.filter(item => item.code !== game.code);
+  } else {
+    game.members = game.members.filter(member => member.id !== req.user.id);
+    game.board = Array(9).fill(null);
+    game.turn = game.hostId;
+    game.winner = null;
+    delete game.winningLine;
+    game.status = 'waiting';
+  }
+  wd('social.json', social);
+  res.json({ ok: true });
+});
+
+// ══════════════════════════════════════════════════════
+//  ADMIN
+// ══════════════════════════════════════════════════════
 app.get('/api/admin/stats', adminAuth, (req, res) => {
   const users  = rd('users.json');
   const plays  = rd('plays.json');
   const liked  = rd('liked.json');
-  const config = rd('config.json');
-
-  const totalUsers  = users.filter(u => u.role === 'user').length;
+  const totalUsers  = users.filter(u => u.role !== 'admin').length;
   const totalPlays  = plays.length;
-  const totalLikes  = Object.values(liked).reduce((a,b) => a + b.length, 0);
+  const totalLikes  = Object.values(liked).reduce((a, b) => a + b.length, 0);
   const bannedUsers = users.filter(u => u.banned).length;
-  const now = Date.now();
-  const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
-  const todayStart = today.getTime();
-  const weekStart = todayStart - 6 * 86400000;
-  const previousWeekStart = weekStart - 7 * 86400000;
-  const newUsersToday = users.filter(u => u.role === 'user' && new Date(u.createdAt).getTime() >= todayStart).length;
-  const newUsersWeek = users.filter(u => u.role === 'user' && new Date(u.createdAt).getTime() >= weekStart).length;
-  const previousWeekUsers = users.filter(u => u.role === 'user' && new Date(u.createdAt).getTime() >= previousWeekStart && new Date(u.createdAt).getTime() < weekStart).length;
-  const playsToday = plays.filter(p => p.timestamp >= todayStart).length;
-  const likesToday = Object.values(liked).reduce((count, items) => count + items.filter(item => item.likedAt >= todayStart).length, 0);
-  const listeningByUser = {};
-  plays.forEach(p => {
-    if (!p.userId) return;
-    listeningByUser[p.userId] = (listeningByUser[p.userId] || 0) + (p.durationSeconds || 0);
-  });
-  const activeByUser = {};
-  plays.filter(p => !p.stoppedAt && p.lastHeartbeatAt && now - p.lastHeartbeatAt < 45000)
-    .forEach(p => { activeByUser[p.userId] = p; });
-  const listeners = users.filter(u => u.role === 'user').map(u => ({
-    id: u.id, name: u.name, email: u.email,
-    listenSeconds: Math.floor(listeningByUser[u.id] || 0),
-    totalPlays: u.totalPlays || 0,
-    currentlyListening: Boolean(activeByUser[u.id]),
-    currentSong: activeByUser[u.id]?.songTitle || '',
-  })).sort((a, b) => b.listenSeconds - a.listenSeconds);
-
-  // Top songs
   const songCount = {};
-  plays.forEach(p => { songCount[p.songId] = (songCount[p.songId]||{ count:0, title:p.songTitle, artist:p.songArtist, thumb:p.thumb }); songCount[p.songId].count++; });
-  const topSongs = Object.entries(songCount).sort((a,b)=>b[1].count-a[1].count).slice(0,5).map(([id,v])=>({id,...v}));
-
-  // Plays per day (last 7 local days)
-  const playsPerDay = Array.from({ length: 7 }, (_, i) => {
-    const date = new Date(now);
-    date.setHours(0, 0, 0, 0);
-    date.setDate(date.getDate() - (6 - i));
-    const start = date.getTime();
-    return {
-      label: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-      count: plays.filter(p => p.timestamp >= start && p.timestamp < start + 86400000).length,
-    };
+  plays.forEach(p => {
+    if (!songCount[p.songId]) songCount[p.songId] = { count: 0, title: p.songTitle, artist: p.songArtist, thumb: p.thumb };
+    songCount[p.songId].count++;
   });
-
-  // Recent activity
-  const recentActivity = plays.slice(-10).reverse().map(p => ({
-    user: users.find(u=>u.id===p.userId)?.name || 'Unknown',
-    song: p.songTitle, artist: p.songArtist,
-    time: p.timestamp,
-    listenSeconds: Math.floor(p.durationSeconds || 0),
-  }));
-
-  res.json({
-    totalUsers, totalPlays, totalLikes, bannedUsers, topSongs, playsPerDay,
-    recentActivity, listeners, currentlyListening: Object.keys(activeByUser).length,
-    totalListenSeconds: Object.values(listeningByUser).reduce((sum, seconds) => sum + seconds, 0),
-    totalSongs: config.featuredSongs.length, newUsersToday, playsToday, likesToday,
-    newUsersWeek,
-    growthRate: previousWeekUsers ? (newUsersWeek - previousWeekUsers) / previousWeekUsers : 0,
-  });
+  const topSongs = Object.entries(songCount).sort((a,b)=>b[1].count-a[1].count).slice(0,10).map(([id,v])=>({id,...v}));
+  const now = Date.now();
+  const days = Array.from({length:7},(_,i)=>{
+    const d = new Date(now - i*86400000);
+    return d.toLocaleDateString('en-US',{month:'short',day:'numeric'});
+  }).reverse();
+  const playsPerDay = days.map(label => ({ label, count: plays.filter(p => new Date(p.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'}) === label).length }));
+  const recent = plays.slice(-10).reverse().map(p => ({ user: users.find(u=>u.id===p.userId)?.name||'Unknown', song: p.songTitle, artist: p.songArtist, time: new Date(p.timestamp).toLocaleTimeString() }));
+  res.json({ totalUsers, totalPlays, totalLikes, bannedUsers, topSongs, playsPerDay, recent });
 });
 
-// GET /api/admin/users
 app.get('/api/admin/users', adminAuth, (req, res) => {
-  const plays = rd('plays.json');
-  const users = rd('users.json').filter(u => u.role === 'user').map(u => ({
-    id: u.id, name: u.name, email: u.email, role: u.role,
-    createdAt: u.createdAt, banned: u.banned, totalPlays: u.totalPlays||0,
-    listenSeconds: Math.floor(plays.filter(p => p.userId === u.id).reduce((sum, p) => sum + (p.durationSeconds || 0), 0)),
-    currentSong: plays.slice().reverse().find(p => p.userId === u.id && !p.stoppedAt && p.lastHeartbeatAt && Date.now() - p.lastHeartbeatAt < 45000)?.songTitle || '',
-  }));
-  res.json(users);
+  res.json(rd('users.json').map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt, banned: u.banned, totalPlays: u.totalPlays||0 })));
 });
 
-// PUT /api/admin/users/:id  → ban/unban or change role
 app.put('/api/admin/users/:id', adminAuth, (req, res) => {
   const users = rd('users.json');
   const u = users.find(u => u.id === req.params.id);
-  if (!u || u.role !== 'user') return res.status(404).json({ error: 'User not found' });
-  if (req.body.role !== undefined) return res.status(403).json({ error: 'Only a Super Admin can change account roles' });
+  if (!u) return res.status(404).json({ error: 'Not found' });
   if (req.body.banned !== undefined) u.banned = req.body.banned;
+  if (req.body.role) u.role = req.body.role;
   wd('users.json', users);
   res.json({ ok: true });
 });
 
-// DELETE /api/admin/users/:id
 app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
   let users = rd('users.json');
-  if (!users.some(u => u.id === req.params.id && u.role === 'user')) return res.status(404).json({ error: 'User not found' });
   users = users.filter(u => u.id !== req.params.id);
   wd('users.json', users);
   const liked = rd('liked.json');
@@ -550,56 +786,14 @@ app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/admin/plays
-app.get('/api/admin/plays', adminAuth, (req, res) => {
-  res.json(rd('plays.json').reverse().slice(0,100));
-});
-
-// GET /api/admin/songs
-app.get('/api/admin/songs', adminAuth, (req, res) => {
+app.get('/api/admin/config', superAdminAuth, (req, res) => {
   const config = rd('config.json');
-  const plays = rd('plays.json');
-  const liked = rd('liked.json');
-  const songs = config.featuredSongs.map(song => ({
-    ...song,
-    plays: plays.filter(play => play.songId === song.id).length,
-    likes: Object.values(liked).reduce((count, items) => count + items.filter(item => item.id === song.id).length, 0),
-  }));
-  res.json(songs);
+  res.json({
+    ytApiKeyConfigured: Boolean(process.env.YOUTUBE_API_KEY || config.ytApiKey),
+    featuredSongs: config.featuredSongs,
+  });
 });
 
-// POST /api/admin/songs
-app.post('/api/admin/songs', adminAuth, (req, res) => {
-  const rawId = String(req.body.id || req.body.youtubeUrl || '').trim();
-  const match = rawId.match(/^(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)?([A-Za-z0-9_-]{11})(?:[?&/].*)?$/);
-  const { title, artist } = req.body;
-  if (!match || !title || !artist) return res.status(400).json({ error: 'Valid YouTube video URL/ID, title, and artist are required' });
-
-  const config = rd('config.json');
-  const id = match[1];
-  if (config.featuredSongs.some(song => song.id === id)) return res.status(409).json({ error: 'Song already exists' });
-  const song = {
-    id, title: String(title).trim(), artist: String(artist).trim(),
-    dur: String(req.body.dur || ''), album: String(req.body.album || 'YouTube'),
-    thumb: `https://img.youtube.com/vi/${id}/mqdefault.jpg`, createdAt: new Date().toISOString(),
-  };
-  if (!song.title || !song.artist) return res.status(400).json({ error: 'Title and artist are required' });
-  config.featuredSongs.unshift(song);
-  wd('config.json', config);
-  res.status(201).json(song);
-});
-
-// DELETE /api/admin/songs/:id
-app.delete('/api/admin/songs/:id', adminAuth, (req, res) => {
-  const config = rd('config.json');
-  const songs = config.featuredSongs.filter(song => song.id !== req.params.id);
-  if (songs.length === config.featuredSongs.length) return res.status(404).json({ error: 'Song not found' });
-  config.featuredSongs = songs;
-  wd('config.json', config);
-  res.json({ ok: true });
-});
-
-// PUT /api/admin/config  → update API key / featured songs
 app.put('/api/admin/config', superAdminAuth, (req, res) => {
   const cfg = rd('config.json');
   if (req.body.ytApiKey) cfg.ytApiKey = req.body.ytApiKey;
@@ -608,25 +802,13 @@ app.put('/api/admin/config', superAdminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// GET /api/admin/config
-app.get('/api/admin/config', superAdminAuth, (req, res) => {
-  const config = rd('config.json');
-  res.json({ ytApiKeyConfigured: Boolean(config.ytApiKey || process.env.YOUTUBE_API_KEY) });
-});
+// Catch-all
+app.get('*', (req, res) => res.sendFile(path.join(__dirname, 'public', 'index.html')));
 
-// ── Catch all → serve index.html ─────────────────────
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+if (!isVercel) {
+  app.listen(PORT, () => {
+    console.log(`Nymix listening on http://localhost:${PORT}`);
+  });
+}
 
-app.listen(PORT, () => {
-  console.log('\n🎵  NYMIX Music Platform');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log(`🌐  App:     http://localhost:${PORT}`);
-  console.log(`👑  Super Admin: http://localhost:${PORT}/super-admin`);
-  console.log(`🛡️  Admin:   http://localhost:${PORT}/admin`);
-  console.log(`👤  User:    http://localhost:${PORT}/user`);
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-  console.log('📧  Super Admin: admin@nymix.com');
-  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
-});
+module.exports = app;

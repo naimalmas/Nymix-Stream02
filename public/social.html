@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Nymix Social</title>
+  <link rel="stylesheet" href="/social.css" />
+  <script src="https://www.youtube.com/iframe_api"></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">Nymix <span>Social</span></a>
+    <nav aria-label="Social features">
+      <button class="tab active" data-panel="people">People</button>
+      <button class="tab" data-panel="chat">Chat</button>
+      <button class="tab" data-panel="listen">Listen together</button>
+      <button class="tab" data-panel="games">Games</button>
+    </nav>
+    <div class="account">
+      <span id="account-name"></span>
+      <button class="button secondary" id="sign-out">Sign out</button>
+    </div>
+  </header>
+
+  <main>
+    <div class="page-heading">
+      <div>
+        <p class="eyebrow">YOUR MUSIC, TOGETHER</p>
+        <h1>Friends, chat & play</h1>
+      </div>
+      <div class="sync-indicator"><span class="online-dot"></span> Updates every few seconds</div>
+    </div>
+    <p class="notice" id="notice" role="status" aria-live="polite"></p>
+
+    <section class="panel active" id="panel-people">
+      <div class="columns">
+        <article class="card">
+          <div class="card-heading"><div><p class="eyebrow">DISCOVER</p><h2>Find people</h2></div></div>
+          <form id="user-search-form" class="inline-form">
+            <label class="sr-only" for="user-search">Search by name or email</label>
+            <input id="user-search" autocomplete="off" placeholder="Search name or email…" minlength="2" />
+            <button class="button" type="submit">Search</button>
+          </form>
+          <div id="search-results" class="stack empty-state">Search for a friend by name or email.</div>
+        </article>
+        <article class="card">
+          <div class="card-heading"><div><p class="eyebrow">YOUR PEOPLE</p><h2>Friends</h2></div><span class="count" id="friend-count">0</span></div>
+          <div id="friends-list" class="stack empty-state">Your accepted friends will appear here.</div>
+        </article>
+      </div>
+      <article class="card">
+        <div class="card-heading"><div><p class="eyebrow">CONNECTIONS</p><h2>Friend requests</h2></div></div>
+        <div id="requests-list" class="stack empty-state">No pending requests.</div>
+      </article>
+    </section>
+
+    <section class="panel" id="panel-chat">
+      <div class="columns chat-layout">
+        <article class="card">
+          <div class="card-heading"><div><p class="eyebrow">PRIVATE MESSAGES</p><h2>Friends</h2></div></div>
+          <div id="chat-friends" class="stack empty-state">Add a friend to start chatting.</div>
+        </article>
+        <article class="card chat-card">
+          <div class="card-heading"><div><p class="eyebrow">CONVERSATION</p><h2 id="chat-title">Choose a friend</h2></div></div>
+          <div id="chat-messages" class="messages empty-state">Your private conversation will appear here.</div>
+          <form id="chat-form" class="inline-form message-form">
+            <label class="sr-only" for="chat-input">Message</label>
+            <input id="chat-input" maxlength="1000" placeholder="Write a message…" disabled />
+            <button class="button" id="chat-send" type="submit" disabled>Send</button>
+          </form>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-listen">
+      <div class="columns listen-layout">
+        <article class="card">
+          <div class="card-heading"><div><p class="eyebrow">PICK THE MUSIC</p><h2>Start a listening room</h2></div></div>
+          <form id="song-search-form" class="inline-form">
+            <label class="sr-only" for="song-search">Search songs</label>
+            <input id="song-search" autocomplete="off" placeholder="Search songs on YouTube…" />
+            <button class="button" type="submit">Search</button>
+          </form>
+          <div id="song-results" class="stack empty-state">Search for a song, then choose it to start your room.</div>
+          <form id="room-join-form" class="inline-form join-form">
+            <label class="sr-only" for="room-code">Listening room code</label>
+            <input id="room-code" maxlength="8" placeholder="Enter a friend's room code" />
+            <button class="button secondary" type="submit">Join room</button>
+          </form>
+          <div class="card-heading subheading"><div><p class="eyebrow">ACTIVE ROOMS</p><h2>Your rooms</h2></div></div>
+          <div id="rooms-list" class="stack empty-state">No active listening rooms.</div>
+        </article>
+        <article class="card listen-card">
+          <div class="card-heading"><div><p class="eyebrow">SYNCED PLAYBACK</p><h2 id="room-title">No room selected</h2></div></div>
+          <div id="room-player-wrap" class="player-wrap"><div id="room-player"></div><p id="player-placeholder">Join a room or start one to listen together.</p></div>
+          <div class="room-meta"><span id="room-code-display"></span><span id="room-members"></span></div>
+          <div class="player-controls">
+            <button class="button" id="room-play" disabled>Play</button>
+            <button class="button secondary" id="room-pause" disabled>Pause</button>
+            <button class="button secondary" id="room-leave" disabled>Leave room</button>
+          </div>
+          <p class="hint" id="room-hint">Only the room host controls playback. Share the room code with a friend.</p>
+          <div class="room-chat">
+            <h3>Room chat</h3>
+            <div class="messages room-messages" id="room-messages">Room chat appears here.</div>
+            <form id="room-chat-form" class="inline-form message-form">
+              <label class="sr-only" for="room-chat-input">Room message</label>
+              <input id="room-chat-input" maxlength="500" placeholder="Message everyone in the room…" disabled />
+              <button class="button" id="room-chat-send" type="submit" disabled>Send</button>
+            </form>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-games">
+      <div class="columns game-layout">
+        <article class="card">
+          <div class="card-heading"><div><p class="eyebrow">TWO PLAYERS</p><h2>Tic-tac-toe</h2></div></div>
+          <p class="description">Create a game and share its code with a friend, or join their game with a code.</p>
+          <button class="button" id="game-create">Create a game</button>
+          <form id="game-join-form" class="inline-form join-form">
+            <label class="sr-only" for="game-code-input">Game code</label>
+            <input id="game-code-input" maxlength="8" placeholder="Enter a friend's game code" />
+            <button class="button secondary" type="submit">Join game</button>
+          </form>
+          <div class="card-heading subheading"><div><p class="eyebrow">YOUR GAMES</p><h2>Active games</h2></div></div>
+          <div id="games-list" class="stack empty-state">No active games.</div>
+        </article>
+        <article class="card game-card">
+          <div class="card-heading"><div><p class="eyebrow">YOUR MATCH</p><h2 id="game-title">No game selected</h2></div></div>
+          <p class="room-meta" id="game-code-display"></p>
+          <p class="game-status" id="game-status">Create a game or join a friend's game.</p>
+          <div class="board" id="game-board" role="grid" aria-label="Tic-tac-toe board"></div>
+          <div class="player-controls">
+            <button class="button secondary" id="game-reset" disabled>Play again</button>
+            <button class="button secondary" id="game-leave" disabled>Leave game</button>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+  <script src="/social.js"></script>
+</body>
+</html>

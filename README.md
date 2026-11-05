@@ -2,6 +2,12 @@
 
 Nymix is an Express-backed music app with separate User, Admin, and Super Admin dashboards.
 
+## Social features
+
+Signed-in members can find other members by name or email, send and accept friend requests, and chat privately. Friends can start or join a listening room with a shareable code, sync YouTube playback, and use room chat. Tic-tac-toe rooms support two friends and synchronize moves through the API. Social data is stored with the app state in PostgreSQL on Vercel and in ignored local JSON files during development; updates use short-interval polling.
+
+Open **Friends & Games** in the music app, or go directly to `/social.html`. A friend relationship is required before private chats, listening rooms, or games can be joined.
+
 ## Local development
 
 ```sh
