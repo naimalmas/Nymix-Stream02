@@ -695,7 +695,7 @@ async function loadReels(reset = false, append = false) {
       card.className = 'reel-card';
       const player = document.createElement('iframe');
       player.className = 'reel-player';
-      player.dataset.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reel.id)}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&playsinline=1&rel=0`;
+      player.dataset.src = `https://www.youtube-nocookie.com/embed/${encodeURIComponent(reel.id)}?enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}&playsinline=1&rel=0&mute=1`;
       player.title = `${reel.title} — ${reel.channel}`;
       player.loading = 'lazy';
       player.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share';
@@ -725,7 +725,7 @@ async function loadReels(reset = false, append = false) {
     state.reelsNextPageToken = data.nextPageToken || null;
     state.reelsLoaded = true;
     status.textContent = data.items.length
-      ? 'Recent YouTube Shorts selected for this community.'
+      ? 'Recent YouTube Shorts selected for this community. Reels autoplay muted; use the player controls for sound.'
       : list.childElementCount ? '' : 'No matching Shorts found yet. Try another topic in Super Admin settings.';
     more.hidden = !state.reelsNextPageToken || Boolean(state.reelsPageObserver);
     if (state.reelsNextPageToken && state.reelsPageObserver && list.lastElementChild) {
@@ -744,9 +744,11 @@ async function loadReels(reset = false, append = false) {
 function initializeReelPlayer(iframe) {
   if (!state.youtubeReady || !window.YT?.Player || !iframe.src || state.reelPlayers.has(iframe)) return;
   const player = new YT.Player(iframe, {
+    playerVars: { mute: 1, playsinline: 1, rel: 0 },
     events: {
       onReady: event => {
         if (state.activeReelPlayer === iframe && document.body.classList.contains('reels-active')) {
+          event.target.mute();
           event.target.playVideo();
         }
       },
@@ -776,6 +778,7 @@ function setActiveReel(iframe) {
   const player = state.reelPlayers.get(iframe);
   if (!player) return;
   try {
+    player.mute();
     player.playVideo();
   } catch (error) {
     console.error('Could not start the active Reel:', error);
