@@ -149,7 +149,7 @@ async function play(song) {
   // Update hero banner
   $('hero-img').src = song.thumb || `https://img.youtube.com/vi/${song.id}/maxresdefault.jpg`;
   $('hero-title').textContent = song.title;
-  $('hero-listeners').textContent = 'Naim Almas Official';
+  $('hero-listeners').textContent = song.artist || 'YouTube';
 
   // Page title
   document.title = `${song.title} — Nymix`;
@@ -458,35 +458,87 @@ function renderLiked() {
   });
 }
 
-// ── Playlist Table ────────────────────────────────────
+// ── Featured music packs ──────────────────────────────
+const featuredPacks = [
+  {
+    id: 'nymix',
+    title: 'Nymix Picks',
+    fallbackTitle: 'Naim Almas Official',
+    fallbackArtist: 'Naim Almas',
+    channelUrl: 'https://www.youtube.com/@naimalmasofficial',
+    songs: [],
+    error: '',
+  },
+  {
+    id: 'prokash',
+    title: 'Prokash Hits',
+    fallbackTitle: 'Prokash Hits',
+    fallbackArtist: 'Prokash',
+    channelUrl: 'https://www.youtube.com/channel/UCh0udHXRXh-wxmX65ZOzVZw',
+    songs: [],
+    error: '',
+  },
+];
 let featuredSongs = [];
-async function buildPlaylist() {
-  const tbody = $('playlist-body');
-  try {
-    const data = await apiFetch('/promoted-songs');
-    if (data.error) throw new Error(data.error);
-    featuredSongs = data.items;
-    if (!Array.isArray(featuredSongs)) throw new Error('Invalid official channel song list');
-    $('featured-heading').textContent = `Latest from ${data.channelTitle || 'Naim Almas Official'}`;
-    $('hero-tag').textContent = 'Featured from the official channel';
-    $('hero-play-btn').disabled = featuredSongs.length === 0;
-  } catch (error) {
-    featuredSongs = [];
-    $('hero-play-btn').disabled = true;
-    tbody.innerHTML = `<tr><td class="featured-error" colspan="6">${esc(error.message || 'Unable to load official channel songs')}</td></tr>`;
-    $('hero-title').textContent = 'Listen to Naim Almas Official';
-    return featuredSongs;
-  }
+let activeFeaturedPackIndex = 0;
+let featuredPackRotationTimer = null;
+let featuredPackRotationPaused = false;
 
-  if (featuredSongs.length) {
-    $('hero-img').src = featuredSongs[0].thumb || thumb(featuredSongs[0].id);
-    $('hero-title').textContent = featuredSongs[0].title;
+function renderFeaturedPack(index) {
+  activeFeaturedPackIndex = (index + featuredPacks.length) % featuredPacks.length;
+  const pack = featuredPacks[activeFeaturedPackIndex];
+  featuredSongs = pack.songs;
+  const banner = $('hero-banner');
+  banner.classList.remove('slide-change');
+  void banner.offsetWidth;
+  banner.classList.add('slide-change');
+  setTimeout(() => banner.classList.remove('slide-change'), 500);
+  $('featured-pack-page-title').textContent = pack.title;
+  $('hero-tag').textContent = 'FEATURED MUSIC PACK';
+  $('hero-listeners').textContent = pack.channelTitle || pack.fallbackArtist;
+  $('featured-heading').textContent = `Latest from ${pack.channelTitle || pack.fallbackTitle}`;
+  $('hero-channel-link').href = pack.channelUrl;
+  $('featured-channel-link').href = pack.channelUrl;
+  $('hero-play-btn').disabled = featuredSongs.length === 0;
+  $('hero-img').src = featuredSongs[0]?.thumb || '';
+  $('hero-title').textContent = featuredSongs[0]?.title || `Listen to ${pack.fallbackTitle}`;
+
+  const dots = $('hero-slide-dots');
+  dots.replaceChildren();
+  featuredPacks.forEach((item, dotIndex) => {
+    const dot = document.createElement('button');
+    dot.type = 'button';
+    dot.className = `hero-slide-dot${dotIndex === activeFeaturedPackIndex ? ' active' : ''}`;
+    dot.setAttribute('aria-label', `Show ${item.title}`);
+    dot.setAttribute('aria-current', dotIndex === activeFeaturedPackIndex ? 'true' : 'false');
+    dot.addEventListener('click', () => {
+      renderFeaturedPack(dotIndex);
+      restartFeaturedPackRotation();
+    });
+    dots.appendChild(dot);
+  });
+
+  const tbody = $('playlist-body');
+  tbody.replaceChildren();
+  if (pack.error) {
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.className = 'featured-error';
+    cell.colSpan = 6;
+    cell.textContent = pack.error;
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    return;
   }
-  tbody.innerHTML = '';
   if (!featuredSongs.length) {
-    $('hero-play-btn').disabled = true;
-    tbody.innerHTML = '<tr><td class="featured-error" colspan="6">No videos are available on the official channel yet.</td></tr>';
-    return featuredSongs;
+    const row = document.createElement('tr');
+    const cell = document.createElement('td');
+    cell.className = 'featured-error';
+    cell.colSpan = 6;
+    cell.textContent = `No videos are available in ${pack.title} yet.`;
+    row.appendChild(cell);
+    tbody.appendChild(row);
+    return;
   }
   featuredSongs.forEach((s, i) => {
     const tr = document.createElement('tr');
@@ -510,6 +562,43 @@ async function buildPlaylist() {
     tr.addEventListener('click', () => playQueue(featuredSongs, i));
     tbody.appendChild(tr);
   });
+}
+
+function stopFeaturedPackRotation() {
+  clearInterval(featuredPackRotationTimer);
+  featuredPackRotationTimer = null;
+}
+
+function startFeaturedPackRotation() {
+  stopFeaturedPackRotation();
+  if (featuredPackRotationPaused || document.hidden ||
+      !$('view-home').classList.contains('active') ||
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches ||
+      featuredPacks.length < 2) return;
+  featuredPackRotationTimer = setInterval(() => {
+    renderFeaturedPack(activeFeaturedPackIndex + 1);
+  }, 6500);
+}
+
+function restartFeaturedPackRotation() {
+  startFeaturedPackRotation();
+}
+
+async function buildPlaylist() {
+  await Promise.all(featuredPacks.map(async pack => {
+    try {
+      const data = await apiFetch(`/promoted-songs?pack=${encodeURIComponent(pack.id)}`);
+      if (data.error) throw new Error(data.error);
+      if (!Array.isArray(data.items)) throw new Error('Invalid featured music pack response');
+      pack.songs = data.items;
+      pack.channelTitle = data.channelTitle || pack.fallbackTitle;
+    } catch (error) {
+      pack.error = error.message || `Unable to load ${pack.title}`;
+      console.error(`Could not load ${pack.title}:`, error);
+    }
+  }));
+  renderFeaturedPack(activeFeaturedPackIndex);
+  startFeaturedPackRotation();
   return featuredSongs;
 }
 
@@ -606,6 +695,8 @@ function showView(name, syncPortal = true) {
     messages: 'Messages', feed: 'Feed', reels: 'Reels', profile: 'Profile', 'add-friend': 'Add friend',
   };
   $('view-title').textContent = titles[name] || '';
+  if (name === 'home') startFeaturedPackRotation();
+  else stopFeaturedPackRotation();
   if (viewName === 'messages' && syncPortal) {
     $('social-portal')?.contentWindow?.postMessage({
       type: 'nymix-social-panel',
@@ -773,6 +864,35 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
 
   updateUserMenu();
+  $('hero-slide-prev').addEventListener('click', () => {
+    renderFeaturedPack(activeFeaturedPackIndex - 1);
+    restartFeaturedPackRotation();
+  });
+  $('hero-slide-next').addEventListener('click', () => {
+    renderFeaturedPack(activeFeaturedPackIndex + 1);
+    restartFeaturedPackRotation();
+  });
+  $('hero-banner').addEventListener('mouseenter', () => {
+    featuredPackRotationPaused = true;
+    stopFeaturedPackRotation();
+  });
+  $('hero-banner').addEventListener('mouseleave', () => {
+    featuredPackRotationPaused = false;
+    startFeaturedPackRotation();
+  });
+  $('hero-banner').addEventListener('focusin', () => {
+    featuredPackRotationPaused = true;
+    stopFeaturedPackRotation();
+  });
+  $('hero-banner').addEventListener('focusout', event => {
+    if ($('hero-banner').contains(event.relatedTarget)) return;
+    featuredPackRotationPaused = false;
+    startFeaturedPackRotation();
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopFeaturedPackRotation();
+    else startFeaturedPackRotation();
+  });
   $('notification-toggle').addEventListener('click', () => {
     const open = $('notification-panel').hidden;
     $('notification-panel').hidden = !open;

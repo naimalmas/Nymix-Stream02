@@ -108,8 +108,6 @@
         <button class="mobile-menu-toggle" id="mobile-menu-toggle" type="button" aria-label="Open menu" aria-controls="app-sidebar" aria-expanded="false">
           <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#list"></use></svg>
         </button>
-        <button class="nav-arrow" id="btn-back" aria-label="Go back"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-left"></use></svg></button>
-        <button class="nav-arrow" id="btn-fwd" aria-label="Go forward"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg></button>
         <div class="view-title" id="view-title">What's hot</div>
         <div class="notification-wrap" id="notification-wrap">
           <button type="button" class="notification-toggle" id="notification-toggle" aria-label="Notifications" aria-expanded="false" aria-controls="notification-panel">
@@ -127,10 +125,10 @@
 
       <!-- Home View -->
       <div class="view active" id="view-home">
-        <h1 class="section-big-title">Nymix picks</h1>
+        <h1 class="section-big-title" id="featured-pack-page-title" aria-live="polite">Nymix Picks</h1>
 
-        <!-- Hero Banner -->
-        <div class="hero-banner" id="hero-banner">
+        <!-- Featured music carousel -->
+        <div class="hero-banner" id="hero-banner" role="region" aria-roledescription="carousel" aria-label="Featured music packs">
           <div class="hero-overlay"></div>
           <img class="hero-bg" id="hero-img" alt="" />
           <div class="hero-content">
@@ -142,8 +140,17 @@
                 <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg>
                 Play
               </button>
-              <a class="btn-follow" href="https://www.youtube.com/@naimalmasofficial" target="_blank" rel="noopener noreferrer">Visit channel</a>
+              <a class="btn-follow" id="hero-channel-link" href="https://www.youtube.com/@naimalmasofficial" target="_blank" rel="noopener noreferrer">Visit channel</a>
             </div>
+          </div>
+          <div class="hero-carousel-controls" aria-label="Featured music packs">
+            <button type="button" class="hero-slide-arrow" id="hero-slide-prev" aria-label="Previous featured pack">
+              <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-left"></use></svg>
+            </button>
+            <div class="hero-slide-dots" id="hero-slide-dots" role="group" aria-label="Choose a featured pack"></div>
+            <button type="button" class="hero-slide-arrow" id="hero-slide-next" aria-label="Next featured pack">
+              <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg>
+            </button>
           </div>
         </div>
 
@@ -151,7 +158,7 @@
         <div class="playlist-section">
           <div class="playlist-header">
             <div><h2 id="featured-heading">Latest from Naim Almas Official</h2><p class="featured-caption">Music videos from the official YouTube channel</p></div>
-            <a class="show-all-btn" href="https://www.youtube.com/@naimalmasofficial" target="_blank" rel="noopener noreferrer">View channel</a>
+            <a class="show-all-btn" id="featured-channel-link" href="https://www.youtube.com/@naimalmasofficial" target="_blank" rel="noopener noreferrer">View channel</a>
           </div>
           <table class="playlist-table">
             <thead>

@@ -12,6 +12,8 @@ Open **Messages** or **Add friend** from the Nymix sidebar, or go directly to `/
 
 The Nymix home page features recent videos from the [Naim Almas Official YouTube channel](https://www.youtube.com/@naimalmasofficial). The server uses the configured YouTube Data API key and caches the channel playlist for 15 minutes.
 
+The home page also rotates between Nymix Picks and Prokash Hits featured music packs, using uploads from the [Prokash YouTube channel](https://www.youtube.com/channel/UCh0udHXRXh-wxmX65ZOzVZw). The banner's arrows and dots let listeners switch packs manually; the song list and Play button follow the selected pack.
+
 ## Local development
 
 ```sh

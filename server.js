@@ -300,17 +300,36 @@ app.get('/api/search', async (req, res) => {
 
 app.get('/api/songs', (req, res) => res.json(rd('config.json').featuredSongs));
 
-const promotedChannelId = 'UCDXZVqwPXIO5ytEP7rDIjGQ';
-let promotedSongsCache = { expiresAt: 0, data: null };
+const promotedChannels = {
+  nymix: {
+    id: 'UCDXZVqwPXIO5ytEP7rDIjGQ',
+    title: 'Nymix Picks',
+    fallbackTitle: 'Naim Almas Official',
+    url: 'https://www.youtube.com/@naimalmasofficial',
+  },
+  prokash: {
+    id: 'UCh0udHXRXh-wxmX65ZOzVZw',
+    title: 'Prokash Hits',
+    fallbackTitle: 'Prokash Hits',
+    url: 'https://www.youtube.com/channel/UCh0udHXRXh-wxmX65ZOzVZw',
+  },
+};
+const promotedSongsCache = new Map();
 app.get('/api/promoted-songs', async (req, res) => {
-  if (promotedSongsCache.data && promotedSongsCache.expiresAt > Date.now()) return res.json(promotedSongsCache.data);
+  const packId = typeof req.query.pack === 'string' ? req.query.pack : 'nymix';
+  const promotedChannel = Object.prototype.hasOwnProperty.call(promotedChannels, packId)
+    ? promotedChannels[packId]
+    : null;
+  if (!promotedChannel) return res.status(400).json({ error: 'Unknown featured music pack' });
+  const cached = promotedSongsCache.get(packId);
+  if (cached && cached.expiresAt > Date.now()) return res.json(cached.data);
   try {
     const config = rd('config.json');
     const key = process.env.YOUTUBE_API_KEY || config.ytApiKey;
     if (!key) return res.status(503).json({ error: 'YouTube API key is required to load the official channel songs' });
     const channelParams = new URLSearchParams({
       part: 'snippet,contentDetails',
-      id: promotedChannelId,
+      id: promotedChannel.id,
       key,
     });
     const channelResponse = await fetch(`https://www.googleapis.com/youtube/v3/channels?${channelParams}`);
@@ -339,23 +358,25 @@ app.get('/api/promoted-songs', async (req, res) => {
       const thumbnails = item.snippet?.thumbnails || {};
       return {
         id: videoId,
-        title: item.snippet?.title || 'Naim Almas Official',
-        artist: channel.snippet?.title || 'Naim Almas Official',
-        album: 'Naim Almas Official',
+        title: item.snippet?.title || promotedChannel.fallbackTitle,
+        artist: channel.snippet?.title || promotedChannel.fallbackTitle,
+        album: promotedChannel.title,
         dur: '',
         thumb: thumbnails.maxres?.url || thumbnails.high?.url || thumbnails.medium?.url || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
       };
     }).filter(Boolean);
     const data = {
-      channelTitle: channel.snippet?.title || 'Naim Almas Official',
-      channelUrl: 'https://www.youtube.com/@naimalmasofficial',
+      packId,
+      packTitle: promotedChannel.title,
+      channelTitle: channel.snippet?.title || promotedChannel.fallbackTitle,
+      channelUrl: promotedChannel.url,
       items,
     };
-    promotedSongsCache = { expiresAt: Date.now() + 15 * 60 * 1000, data };
+    promotedSongsCache.set(packId, { expiresAt: Date.now() + 15 * 60 * 1000, data });
     res.json(data);
   } catch (error) {
-    console.error('Unable to load promoted channel songs:', error.message);
-    res.status(502).json({ error: 'Unable to load songs from the official YouTube channel right now' });
+    console.error(`Unable to load ${promotedChannel.title} songs:`, error.message);
+    res.status(502).json({ error: `Unable to load ${promotedChannel.title} songs right now` });
   }
 });
 
