@@ -10,7 +10,7 @@
   <link rel="stylesheet" href="/social.css" />
   <script src="https://www.youtube.com/iframe_api"></script>
 </head>
-<body>
+<body class="messages-page">
   <header class="topbar">
     <a class="brand" href="/" aria-label="Nymix home"><span class="brand-icon" aria-hidden="true"><svg class="ui-icon"><use href="/icons.svg#music"></use></svg></span><span>Nymix</span></a>
     <nav aria-label="Nymix navigation">
@@ -24,7 +24,7 @@
     </div>
   </header>
 
-  <main>
+  <main class="messages-main">
     <p class="notice" id="notice" role="status" aria-live="polite"></p>
 
     <section class="panel" id="panel-people">
@@ -88,22 +88,25 @@
     </section>
 
     <section class="panel active" id="panel-chat">
-      <div class="inbox-layout">
+      <div class="inbox-layout" id="inbox-layout">
         <aside class="card inbox-sidebar" aria-label="Direct messages">
           <div class="inbox-sidebar-heading">
-            <div><p class="eyebrow">YOUR PEOPLE</p><h1>Messages</h1></div>
-            <span class="count" id="friend-count">0</span>
+            <div><h1>Messages</h1><p class="inbox-subtitle">Stay in touch with your friends</p></div>
+            <div class="inbox-heading-actions">
+              <span class="count" id="friend-count">0</span>
+              <button type="button" class="icon-button new-message-button" id="discover-from-inbox" aria-label="Find people to message"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#compose"></use></svg></button>
+            </div>
           </div>
           <label class="sr-only" for="thread-search">Filter conversations</label>
-          <input id="thread-search" class="thread-search" type="search" placeholder="Search friends…" autocomplete="off" />
+          <div class="thread-search-wrap"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#search"></use></svg><input id="thread-search" class="thread-search" type="search" placeholder="Search messages" autocomplete="off" /></div>
           <div id="chat-friends" class="thread-list"></div>
-          <button type="button" class="discover-link" id="discover-from-inbox">Find people <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right-long"></use></svg></button>
         </aside>
-        <article class="card chat-card">
+        <article class="card chat-card" id="chat-card">
           <header class="conversation-header">
+            <button type="button" class="icon-button inbox-back-button" id="back-to-inbox" aria-label="Back to messages"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-left"></use></svg></button>
             <div class="conversation-person">
-              <span class="conversation-avatar" id="chat-avatar"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg></span>
-              <div><p class="eyebrow">DIRECT MESSAGE</p><h2 id="chat-title">Choose a friend</h2></div>
+              <span class="conversation-avatar" id="chat-avatar"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#users"></use></svg></span>
+              <div><h2 id="chat-title">Your messages</h2><p class="conversation-subtitle" id="chat-subtitle">Select a friend to start chatting</p></div>
             </div>
             <div class="conversation-actions" aria-label="Things to do together">
               <button type="button" class="button secondary" id="chat-game-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#gamepad"></use></svg> Play</button>
@@ -138,11 +141,18 @@
             </section>
             <div id="chat-listen-activity"></div>
           </div>
-          <div id="chat-messages" class="messages conversation-messages">Choose a friend to start chatting.</div>
+          <div id="chat-messages" class="messages conversation-messages">
+            <div class="chat-welcome">
+              <span class="welcome-avatar"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#message"></use></svg></span>
+              <h2>Your messages</h2>
+              <p>Pick a conversation and say hello. You can listen to music or play a game together right here.</p>
+              <button type="button" class="button secondary" id="discover-from-empty">Find people</button>
+            </div>
+          </div>
           <form id="chat-form" class="inline-form message-form">
             <label class="sr-only" for="chat-input">Message</label>
-            <input id="chat-input" maxlength="1000" placeholder="Message…" disabled />
-            <button class="button send-button" id="chat-send" type="submit" disabled aria-label="Send message">Send</button>
+            <textarea id="chat-input" rows="1" maxlength="1000" placeholder="Message…" disabled></textarea>
+            <button class="button send-button" id="chat-send" type="submit" disabled aria-label="Send message"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#send"></use></svg></button>
           </form>
         </article>
       </div>

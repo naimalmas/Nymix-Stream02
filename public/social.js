@@ -2,6 +2,7 @@ const API = '/api';
 const state = {
   user: JSON.parse(localStorage.getItem('nx_user') || 'null'),
   friends: [],
+  lastMessages: {},
   requests: [],
   gameInvites: [],
   roomInvites: [],
@@ -128,25 +129,39 @@ function renderFriends() {
     ]),
   );
   const query = $('thread-search').value.trim().toLocaleLowerCase();
-  renderList($('chat-friends'), state.friends.filter(friend =>
-    !query || friend.name.toLocaleLowerCase().includes(query),
-  ), 'No conversations yet. Find a friend to start chatting.', friend => {
+  const friends = [...state.friends].sort((a, b) =>
+    (state.lastMessages[b.id]?.ts || 0) - (state.lastMessages[a.id]?.ts || 0),
+  ).filter(friend =>
+    !query || friend.name.toLocaleLowerCase().includes(query) ||
+      state.lastMessages[friend.id]?.text.toLocaleLowerCase().includes(query),
+  );
+  renderList($('chat-friends'), friends, 'No friends yet. Find people to start a conversation.', friend => {
     const thread = document.createElement('button');
     thread.type = 'button';
-    thread.className = `thread-row${state.activeFriend?.id === friend.id ? ' active' : ''}`;
+    const lastMessage = state.lastMessages[friend.id];
+    thread.className = `thread-row${state.activeFriend?.id === friend.id ? ' active' : ''}${lastMessage ? ' has-message' : ''}`;
     thread.setAttribute('aria-current', state.activeFriend?.id === friend.id ? 'true' : 'false');
     const avatar = document.createElement('span');
     avatar.className = 'thread-avatar';
     avatar.textContent = friend.name.trim().slice(0, 1).toUpperCase();
     const copy = document.createElement('span');
     copy.className = 'thread-copy';
+    const topline = document.createElement('span');
+    topline.className = 'thread-topline';
     const name = document.createElement('strong');
     name.textContent = friend.name;
+    topline.appendChild(name);
+    if (lastMessage) {
+      const time = document.createElement('time');
+      time.dateTime = new Date(lastMessage.ts).toISOString();
+      time.textContent = formatThreadTime(lastMessage.ts);
+      topline.appendChild(time);
+    }
     const preview = document.createElement('span');
-    preview.textContent = state.activeFriend?.id === friend.id && state.chatMessages.length
-      ? state.chatMessages[state.chatMessages.length - 1].text
+    preview.textContent = lastMessage
+      ? `${lastMessage.from === state.user.id ? 'You: ' : ''}${lastMessage.text}`
       : 'Start a conversation';
-    copy.append(name, preview);
+    copy.append(topline, preview);
     const arrow = document.createElement('span');
     arrow.className = 'thread-arrow';
     arrow.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg>';
@@ -154,6 +169,15 @@ function renderFriends() {
     thread.addEventListener('click', () => selectFriend(friend));
     return thread;
   });
+}
+
+function formatThreadTime(timestamp) {
+  const date = new Date(timestamp);
+  const today = new Date();
+  const startOfToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  if (date >= startOfToday) return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  if (date >= new Date(startOfToday - 6 * 86400000)) return date.toLocaleDateString([], { weekday: 'short' });
+  return date.toLocaleDateString([], { month: 'numeric', day: 'numeric' });
 }
 
 function renderRequests() {
@@ -385,21 +409,75 @@ function renderInlineGame(game) {
 
 function renderMessages(container, messages, emptyText) {
   container.replaceChildren();
-  container.classList.toggle('empty-state', messages.length === 0);
+  container.classList.remove('empty-state');
   if (!messages.length) {
-    container.textContent = emptyText;
+    const welcome = document.createElement('div');
+    welcome.className = 'chat-welcome';
+    const avatar = document.createElement('span');
+    avatar.className = 'welcome-avatar';
+    avatar.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#message"></use></svg>';
+    const title = document.createElement('h2');
+    title.textContent = state.activeFriend ? `Say hello to ${state.activeFriend.name}` : 'Your messages';
+    const description = document.createElement('p');
+    description.textContent = state.activeFriend
+      ? emptyText
+      : 'Pick a conversation and say hello. Listen to music or play a game together right here.';
+    welcome.append(avatar, title, description);
+    if (!state.activeFriend) {
+      const discover = document.createElement('button');
+      discover.type = 'button';
+      discover.className = 'button secondary';
+      discover.textContent = 'Find people';
+      discover.addEventListener('click', () => setPanel('people'));
+      welcome.appendChild(discover);
+    }
+    container.appendChild(welcome);
     return;
   }
+  let previousDay = '';
+  let previousSender = null;
+  let group = null;
   messages.forEach(message => {
-    const bubble = document.createElement('div');
-    bubble.className = `message${message.from === state.user.id ? ' mine' : ''}`;
-    const author = document.createElement('small');
     const date = new Date(message.ts);
-    author.textContent = `${message.fromName || 'Friend'} · ${date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
-    const text = document.createElement('span');
-    text.textContent = message.text;
-    bubble.append(author, text);
-    container.appendChild(bubble);
+    const day = `${date.getFullYear()}-${date.getMonth()}-${date.getDate()}`;
+    if (day !== previousDay) {
+      const divider = document.createElement('div');
+      divider.className = 'message-date';
+      const today = new Date();
+      const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
+      const messageDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+      divider.textContent = messageDay.getTime() === new Date(today.getFullYear(), today.getMonth(), today.getDate()).getTime()
+        ? 'Today'
+        : messageDay.getTime() === yesterday.getTime()
+          ? 'Yesterday'
+          : date.toLocaleDateString([], { month: 'long', day: 'numeric', year: date.getFullYear() === today.getFullYear() ? undefined : 'numeric' });
+      container.appendChild(divider);
+      previousDay = day;
+      previousSender = null;
+    }
+    if (message.from !== previousSender) {
+      group = document.createElement('div');
+      group.className = `message-group${message.from === state.user.id ? ' mine' : ' theirs'}`;
+      const avatar = document.createElement('span');
+      avatar.className = 'message-group-avatar';
+      avatar.textContent = (message.fromName || state.activeFriend?.name || '?').trim().slice(0, 1).toUpperCase();
+      const body = document.createElement('div');
+      body.className = 'message-group-body';
+      group.append(avatar, body);
+      container.appendChild(group);
+      previousSender = message.from;
+    }
+    const bubble = document.createElement('div');
+    bubble.className = 'message';
+    bubble.textContent = message.text;
+    group.querySelector('.message-group-body').appendChild(bubble);
+    const groupBody = group.querySelector('.message-group-body');
+    groupBody.querySelector('.message-time')?.remove();
+    const time = document.createElement('time');
+    time.className = 'message-time';
+    time.dateTime = date.toISOString();
+    time.textContent = date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    groupBody.appendChild(time);
   });
   container.scrollTop = container.scrollHeight;
 }
@@ -409,7 +487,9 @@ async function selectFriend(friend) {
   state.chatMessages = [];
   state.chatAfter = 0;
   $('chat-title').textContent = friend.name;
+  $('chat-subtitle').textContent = 'Your Nymix friend';
   $('chat-avatar').textContent = friend.name.trim().slice(0, 1).toUpperCase();
+  $('inbox-layout').classList.add('conversation-open');
   $('chat-input').disabled = false;
   $('chat-send').disabled = false;
   $('chat-game-button').disabled = false;
@@ -427,16 +507,22 @@ async function refreshChat(initial = false) {
   const after = initial ? 0 : Math.max(0, state.chatAfter - 1);
   const messages = await api(`/chat/${encodeURIComponent(state.activeFriend.id)}?after=${after}`);
   const seen = new Set(state.chatMessages.map(message => message.id));
-  state.chatMessages.push(...messages.filter(message => !seen.has(message.id)));
+  const newMessages = messages.filter(message => !seen.has(message.id));
+  state.chatMessages.push(...newMessages);
   state.chatMessages.sort((a, b) => a.ts - b.ts);
   state.chatAfter = Math.max(state.chatAfter, ...state.chatMessages.map(message => message.ts), 0);
-  renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
-  renderFriends();
+  if (initial || newMessages.length) {
+    renderMessages($('chat-messages'), state.chatMessages, `This is the beginning of your conversation with ${state.activeFriend.name}.`);
+    const latest = state.chatMessages[state.chatMessages.length - 1];
+    if (latest) state.lastMessages[state.activeFriend.id] = latest;
+    renderFriends();
+  }
 }
 
 async function refreshOverview() {
   const data = await api('/social/overview');
   state.friends = data.friends;
+  state.lastMessages = data.lastMessages || {};
   state.requests = data.requests;
   state.gameInvites = data.gameInvites || [];
   state.roomInvites = data.roomInvites || [];
@@ -715,6 +801,9 @@ async function refreshSocial() {
 document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setPanel(tab.dataset.panel)));
 
 $('discover-from-inbox').addEventListener('click', () => setPanel('people'));
+$('discover-from-empty').addEventListener('click', () => setPanel('people'));
+
+$('back-to-inbox').addEventListener('click', () => $('inbox-layout').classList.remove('conversation-open'));
 
 $('thread-search').addEventListener('input', renderFriends);
 
@@ -780,9 +869,24 @@ $('chat-form').addEventListener('submit', async event => {
     const message = await post(`/chat/${encodeURIComponent(state.activeFriend.id)}`, { text });
     state.chatMessages.push(message);
     state.chatAfter = Math.max(state.chatAfter, message.ts);
+    state.lastMessages[state.activeFriend.id] = message;
     $('chat-input').value = '';
     renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+    renderFriends();
   } catch (error) { showNotice(error.message, true); }
+});
+
+$('chat-input').addEventListener('input', event => {
+  const input = event.currentTarget;
+  input.style.height = 'auto';
+  input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+});
+
+$('chat-input').addEventListener('keydown', event => {
+  if (event.key === 'Enter' && !event.shiftKey) {
+    event.preventDefault();
+    $('chat-form').requestSubmit();
+  }
 });
 
 $('song-search-form').addEventListener('submit', async event => {

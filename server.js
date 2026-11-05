@@ -457,6 +457,12 @@ app.get('/api/social/overview', userAuth, (req, res) => {
       return account ? { ...safeProfile(account), id: relation.id, direction: incoming ? 'incoming' : 'outgoing' } : null;
     }).filter(Boolean);
   const social = getSocialState();
+  const messages = rd('messages.json');
+  const lastMessages = Object.fromEntries(friends.flatMap(friend => {
+    const conversation = messages[chatRoomId(req.user.id, friend.id)] || [];
+    const latest = conversation[conversation.length - 1];
+    return latest ? [[friend.id, { from: latest.from, text: latest.text, ts: latest.ts }]] : [];
+  }));
   const rooms = social.listenRooms.filter(room => memberOf(room, req.user.id))
     .map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, members: room.members }));
   const games = social.games.filter(game => memberOf(game, req.user.id) && game.status !== 'closed')
@@ -469,7 +475,7 @@ app.get('/api/social/overview', userAuth, (req, res) => {
     room.invitedUserId === req.user.id && room.createdAt > Date.now() - 86400000 &&
     areFriends(room.hostId, req.user.id),
   ).map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, createdAt: room.createdAt }));
-  res.json({ friends, requests, rooms, games, gameInvites, roomInvites });
+  res.json({ friends, requests, rooms, games, gameInvites, roomInvites, lastMessages });
 });
 
 app.get('/api/users/suggestions', userAuth, (req, res) => {
