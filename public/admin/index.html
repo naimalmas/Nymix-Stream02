@@ -6,6 +6,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+.ui-icon{display:inline-block;width:1em;height:1em;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;vertical-align:middle}
 :root{--bg:#0d0520;--bg2:#130930;--card:rgba(255,255,255,0.05);--border:rgba(255,255,255,0.08);--purple:#7c3aed;--pl:#a855f7;--glow:rgba(124,58,237,0.35);--text:#fff;--t2:#c4b5fd;--t3:#9ca3af;--red:#ef4444;--green:#22c55e;--sidebar:200px}
 html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);overflow:hidden}
 .blob{position:fixed;border-radius:50%;filter:blur(80px);pointer-events:none;z-index:0}
@@ -15,13 +16,14 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .sidebar{background:rgba(10,5,25,0.95);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:20px 12px;backdrop-filter:blur(20px)}
 .logo{display:flex;align-items:center;gap:9px;padding:0 8px;margin-bottom:28px}
 .logo-icon{width:34px;height:34px;background:linear-gradient(135deg,var(--purple),var(--pl));border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;box-shadow:0 4px 15px var(--glow);flex-shrink:0}
+.logo-icon .ui-icon{width:19px;height:19px;color:#fff}
 .logo span{font-size:18px;font-weight:800}
 .logo sub{font-size:9px;background:var(--red);color:#fff;padding:2px 5px;border-radius:4px;margin-left:2px;font-weight:700;vertical-align:middle}
 .nav{display:flex;flex-direction:column;gap:2px;flex:1}
 .nav a{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;color:var(--t3);font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;text-decoration:none;border-left:3px solid transparent}
 .nav a:hover{background:var(--card);color:var(--text)}
 .nav a.active{background:rgba(124,58,237,0.2);color:var(--text);border-left-color:var(--purple)}
-.nav a span{font-size:16px;width:20px;text-align:center}
+.nav a .ui-icon{width:18px;height:18px;flex:0 0 20px}
 .sidebar-footer{margin-top:auto}
 .admin-badge{display:flex;align-items:center;gap:9px;background:var(--card);border:1px solid var(--border);border-radius:11px;padding:10px 11px}
 .admin-av{width:32px;height:32px;background:linear-gradient(135deg,var(--red),#f97316);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;flex-shrink:0}
@@ -29,6 +31,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .admin-role{font-size:10px;color:var(--red);font-weight:600}
 .logout-btn{margin-left:auto;background:none;border:none;color:var(--t3);font-size:16px;cursor:pointer;transition:color 0.15s}
 .logout-btn:hover{color:var(--red)}
+.logout-btn .ui-icon{width:17px;height:17px}
 .main{display:flex;flex-direction:column;overflow:hidden}
 .topbar{display:flex;align-items:center;justify-content:space-between;padding:16px 24px;background:rgba(13,5,32,0.9);border-bottom:1px solid var(--border);backdrop-filter:blur(10px);flex-shrink:0}
 .topbar h1{font-size:20px;font-weight:800}
@@ -49,6 +52,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .stat-card:nth-child(4)::before{background:#ef4444}
 .stat-card:hover{transform:translateY(-2px);box-shadow:0 8px 25px rgba(0,0,0,0.3)}
 .stat-icon{font-size:24px;margin-bottom:10px}
+.stat-icon .ui-icon{width:24px;height:24px}
 .stat-num{font-size:32px;font-weight:800;line-height:1}
 .stat-label{font-size:12px;color:var(--t3);margin-top:6px;font-weight:500}
 .stat-change{font-size:11px;margin-top:4px}
@@ -75,6 +79,7 @@ html,body{height:100%;font-family:'Inter',sans-serif;background:var(--bg);color:
 .activity-desc{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .activity-time{font-size:10px;color:var(--t3)}
 .activity-song{font-size:11px;color:var(--pl)}
+.activity-song .ui-icon{width:14px;height:14px;margin-right:4px}
 .table-wrap{overflow-x:auto}
 table{width:100%;border-collapse:collapse}
 thead th{font-size:11px;letter-spacing:0.8px;color:var(--t3);text-align:left;padding:0 12px 12px;font-weight:600;text-transform:uppercase}
@@ -94,6 +99,7 @@ tbody td{padding:11px 12px;font-size:13px;vertical-align:middle}
 .btn-ban{background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s}
 .btn-unban{background:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#4ade80;border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s}
 .btn-del{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--t3);border-radius:7px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'Inter',sans-serif;transition:all 0.15s}
+.action-btns .ui-icon{width:14px;height:14px}
 .btn-del:hover{background:rgba(239,68,68,0.15);color:#f87171;border-color:rgba(239,68,68,0.3)}
 .settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
 .setting-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:22px}
@@ -126,32 +132,32 @@ input[readonly]{opacity:0.6;cursor:not-allowed}
 <div class="app">
   <aside class="sidebar">
     <div class="logo">
-      <div class="logo-icon">🎵</div>
+      <div class="logo-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg></div>
       <span>Nymix <sub>ADMIN</sub></span>
     </div>
     <nav class="nav">
-      <a class="active" data-s="dashboard"><span>📊</span> Dashboard</a>
-      <a data-s="users"><span>👥</span> Users</a>
-      <a data-s="analytics"><span>📈</span> Analytics</a>
-      <a data-s="songs"><span>🎵</span> Songs</a>
-      <a data-s="settings"><span>⚙️</span> Settings</a>
-      <a href="/" style="margin-top:8px"><span>🌐</span> Player</a>
+      <a class="active" data-s="dashboard"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#chart"></use></svg> Dashboard</a>
+      <a data-s="users"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#users"></use></svg> Users</a>
+      <a data-s="analytics"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#chart"></use></svg> Analytics</a>
+      <a data-s="songs"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Songs</a>
+      <a data-s="settings"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#settings"></use></svg> Settings</a>
+      <a href="/" style="margin-top:8px"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#globe"></use></svg> Player</a>
     </nav>
     <div class="sidebar-footer">
       <div class="admin-badge">
         <div class="admin-av" id="admin-av">A</div>
         <div><div class="admin-name" id="admin-name">Admin</div><div class="admin-role">Administrator</div></div>
-        <button class="logout-btn" onclick="logout()">🚪</button>
+        <button class="logout-btn" onclick="logout()" aria-label="Log out"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
       </div>
     </div>
   </aside>
 
   <div class="main">
     <div class="topbar">
-      <h1 id="page-title">📊 Dashboard Overview</h1>
+      <h1 id="page-title">Dashboard Overview</h1>
       <div class="topbar-right">
         <div style="font-size:12px;color:var(--t3)" id="last-updated"></div>
-        <button class="refresh-btn" onclick="loadAll()">🔄 Refresh</button>
+        <button class="refresh-btn" onclick="loadAll()"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#repeat"></use></svg> Refresh</button>
       </div>
     </div>
     <div class="content">
@@ -159,22 +165,22 @@ input[readonly]{opacity:0.6;cursor:not-allowed}
       <!-- Dashboard -->
       <div class="section active" id="s-dashboard">
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num" id="st-users">—</div><div class="stat-label">Total Users</div><div class="stat-change" style="color:#4ade80">↑ Active members</div></div>
-          <div class="stat-card"><div class="stat-icon">▶️</div><div class="stat-num" id="st-plays">—</div><div class="stat-label">Total Plays</div><div class="stat-change" style="color:#38bdf8">🎵 All time</div></div>
-          <div class="stat-card"><div class="stat-icon">❤️</div><div class="stat-num" id="st-likes">—</div><div class="stat-label">Total Likes</div><div class="stat-change" style="color:#a855f7">💜 Songs liked</div></div>
-          <div class="stat-card"><div class="stat-icon">🚫</div><div class="stat-num" id="st-banned">—</div><div class="stat-label">Banned Users</div><div class="stat-change" style="color:#f87171">⚠ Restricted</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#users"></use></svg></div><div class="stat-num" id="st-users">—</div><div class="stat-label">Total Users</div><div class="stat-change" style="color:#4ade80">Active members</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#play"></use></svg></div><div class="stat-num" id="st-plays">—</div><div class="stat-label">Total Plays</div><div class="stat-change" style="color:#38bdf8">All time</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#heart"></use></svg></div><div class="stat-num" id="st-likes">—</div><div class="stat-label">Total Likes</div><div class="stat-change" style="color:#a855f7">Songs liked</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#ban"></use></svg></div><div class="stat-num" id="st-banned">—</div><div class="stat-label">Banned Users</div><div class="stat-change" style="color:#f87171">Restricted</div></div>
         </div>
         <div class="two-col">
-          <div class="card"><div class="card-title"><span>📈</span> Plays — Last 7 Days</div><div class="bar-chart" id="bar-chart"></div></div>
-          <div class="card"><div class="card-title"><span>🔥</span> Top Songs</div><div id="top-songs"><div class="loading"><div class="spinner"></div></div></div></div>
+          <div class="card"><div class="card-title"><svg class="ui-icon"><use href="/icons.svg#chart"></use></svg> Plays — Last 7 Days</div><div class="bar-chart" id="bar-chart"></div></div>
+          <div class="card"><div class="card-title"><svg class="ui-icon"><use href="/icons.svg#music"></use></svg> Top Songs</div><div id="top-songs"><div class="loading"><div class="spinner"></div></div></div></div>
         </div>
-        <div class="card"><div class="card-title"><span>⚡</span> Recent Activity</div><div id="recent-activity"><div class="loading"><div class="spinner"></div></div></div></div>
+        <div class="card"><div class="card-title"><svg class="ui-icon"><use href="/icons.svg#clock"></use></svg> Recent Activity</div><div id="recent-activity"><div class="loading"><div class="spinner"></div></div></div></div>
       </div>
 
       <!-- Users -->
       <div class="section" id="s-users">
         <div class="card">
-          <div class="card-title"><span>👥</span> User Management</div>
+          <div class="card-title"><svg class="ui-icon"><use href="/icons.svg#users"></use></svg> User Management</div>
           <div class="search-row">
             <input class="table-search" type="text" id="user-search" placeholder="Search users..." oninput="filterUsers(this.value)"/>
             <span class="total-badge" id="user-count"></span>
@@ -191,19 +197,19 @@ input[readonly]{opacity:0.6;cursor:not-allowed}
       <!-- Analytics -->
       <div class="section" id="s-analytics">
         <div class="stats-grid">
-          <div class="stat-card"><div class="stat-icon">🎵</div><div class="stat-num" id="an-plays">—</div><div class="stat-label">Total Plays</div></div>
-          <div class="stat-card"><div class="stat-icon">👥</div><div class="stat-num" id="an-users">—</div><div class="stat-label">Total Users</div></div>
-          <div class="stat-card"><div class="stat-icon">❤️</div><div class="stat-num" id="an-likes">—</div><div class="stat-label">Songs Liked</div></div>
-          <div class="stat-card"><div class="stat-icon">🏆</div><div class="stat-num" id="an-top">—</div><div class="stat-label">Top Song Plays</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#music"></use></svg></div><div class="stat-num" id="an-plays">—</div><div class="stat-label">Total Plays</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#users"></use></svg></div><div class="stat-num" id="an-users">—</div><div class="stat-label">Total Users</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#heart"></use></svg></div><div class="stat-num" id="an-likes">—</div><div class="stat-label">Songs Liked</div></div>
+          <div class="stat-card"><div class="stat-icon"><svg class="ui-icon"><use href="/icons.svg#crown"></use></svg></div><div class="stat-num" id="an-top">—</div><div class="stat-label">Top Song Plays</div></div>
         </div>
-        <div class="card"><div class="card-title"><span>📊</span> Plays Per Day (Last 7 Days)</div><div class="bar-chart" id="bar-chart2" style="height:120px"></div></div>
-        <div class="card"><div class="card-title"><span>🏆</span> Top Songs (All Time)</div><div id="top-songs-full"></div></div>
+        <div class="card"><div class="card-title"><svg class="ui-icon"><use href="/icons.svg#chart"></use></svg> Plays Per Day (Last 7 Days)</div><div class="bar-chart" id="bar-chart2" style="height:120px"></div></div>
+        <div class="card"><div class="card-title"><svg class="ui-icon"><use href="/icons.svg#crown"></use></svg> Top Songs (All Time)</div><div id="top-songs-full"></div></div>
       </div>
 
       <!-- Songs -->
       <div class="section" id="s-songs">
         <div class="card">
-          <div class="card-title"><span>🎵</span> Add a featured song</div>
+          <div class="card-title"><svg class="ui-icon"><use href="/icons.svg#music"></use></svg> Add a featured song</div>
           <form id="song-form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:12px 0 18px">
             <label>YouTube URL or ID<input class="table-search" id="song-url" required placeholder="YouTube video URL" style="width:100%"/></label>
             <label>Title<input class="table-search" id="song-title" required style="width:100%"/></label>
@@ -212,7 +218,7 @@ input[readonly]{opacity:0.6;cursor:not-allowed}
           </form>
           <div class="save-msg" id="song-msg" role="status"></div>
         </div>
-        <div class="card"><div class="card-title"><span>🎼</span> Featured Playlist</div><div id="featured-list"></div></div>
+        <div class="card"><div class="card-title"><svg class="ui-icon"><use href="/icons.svg#list"></use></svg> Featured Playlist</div><div id="featured-list"></div></div>
       </div>
 
       <!-- Settings -->
@@ -251,7 +257,7 @@ const api=(url,opts={})=>fetch(API+url,{headers:hdr,...opts}).then(r=>r.json());
 function toast(msg,type='ok'){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show '+type;setTimeout(()=>el.classList.remove('show'),3000);}
 // Nav
 let usersData=[];
-const TITLES={dashboard:'📊 Dashboard Overview',users:'👥 User Management',analytics:'📈 Analytics',songs:'🎵 Featured Songs',settings:'⚙️ Settings'};
+const TITLES={dashboard:'Dashboard Overview',users:'User Management',analytics:'Analytics',songs:'Featured Songs',settings:'Settings'};
 document.querySelectorAll('.nav a[data-s]').forEach(a=>{
   a.addEventListener('click',()=>{
     document.querySelectorAll('.nav a').forEach(x=>x.classList.remove('active'));a.classList.add('active');
@@ -299,7 +305,7 @@ function renderRecent(recent){
       <div class="activity-av">${(r.user||'?')[0].toUpperCase()}</div>
       <div class="activity-info">
         <div class="activity-desc"><strong>${esc(r.user)}</strong> played a song</div>
-        <div class="activity-song">🎵 ${esc(r.song)}</div>
+        <div class="activity-song"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg> ${esc(r.song)}</div>
       </div>
       <div class="activity-time">${new Date(r.time).toLocaleString()}</div>
     </div>`).join(''):'<div class="empty">No recent activity</div>';
@@ -323,17 +329,17 @@ function renderUsers(list){
       <td>${esc(u.currentSong||'—')}</td>
       <td style="color:#9ca3af;font-size:12px">${new Date(u.createdAt).toLocaleDateString()}</td>
       <td><span class="badge ${u.banned?'badge-banned':'badge-active'}">${u.banned?'Banned':'Active'}</span></td>
-      <td><div class="action-btns">${u.banned?`<button class="btn-unban" onclick="banUser('${u.id}',false)">✓ Unban</button>`:`<button class="btn-ban" onclick="banUser('${u.id}',true)">🚫 Ban</button>`}<button class="btn-del" onclick="delUser('${u.id}','${esc(u.name)}')">🗑</button></div></td>
+      <td><div class="action-btns">${u.banned?`<button class="btn-unban" onclick="banUser('${u.id}',false)"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#check"></use></svg> Unban</button>`:`<button class="btn-ban" onclick="banUser('${u.id}',true)"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#ban"></use></svg> Ban</button>`}<button class="btn-del" onclick="delUser('${u.id}','${esc(u.name)}')" aria-label="Delete user"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#trash"></use></svg></button></div></td>
     </tr>`).join(''):'<tr><td colspan="9"><div class="empty">No users found</div></td></tr>';
 }
 function filterUsers(q){renderUsers(usersData.filter(u=>u.name.toLowerCase().includes(q.toLowerCase())||u.email.toLowerCase().includes(q.toLowerCase())));}
 async function banUser(id,ban){
-  try{await api('/admin/users/'+id,{method:'PUT',body:JSON.stringify({banned:ban})});toast(ban?'🚫 User banned':'✓ User unbanned',ban?'err':'ok');await loadUsers();await loadStats();}
+  try{await api('/admin/users/'+id,{method:'PUT',body:JSON.stringify({banned:ban})});toast(ban?'User banned':'User unbanned',ban?'err':'ok');await loadUsers();await loadStats();}
   catch(e){toast('Error: '+e.message,'err');}
 }
 async function delUser(id,name){
   if(!confirm('Delete user "'+name+'"? This cannot be undone.'))return;
-  try{await api('/admin/users/'+id,{method:'DELETE'});toast('🗑 User deleted');await loadUsers();await loadStats();}
+  try{await api('/admin/users/'+id,{method:'DELETE'});toast('User deleted');await loadUsers();await loadStats();}
   catch(e){toast('Error: '+e.message,'err');}
 }
 async function loadFeaturedSongs(){

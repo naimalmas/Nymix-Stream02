@@ -39,23 +39,23 @@
       <div class="nav-section-label">Menu: 5</div>
       <nav class="nav-menu">
         <a class="nav-link active" data-view="home">
-          <span class="nav-icon">🏠</span> Home
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#home"></use></svg> Home
         </a>
         <a class="nav-link" data-view="discover">
-          <span class="nav-icon">🧭</span> Discover
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#compass"></use></svg> Discover
         </a>
         <a class="nav-link" data-view="browse">
-          <span class="nav-icon">📻</span> Browse
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#radio"></use></svg> Browse
         </a>
         <a class="nav-link" data-view="liked">
-          <span class="nav-icon">❤️</span> Liked
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#heart"></use></svg> Liked
         </a>
         <a class="nav-link" data-view="radio">
-          <span class="nav-icon">🎙️</span> Radio
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg> Radio
           <span class="badge-new">new</span>
         </a>
         <a class="nav-link" href="/social.html">
-          <span class="nav-icon">👥</span> Friends & Games
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#users"></use></svg> Messages
           <span class="badge-new">new</span>
         </a>
       </nav>
@@ -63,14 +63,14 @@
       <div class="nav-section-label" style="margin-top:20px">Library: 3</div>
       <nav class="nav-menu">
         <a class="nav-link" data-view="albums">
-          <span class="nav-icon lib-icon" style="background:#7c3aed">▶</span> Albums
+          <svg class="nav-icon lib-icon ui-icon" style="background:#7c3aed" aria-hidden="true"><use href="/icons.svg#album"></use></svg> Albums
           <span class="dot-blue"></span>
         </a>
         <a class="nav-link" data-view="songs">
-          <span class="nav-icon lib-icon" style="background:#059669">♪</span> Songs
+          <svg class="nav-icon lib-icon ui-icon" style="background:#059669" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Songs
         </a>
         <a class="nav-link" data-view="artists">
-          <span class="nav-icon lib-icon" style="background:#dc2626">👤</span> Artists
+          <svg class="nav-icon lib-icon ui-icon" style="background:#dc2626" aria-hidden="true"><use href="/icons.svg#user"></use></svg> Artists
         </a>
       </nav>
 
@@ -81,7 +81,7 @@
             <div class="user-name">Naim Almas</div>
             <div class="user-plan">Premium member</div>
           </div>
-          <button class="settings-btn" id="settings-btn">⚙️</button>
+          <button class="settings-btn" id="settings-btn" aria-label="Settings"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#settings"></use></svg></button>
         </div>
       </div>
     </aside>
@@ -90,29 +90,29 @@
     <main class="center">
       <!-- Top Nav -->
       <div class="center-topbar">
-        <button class="nav-arrow" id="btn-back">‹</button>
-        <button class="nav-arrow" id="btn-fwd">›</button>
+        <button class="nav-arrow" id="btn-back" aria-label="Go back"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-left"></use></svg></button>
+        <button class="nav-arrow" id="btn-fwd" aria-label="Go forward"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg></button>
         <div class="view-title" id="view-title">What's hot</div>
       </div>
 
       <!-- Home View -->
       <div class="view active" id="view-home">
-        <h1 class="section-big-title">Trending</h1>
+        <h1 class="section-big-title">Nymix picks</h1>
 
         <!-- Hero Banner -->
         <div class="hero-banner" id="hero-banner">
           <div class="hero-overlay"></div>
-          <img class="hero-bg" id="hero-img" src="https://img.youtube.com/vi/JGwWNGJdvx8/maxresdefault.jpg" alt="trending" />
+          <img class="hero-bg" id="hero-img" alt="" />
           <div class="hero-content">
-            <div class="hero-tag">Artist</div>
-            <div class="hero-listeners">👥 Monthly listeners: <strong id="hero-listeners">1.2M</strong></div>
-            <h2 class="hero-title" id="hero-title">Top hits worldwide</h2>
+            <div class="hero-tag" id="hero-tag">Featured artist</div>
+            <div class="hero-listeners">Official music from <strong id="hero-listeners">Naim Almas</strong></div>
+            <h2 class="hero-title" id="hero-title">Listen to Naim Almas Official</h2>
             <div class="hero-actions">
-              <button class="btn-play-hero" id="hero-play-btn">
-                <svg width="14" height="14" fill="white" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+              <button class="btn-play-hero" id="hero-play-btn" disabled>
+                <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg>
                 Play
               </button>
-              <button class="btn-follow">Follow</button>
+              <a class="btn-follow" href="https://www.youtube.com/@naimalmasofficial" target="_blank" rel="noopener noreferrer">Visit channel</a>
             </div>
           </div>
         </div>
@@ -120,8 +120,8 @@
         <!-- Playlist Table -->
         <div class="playlist-section">
           <div class="playlist-header">
-            <h2>Playlist</h2>
-            <button class="show-all-btn" id="show-all-btn">Show all</button>
+            <div><h2 id="featured-heading">Latest from Naim Almas Official</h2><p class="featured-caption">Music videos from the official YouTube channel</p></div>
+            <a class="show-all-btn" href="https://www.youtube.com/@naimalmasofficial" target="_blank" rel="noopener noreferrer">View channel</a>
           </div>
           <table class="playlist-table">
             <thead>
@@ -157,32 +157,32 @@
 
       <!-- Liked View -->
       <div class="view" id="view-liked">
-        <h1 class="section-big-title">❤️ Liked Songs</h1>
+        <h1 class="section-big-title"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#heart"></use></svg> Liked Songs</h1>
         <div id="liked-list" class="song-list-view"></div>
       </div>
 
       <!-- Radio View -->
       <div class="view" id="view-radio">
-        <h1 class="section-big-title">🎙️ Radio</h1>
+        <h1 class="section-big-title"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg> Radio</h1>
         <div class="radio-grid" id="radio-grid"></div>
       </div>
 
       <!-- Bottom Player Bar -->
       <div class="player-bar">
         <div class="player-left">
-          <button class="p-ctrl-btn" title="Like" id="p-like-btn">♡</button>
-          <button class="p-ctrl-btn" title="Add">⊞</button>
-          <button class="p-ctrl-btn active" id="btn-shuffle" title="Shuffle">⇄</button>
+          <button class="p-ctrl-btn" title="Like" id="p-like-btn"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#heart"></use></svg></button>
+          <button class="p-ctrl-btn" title="Add"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#list"></use></svg></button>
+          <button class="p-ctrl-btn active" id="btn-shuffle" title="Shuffle"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#shuffle"></use></svg></button>
         </div>
         <div class="player-center">
-          <button class="p-ctrl-btn" id="btn-prev">⏮</button>
-          <button class="p-ctrl-btn repeat-btn" id="btn-repeat">↺</button>
+          <button class="p-ctrl-btn" id="btn-prev" aria-label="Previous song"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#skip-back"></use></svg></button>
+          <button class="p-ctrl-btn repeat-btn" id="btn-repeat" aria-label="Repeat"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#repeat"></use></svg></button>
           <button class="play-pause-btn" id="btn-playpause">
-            <span id="play-icon-main">▶</span>
-            <span id="pause-icon-main" style="display:none">⏸</span>
+            <svg id="play-icon-main" class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg>
+            <svg id="pause-icon-main" class="ui-icon" style="display:none" aria-hidden="true"><use href="/icons.svg#pause"></use></svg>
           </button>
-          <button class="p-ctrl-btn" id="btn-next">⏭</button>
-          <button class="p-ctrl-btn" title="Queue">☰</button>
+          <button class="p-ctrl-btn" id="btn-next" aria-label="Next song"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#skip-forward"></use></svg></button>
+          <button class="p-ctrl-btn" title="Queue"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#list"></use></svg></button>
         </div>
         <div class="player-right">
           <svg width="14" height="14" fill="#aaa" viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
@@ -209,19 +209,18 @@
           <button class="more-btn">···</button>
         </div>
         <div class="tags-grid">
-          <button class="tag-pill" onclick="searchTag('Acoustic')">🎸 Acoustic</button>
-          <button class="tag-pill" onclick="searchTag('Piano jazz')">🎹 Piano jazz</button>
-          <button class="tag-pill" onclick="searchTag('Jazz')">🎷 Jazz</button>
-          <button class="tag-pill" onclick="searchTag('Indie pop')">🎵 Indie pop</button>
-          <button class="tag-pill" onclick="searchTag('Lo-fi')">🌙 Lo-fi</button>
-          <button class="tag-pill" onclick="searchTag('Hip hop')">🎤 Hip hop</button>
+          <button class="tag-pill" onclick="searchTag('Acoustic')"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Acoustic</button>
+          <button class="tag-pill" onclick="searchTag('Piano jazz')"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Piano jazz</button>
+          <button class="tag-pill" onclick="searchTag('Jazz')"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Jazz</button>
+          <button class="tag-pill" onclick="searchTag('Indie pop')"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Indie pop</button>
+          <button class="tag-pill" onclick="searchTag('Lo-fi')"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#headphones"></use></svg> Lo-fi</button>
+          <button class="tag-pill" onclick="searchTag('Hip hop')"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg> Hip hop</button>
         </div>
       </div>
 
       <!-- Now Playing Card -->
       <div class="now-playing-card">
         <div class="np-card-img-wrap">
-          <div id="yt-player"></div>
           <img id="np-card-img" src="" alt="now playing" style="display:none" />
           <div class="np-card-placeholder" id="np-placeholder">
             <svg width="40" height="40" fill="#ffffff44" viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
@@ -251,15 +250,15 @@
   <div class="modal-bg hidden" id="modal-bg">
     <div class="modal-box">
       <div class="modal-top">
-        <h3>⚙️ Settings</h3>
-        <button id="modal-close">✕</button>
+        <h3><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#settings"></use></svg> Settings</h3>
+        <button id="modal-close" aria-label="Close settings"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
       </div>
       <div class="modal-content">
         <label>YouTube API Key</label>
         <input type="password" id="api-input" placeholder="Paste a new YouTube API key" autocomplete="off" />
         <div class="api-msg" id="api-msg"></div>
         <button class="save-btn" id="save-btn">Save Key</button>
-        <p class="modal-hint">💡 console.cloud.google.com → YouTube Data API v3 → Create Credentials</p>
+        <p class="modal-hint"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#lightbulb"></use></svg> console.cloud.google.com <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg> YouTube Data API v3 <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg> Create Credentials</p>
       </div>
     </div>
   </div>

@@ -300,6 +300,65 @@ app.get('/api/search', async (req, res) => {
 
 app.get('/api/songs', (req, res) => res.json(rd('config.json').featuredSongs));
 
+const promotedChannelId = 'UCDXZVqwPXIO5ytEP7rDIjGQ';
+let promotedSongsCache = { expiresAt: 0, data: null };
+app.get('/api/promoted-songs', async (req, res) => {
+  if (promotedSongsCache.data && promotedSongsCache.expiresAt > Date.now()) return res.json(promotedSongsCache.data);
+  try {
+    const config = rd('config.json');
+    const key = process.env.YOUTUBE_API_KEY || config.ytApiKey;
+    if (!key) return res.status(503).json({ error: 'YouTube API key is required to load the official channel songs' });
+    const channelParams = new URLSearchParams({
+      part: 'snippet,contentDetails',
+      id: promotedChannelId,
+      key,
+    });
+    const channelResponse = await fetch(`https://www.googleapis.com/youtube/v3/channels?${channelParams}`);
+    const channelData = await channelResponse.json();
+    if (!channelResponse.ok || channelData.error) {
+      throw new Error(channelData.error?.message || 'Could not load the official YouTube channel');
+    }
+    const channel = channelData.items?.[0];
+    if (!channel?.contentDetails?.relatedPlaylists?.uploads) {
+      throw new Error('The official YouTube channel could not be found');
+    }
+    const playlistParams = new URLSearchParams({
+      part: 'snippet,contentDetails',
+      playlistId: channel.contentDetails.relatedPlaylists.uploads,
+      maxResults: '20',
+      key,
+    });
+    const playlistResponse = await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?${playlistParams}`);
+    const playlistData = await playlistResponse.json();
+    if (!playlistResponse.ok || playlistData.error) {
+      throw new Error(playlistData.error?.message || 'Could not load songs from the official YouTube channel');
+    }
+    const items = (playlistData.items || []).map(item => {
+      const videoId = item.contentDetails?.videoId;
+      if (!/^[\w-]{11}$/.test(videoId || '')) return null;
+      const thumbnails = item.snippet?.thumbnails || {};
+      return {
+        id: videoId,
+        title: item.snippet?.title || 'Naim Almas Official',
+        artist: channel.snippet?.title || 'Naim Almas Official',
+        album: 'Naim Almas Official',
+        dur: '',
+        thumb: thumbnails.maxres?.url || thumbnails.high?.url || thumbnails.medium?.url || `https://img.youtube.com/vi/${videoId}/mqdefault.jpg`,
+      };
+    }).filter(Boolean);
+    const data = {
+      channelTitle: channel.snippet?.title || 'Naim Almas Official',
+      channelUrl: 'https://www.youtube.com/@naimalmasofficial',
+      items,
+    };
+    promotedSongsCache = { expiresAt: Date.now() + 15 * 60 * 1000, data };
+    res.json(data);
+  } catch (error) {
+    console.error('Unable to load promoted channel songs:', error.message);
+    res.status(502).json({ error: 'Unable to load songs from the official YouTube channel right now' });
+  }
+});
+
 app.post('/api/play', auth, (req, res) => {
   try {
     const { songId, songTitle, songArtist, thumb } = req.body;

@@ -2,6 +2,7 @@
    NYMIX public/app.js — Fixed YouTube Playback
    ===================================================== */
 const API = '/api';
+const iconSvg = name => `<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#${name}"></use></svg>`;
 const token = () => localStorage.getItem('nx_token');
 const user  = () => JSON.parse(localStorage.getItem('nx_user') || 'null');
 
@@ -62,7 +63,7 @@ window.onYouTubeIframeAPIReady = () => {
         S.ytReady = true;
         e.target.setVolume(S.volume);
         startPoller();
-        console.log('%c✅ Nymix Player Ready', 'color:#a855f7;font-size:14px;font-weight:bold');
+        console.log('%cNymix Player Ready', 'color:#a855f7;font-size:14px;font-weight:bold');
       },
       onStateChange: (e) => {
         const YTS = YT.PlayerState;
@@ -92,11 +93,11 @@ window.onYouTubeIframeAPIReady = () => {
 
 function showPlayerError(code) {
   const msgs = {
-    2:   '❌ Invalid video',
-    5:   '❌ HTML5 player error',
-    100: '❌ Video not found',
-    101: '⚠️ Embed not allowed — skipping',
-    150: '⚠️ Embed not allowed — skipping',
+    2:   'Invalid video',
+    5:   'HTML5 player error',
+    100: 'Video not found',
+    101: 'Embed not allowed — skipping',
+    150: 'Embed not allowed — skipping',
   };
   console.warn(msgs[code] || `YT Error ${code}`);
 }
@@ -144,12 +145,12 @@ async function play(song) {
   $('np-card-artist').textContent = song.artist;
 
   // Update hero banner
-  $('hero-img').src = `https://img.youtube.com/vi/${song.id}/maxresdefault.jpg`;
+  $('hero-img').src = song.thumb || `https://img.youtube.com/vi/${song.id}/maxresdefault.jpg`;
   $('hero-title').textContent = song.title;
-  $('hero-listeners').textContent = randListeners();
+  $('hero-listeners').textContent = 'Naim Almas Official';
 
   // Page title
-  document.title = `▶ ${song.title} — Nymix`;
+  document.title = `${song.title} — Nymix`;
 
   // Active row highlight
   document.querySelectorAll('.playlist-table tbody tr').forEach(tr => {
@@ -302,7 +303,7 @@ async function search(q) {
     if (requestId !== searchState.requestId) return;
     $('search-results-grid').innerHTML = `
       <div class="loading-wrap">
-        <span style="font-size:36px">⚠️</span>
+        ${iconSvg('warning')}
         <p style="color:#9ca3af">${e.message}</p>
       </div>`;
   }
@@ -368,7 +369,7 @@ function renderGrid(songs, q, limited = false) {
   const grid = $('search-results-grid');
   grid.innerHTML = '';
   if (!songs.length) {
-    grid.innerHTML = '<div class="loading-wrap"><span style="font-size:36px">🎵</span><p>No results found</p></div>';
+    grid.innerHTML = `<div class="loading-wrap">${iconSvg('music')}<p>No results found</p></div>`;
     return;
   }
   songs.forEach((s, i) => {
@@ -377,7 +378,7 @@ function renderGrid(songs, q, limited = false) {
     c.innerHTML = `
       <img src="${s.thumb || thumb(s.id)}" alt="${esc(s.title)}"
            onerror="this.src='${thumb(s.id)}'" />
-      <div class="sg-play-btn">▶</div>
+      <div class="sg-play-btn">${iconSvg('play')}</div>
       <div class="sg-card-info">
         <div class="sg-card-title">${esc(s.title)}</div>
         <div class="sg-card-artist">${esc(s.artist)}</div>
@@ -423,7 +424,8 @@ function updateLikeBtn() {
   if (!S.current) return;
   const liked = isLiked(S.current.id);
   const btn = $('p-like-btn');
-  btn.textContent = liked ? '♥' : '♡';
+  btn.classList.toggle('liked', liked);
+  btn.setAttribute('aria-label', liked ? 'Unlike song' : 'Like song');
   btn.style.color = liked ? '#a855f7' : '';
 }
 
@@ -432,7 +434,7 @@ function renderLiked() {
   if (!list) return;
   list.innerHTML = '';
   if (!S.liked.length) {
-    list.innerHTML = '<div style="color:#9ca3af;padding:30px;text-align:center">No liked songs yet ♡</div>';
+    list.innerHTML = `<div style="color:#9ca3af;padding:30px;text-align:center">${iconSvg('heart')}<p>No liked songs yet</p></div>`;
     return;
   }
   S.liked.forEach((s, i) => {
@@ -444,7 +446,7 @@ function renderLiked() {
         <div class="sl-title">${esc(s.title)}</div>
         <div class="sl-artist">${esc(s.artist)}</div>
       </div>
-      <button class="sl-like-btn" title="Unlike">♥</button>`;
+      <button class="sl-like-btn" title="Unlike">${iconSvg('heart')}</button>`;
     r.querySelector('.sl-like-btn').addEventListener('click', e => {
       e.stopPropagation();
       toggleLike(s);
@@ -457,11 +459,33 @@ function renderLiked() {
 // ── Playlist Table ────────────────────────────────────
 let featuredSongs = [];
 async function buildPlaylist() {
-  try { featuredSongs = await apiFetch('/songs'); }
-  catch { featuredSongs = DEMO; }
-
   const tbody = $('playlist-body');
+  try {
+    const data = await apiFetch('/promoted-songs');
+    if (data.error) throw new Error(data.error);
+    featuredSongs = data.items;
+    if (!Array.isArray(featuredSongs)) throw new Error('Invalid official channel song list');
+    $('featured-heading').textContent = `Latest from ${data.channelTitle || 'Naim Almas Official'}`;
+    $('hero-tag').textContent = 'Featured from the official channel';
+    $('hero-play-btn').disabled = featuredSongs.length === 0;
+  } catch (error) {
+    featuredSongs = [];
+    $('hero-play-btn').disabled = true;
+    tbody.innerHTML = `<tr><td class="featured-error" colspan="6">${esc(error.message || 'Unable to load official channel songs')}</td></tr>`;
+    $('hero-title').textContent = 'Listen to Naim Almas Official';
+    return featuredSongs;
+  }
+
+  if (featuredSongs.length) {
+    $('hero-img').src = featuredSongs[0].thumb || thumb(featuredSongs[0].id);
+    $('hero-title').textContent = featuredSongs[0].title;
+  }
   tbody.innerHTML = '';
+  if (!featuredSongs.length) {
+    $('hero-play-btn').disabled = true;
+    tbody.innerHTML = '<tr><td class="featured-error" colspan="6">No videos are available on the official channel yet.</td></tr>';
+    return featuredSongs;
+  }
   featuredSongs.forEach((s, i) => {
     const tr = document.createElement('tr');
     tr.dataset.id = s.id;
@@ -473,13 +497,13 @@ async function buildPlaylist() {
       <td class="td-time">${s.dur || '—'}</td>
       <td class="td-album">${s.album || '—'}</td>
       <td class="td-actions">
-        <button class="row-like-btn ${liked ? 'liked' : ''}">${liked ? '♥' : '♡'}</button>
+        <button class="row-like-btn ${liked ? 'liked' : ''}" aria-label="${liked ? 'Unlike' : 'Like'} song">${iconSvg('heart')}</button>
       </td>`;
     tr.querySelector('.row-like-btn').addEventListener('click', e => {
       e.stopPropagation();
       toggleLike(s);
       e.currentTarget.classList.toggle('liked', isLiked(s.id));
-      e.currentTarget.textContent = isLiked(s.id) ? '♥' : '♡';
+      e.currentTarget.setAttribute('aria-label', isLiked(s.id) ? 'Unlike song' : 'Like song');
     });
     tr.addEventListener('click', () => playQueue(featuredSongs, i));
     tbody.appendChild(tr);
@@ -489,35 +513,27 @@ async function buildPlaylist() {
 
 // ── Genres & Radio ────────────────────────────────────
 const GENRES = [
-  { name: 'Pop',       color: 'linear-gradient(135deg,#7c3aed,#ec4899)', emoji: '🎵' },
-  { name: 'Hip-Hop',   color: 'linear-gradient(135deg,#059669,#0d9488)', emoji: '🎤' },
-  { name: 'Rock',      color: 'linear-gradient(135deg,#dc2626,#b45309)', emoji: '🎸' },
-  { name: 'Jazz',      color: 'linear-gradient(135deg,#2563eb,#4f46e5)', emoji: '🎷' },
-  { name: 'Lo-fi',     color: 'linear-gradient(135deg,#0f172a,#1e3a5f)', emoji: '🌙' },
-  { name: 'Electronic',color: 'linear-gradient(135deg,#0891b2,#06b6d4)', emoji: '🎧' },
-  { name: 'Classical', color: 'linear-gradient(135deg,#92400e,#b45309)', emoji: '🎻' },
-  { name: 'R&B',       color: 'linear-gradient(135deg,#9d174d,#be185d)', emoji: '🎼' },
-  { name: 'Acoustic',  color: 'linear-gradient(135deg,#065f46,#047857)', emoji: '🪕' },
-  { name: 'K-Pop',     color: 'linear-gradient(135deg,#be185d,#7c3aed)', emoji: '🌸' },
-  { name: 'Bangla',    color: 'linear-gradient(135deg,#b45309,#92400e)', emoji: '🇧🇩' },
-  { name: 'Indie',     color: 'linear-gradient(135deg,#4c1d95,#5b21b6)', emoji: '✨' },
+  { name: 'Pop',        color: 'linear-gradient(135deg,#7c3aed,#ec4899)', icon: 'music' },
+  { name: 'Hip-Hop',    color: 'linear-gradient(135deg,#059669,#0d9488)', icon: 'mic' },
+  { name: 'Rock',       color: 'linear-gradient(135deg,#dc2626,#b45309)', icon: 'radio' },
+  { name: 'Jazz',       color: 'linear-gradient(135deg,#2563eb,#4f46e5)', icon: 'music' },
+  { name: 'Lo-fi',      color: 'linear-gradient(135deg,#0f172a,#1e3a5f)', icon: 'headphones' },
+  { name: 'Electronic', color: 'linear-gradient(135deg,#0891b2,#06b6d4)', icon: 'radio' },
+  { name: 'Classical',  color: 'linear-gradient(135deg,#92400e,#b45309)', icon: 'music' },
+  { name: 'R&B',        color: 'linear-gradient(135deg,#9d174d,#be185d)', icon: 'mic' },
+  { name: 'Acoustic',   color: 'linear-gradient(135deg,#065f46,#047857)', icon: 'music' },
+  { name: 'K-Pop',      color: 'linear-gradient(135deg,#be185d,#7c3aed)', icon: 'sparkles' },
+  { name: 'Bangla',     color: 'linear-gradient(135deg,#b45309,#92400e)', icon: 'music' },
+  { name: 'Indie',      color: 'linear-gradient(135deg,#4c1d95,#5b21b6)', icon: 'sparkles' },
 ];
 
 const RADIO = [
-  { name: 'Chill Vibes',  desc: 'Relaxing beats', emoji: '😌', query: 'chill lo-fi' },
-  { name: 'Top 40',       desc: 'Current hits',   emoji: '🔥', query: 'top hits 2024' },
-  { name: 'Workout',      desc: 'High energy',    emoji: '💪', query: 'workout music' },
-  { name: 'Late Night',   desc: 'Smooth & mellow',emoji: '🌙', query: 'late night music' },
-  { name: 'Bangla Hits',  desc: 'Best of Bangla', emoji: '🎙️', query: 'bangla song' },
-  { name: 'Acoustic',     desc: 'Stripped back',  emoji: '🎸', query: 'acoustic songs' },
-];
-
-const DEMO = [
-  { id: 'JGwWNGJdvx8', title: 'Shape of You',    artist: 'Ed Sheeran',       dur: '3:53', album: '÷ (Divide)' },
-  { id: 'ktvTqknDobU', title: 'Radioactive',      artist: 'Imagine Dragons',  dur: '3:06', album: 'Night Visions' },
-  { id: '09R8_2nJtjg', title: 'Payphone',         artist: 'Maroon 5',         dur: '3:45', album: 'Overexposed' },
-  { id: 'RgKAFK5djSk', title: 'See You Again',    artist: 'Wiz Khalifa',      dur: '3:50', album: 'Furious 7' },
-  { id: 'YQHsXMglC9A', title: 'Hello',            artist: 'Adele',            dur: '4:55', album: '25' },
+  { name: 'Chill Vibes',  desc: 'Relaxing beats', icon: 'headphones', query: 'chill lo-fi' },
+  { name: 'Top 40',       desc: 'Current hits',   icon: 'chart', query: 'top hits 2024' },
+  { name: 'Workout',      desc: 'High energy',    icon: 'play', query: 'workout music' },
+  { name: 'Late Night',   desc: 'Smooth & mellow',icon: 'radio', query: 'late night music' },
+  { name: 'Bangla Hits',  desc: 'Best of Bangla', icon: 'mic', query: 'bangla song' },
+  { name: 'Acoustic',     desc: 'Stripped back',  icon: 'music', query: 'acoustic songs' },
 ];
 
 function buildGenres() {
@@ -528,7 +544,7 @@ function buildGenres() {
     const c = document.createElement('div');
     c.className = 'genre-card';
     c.style.background = g.color;
-    c.innerHTML = `<div style="font-size:28px;margin-bottom:8px">${g.emoji}</div><div>${g.name}</div>`;
+    c.innerHTML = `<div class="genre-icon">${iconSvg(g.icon)}</div><div>${g.name}</div>`;
     c.addEventListener('click', () => { $('search-input').value = g.name; search(g.name); });
     grid.appendChild(c);
   });
@@ -541,7 +557,7 @@ function buildRadio() {
   RADIO.forEach(r => {
     const c = document.createElement('div');
     c.className = 'radio-card';
-    c.innerHTML = `<div class="radio-emoji">${r.emoji}</div><div class="radio-title">${r.name}</div><div class="radio-desc">${r.desc}</div>`;
+    c.innerHTML = `<div class="radio-icon">${iconSvg(r.icon)}</div><div class="radio-title">${r.name}</div><div class="radio-desc">${r.desc}</div>`;
     c.addEventListener('click', () => { $('search-input').value = r.query; search(r.query); });
     grid.appendChild(c);
   });
@@ -598,13 +614,14 @@ function updateUserMenu() {
         <div class="user-avatar">${u.name[0].toUpperCase()}</div>
         <div class="user-info">
           <div class="user-name">${esc(u.name)}</div>
-          <div class="user-plan">${u.role === 'admin' ? '👑 Admin' : '🎵 Member'}</div>
+          <div class="user-plan">${u.role === 'admin' ? 'Admin' : 'Member'}</div>
         </div>
         <div style="margin-left:auto;display:flex;gap:4px">
           ${u.role === 'admin'
-            ? `<button onclick="window.open('/admin/','_blank')" title="Admin" style="background:none;border:none;cursor:pointer;font-size:15px">👑</button>` : ''}
-          <button onclick="window.open('/user/','_blank')" title="Dashboard" style="background:none;border:none;cursor:pointer;font-size:15px">👤</button>
-          <button onclick="logout()" title="Logout" style="background:none;border:none;cursor:pointer;font-size:15px">🚪</button>
+            ? `<button onclick="window.open('/admin/','_blank')" title="Admin" class="user-menu-button">${iconSvg('shield')}</button>` : ''}
+          <button onclick="window.open('/user/','_blank')" title="Dashboard" class="user-menu-button">${iconSvg('user')}</button>
+          <button title="Settings" id="settings-btn" class="user-menu-button">${iconSvg('settings')}</button>
+          <button onclick="logout()" title="Logout" class="user-menu-button">${iconSvg('close')}</button>
         </div>
       </div>`;
   } else {
@@ -613,7 +630,7 @@ function updateUserMenu() {
         <div class="user-avatar" style="background:#374151">?</div>
         <div class="user-info">
           <div class="user-name">Not logged in</div>
-          <div class="user-plan" style="color:#a855f7">Login →</div>
+          <div class="user-plan" style="color:#a855f7">Login</div>
         </div>
       </div>`;
   }
@@ -635,7 +652,7 @@ async function saveSettings() {
       body: JSON.stringify({ ytApiKey: k }),
     }).catch(() => {});
   }
-  $('api-msg').textContent = '✓ Saved!';
+  $('api-msg').textContent = 'Saved!';
   $('api-msg').className   = 'api-msg ok';
   setTimeout(() => $('modal-bg').classList.add('hidden'), 800);
 }
@@ -649,7 +666,6 @@ const fmt   = s  => {
   const m = Math.floor(s / 60), sc = Math.floor(s % 60);
   return `${m}:${sc.toString().padStart(2, '0')}`;
 };
-const randListeners = () => (Math.floor(Math.random() * 900 + 100) / 100).toFixed(2) + 'M';
 function timeAgo(ts) {
   const d = Math.floor((Date.now() - ts) / 1000);
   if (d < 60) return 'just now';
@@ -660,7 +676,7 @@ function timeAgo(ts) {
 
 // ── Init ──────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // 🔒 Must be logged in
+  // Must be logged in
   if (!requireAuth()) return;
 
   updateUserMenu();
@@ -728,12 +744,6 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
 
   // ── Show all ──
-  $('show-all-btn').addEventListener('click', () => {
-    showView('discover');
-    $('search-heading').textContent = 'Featured Songs';
-    renderGrid(featuredSongs, 'Featured');
-  });
-
   // ── See all played ──
   $('see-all-btn').addEventListener('click', () => showView('liked'));
 

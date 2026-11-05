@@ -24,6 +24,7 @@ body {
   color: var(--text);
   font: 14px/1.55 Inter, system-ui, sans-serif;
 }
+svg.ui-icon { display: inline-block; width: 18px; height: 18px; flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; vertical-align: middle; }
 button, input { font: inherit; }
 button { color: inherit; }
 .topbar {
@@ -40,8 +41,8 @@ button { color: inherit; }
   backdrop-filter: blur(18px);
 }
 .brand { display: flex; align-items: center; gap: 10px; color: var(--text); font-size: 19px; font-weight: 800; text-decoration: none; white-space: nowrap; }
-.brand-icon { display: grid; place-items: center; width: 36px; height: 36px; color: #fff; background: linear-gradient(140deg,#ad73ff,#7044d4); border-radius: 12px; box-shadow: 0 7px 22px rgba(135,81,224,.28); font-size: 21px; }
-.brand-social { color: var(--purple-light); }
+.brand-icon { display: grid; place-items: center; width: 36px; height: 36px; color: #fff; background: linear-gradient(140deg,#ad73ff,#7044d4); border-radius: 12px; box-shadow: 0 7px 22px rgba(135,81,224,.28); }
+.brand-icon .ui-icon { width: 20px; height: 20px; }
 .topbar nav { display: flex; justify-content: center; gap: 7px; flex: 1; overflow-x: auto; }
 .tab { display: inline-flex; align-items: center; gap: 8px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); padding: 10px 13px; cursor: pointer; white-space: nowrap; transition: background .16s ease,color .16s ease; }
 .tab:hover, .tab.active { background: rgba(160,106,255,.13); color: var(--text); }
@@ -77,12 +78,12 @@ h3 { font-size: 14px; margin: 0 0 12px; }
 .hero-copy .eyebrow { margin-bottom: 11px; }
 .hero-copy > p:last-child { max-width: 570px; margin: 0; color: #c2b8d0; font-size: 14px; }
 .hero-decoration { position: absolute; z-index: -1; top: 5px; right: 9%; width: 210px; height: 170px; color: rgba(203,167,255,.1); }
-.hero-decoration span { position: absolute; top: -41px; right: 8px; font-size: 180px; line-height: 1; transform: rotate(12deg); }
+.hero-decoration > .ui-icon { position: absolute; top: -30px; right: -9px; width: 165px; height: 165px; opacity: .48; stroke-width: .8; transform: rotate(12deg); }
 .hero-decoration i, .hero-decoration b { position: absolute; display: block; width: 78px; height: 78px; border: 1px solid rgba(207,170,255,.16); border-radius: 50%; }
 .hero-decoration i { top: 35px; right: 147px; }
 .hero-decoration b { top: 98px; right: 110px; width: 35px; height: 35px; background: rgba(195,153,255,.08); }
 .discover-search { position: relative; z-index: 1; display: flex; align-items: center; gap: 9px; width: min(660px,100%); height: 54px; margin-top: 25px; padding: 5px 6px 5px 16px; border: 1px solid rgba(255,255,255,.16); border-radius: 14px; background: rgba(12,8,21,.82); box-shadow: 0 8px 26px rgba(0,0,0,.18); }
-.search-icon { color: var(--purple-light); font-size: 25px; line-height: 1; transform: rotate(-15deg); }
+.search-icon { width: 20px; height: 20px; color: var(--purple-light); }
 .discover-search input { width: 100%; min-width: 0; padding: 10px 4px; border: 0; outline: 0; background: transparent; color: var(--text); }
 .discover-search input:focus { box-shadow: none; }
 .discover-search input::placeholder { color: #958aa6; }
@@ -226,7 +227,8 @@ input:disabled { opacity: .55; }
 .thread-copy strong, .thread-copy > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .thread-copy strong { font-size: 13px; font-weight: 650; }
 .thread-copy > span { color: var(--muted); font-size: 11px; }
-.thread-arrow { color: #83768f; font-size: 22px; }
+.thread-arrow { color: #83768f; }
+.thread-arrow .ui-icon { width: 17px; height: 17px; }
 .discover-link { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding: 11px 9px 5px; border: 0; border-top: 1px solid var(--border); background: transparent; color: var(--purple-light); text-align: left; cursor: pointer; }
 .chat-card { min-width: 0; min-height: 0; height: 100%; padding: 0; overflow: hidden; }
 .conversation-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 20px; border-bottom: 1px solid var(--border); }

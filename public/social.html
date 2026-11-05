@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Nymix Social</title>
+  <title>Nymix Messages</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -12,10 +12,10 @@
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/" aria-label="Nymix home"><span class="brand-icon" aria-hidden="true">♫</span><span>Nymix <span class="brand-social">Social</span></span></a>
-    <nav aria-label="Social features">
-      <button class="tab active" data-panel="chat"><span aria-hidden="true">▤</span> Messages</button>
-      <button class="tab" data-panel="people"><span aria-hidden="true">✦</span> Discover</button>
+    <a class="brand" href="/" aria-label="Nymix home"><span class="brand-icon" aria-hidden="true"><svg class="ui-icon"><use href="/icons.svg#music"></use></svg></span><span>Nymix</span></a>
+    <nav aria-label="Nymix navigation">
+      <button class="tab active" data-panel="chat"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#list"></use></svg> Messages</button>
+      <button class="tab" data-panel="people"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Discover</button>
     </nav>
     <div class="account">
       <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
@@ -34,9 +34,9 @@
           <h1 id="discover-title">Find your people.</h1>
           <p>Meet music lovers, start a conversation, or challenge a friend to a quick game.</p>
         </div>
-        <div class="hero-decoration" aria-hidden="true"><span>♫</span><i></i><b></b></div>
+        <div class="hero-decoration" aria-hidden="true"><svg class="ui-icon"><use href="/icons.svg#music"></use></svg><i></i><b></b></div>
         <form id="user-search-form" class="discover-search" role="search">
-          <span class="search-icon" aria-hidden="true">⌕</span>
+          <svg class="search-icon ui-icon" aria-hidden="true"><use href="/icons.svg#search"></use></svg>
           <label class="sr-only" for="user-search">Search people by name or email</label>
           <input id="user-search" type="search" autocomplete="off" placeholder="Search by name or email…" minlength="2" aria-controls="search-results" />
           <button class="button" type="submit">Find people</button>
@@ -97,17 +97,17 @@
           <label class="sr-only" for="thread-search">Filter conversations</label>
           <input id="thread-search" class="thread-search" type="search" placeholder="Search friends…" autocomplete="off" />
           <div id="chat-friends" class="thread-list"></div>
-          <button type="button" class="discover-link" id="discover-from-inbox">Find people <span aria-hidden="true">→</span></button>
+          <button type="button" class="discover-link" id="discover-from-inbox">Find people <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right-long"></use></svg></button>
         </aside>
         <article class="card chat-card">
           <header class="conversation-header">
             <div class="conversation-person">
-              <span class="conversation-avatar" id="chat-avatar">♫</span>
+              <span class="conversation-avatar" id="chat-avatar"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg></span>
               <div><p class="eyebrow">DIRECT MESSAGE</p><h2 id="chat-title">Choose a friend</h2></div>
             </div>
             <div class="conversation-actions" aria-label="Things to do together">
-              <button type="button" class="button secondary" id="chat-game-button" disabled><span aria-hidden="true">✕</span> Play</button>
-              <button type="button" class="button secondary" id="chat-listen-button" disabled><span aria-hidden="true">♫</span> Listen</button>
+              <button type="button" class="button secondary" id="chat-game-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#gamepad"></use></svg> Play</button>
+              <button type="button" class="button secondary" id="chat-listen-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#headphones"></use></svg> Listen</button>
             </div>
           </header>
           <div id="chat-activities" class="chat-activities">
@@ -115,7 +115,7 @@
             <section class="inline-activity inline-game" id="inline-game" hidden>
               <div class="activity-heading">
                 <div><p class="eyebrow">PLAY TOGETHER</p><h3 id="inline-game-title">Tic-tac-toe</h3></div>
-                <button type="button" class="icon-button" id="inline-game-close" aria-label="Close game">×</button>
+                <button type="button" class="icon-button" id="inline-game-close" aria-label="Close game"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
               </div>
               <p class="game-status" id="inline-game-status"></p>
               <div class="board" id="inline-game-board" role="grid" aria-label="Tic-tac-toe board"></div>
@@ -127,7 +127,7 @@
             <section class="inline-activity song-picker" id="chat-song-picker" hidden>
               <div class="activity-heading">
                 <div><p class="eyebrow">LISTEN TOGETHER</p><h3>Pick a song</h3></div>
-                <button type="button" class="icon-button" id="chat-song-close" aria-label="Close song search">×</button>
+                <button type="button" class="icon-button" id="chat-song-close" aria-label="Close song search"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
               </div>
               <form id="song-search-form" class="inline-form">
                 <label class="sr-only" for="song-search">Search songs</label>

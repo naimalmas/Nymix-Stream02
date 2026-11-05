@@ -7,6 +7,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    .ui-icon { display:inline-block; width:1em; height:1em; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; vertical-align:middle; }
 
     :root {
       --bg: #0d0520;
@@ -209,6 +210,7 @@
       background: linear-gradient(135deg, #fff, var(--accent3));
       -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
     .stat-icon { font-size: 22px; }
+    .stat-icon .ui-icon { width:22px; height:22px; }
 
     /* ── Liked Songs ── */
     .liked-list { display: flex; flex-direction: column; gap: 8px; }
@@ -315,7 +317,7 @@
       justify-content: center; padding: 48px 24px; gap: 12px;
       text-align: center;
     }
-    .empty-state .empty-icon { font-size: 48px; opacity: .5; }
+    .empty-state .empty-icon { display:inline-flex; font-size: 40px; opacity: .5; }
     .empty-state p { color: var(--muted); font-size: 15px; }
 
     /* ── Spinner ── */
@@ -438,7 +440,7 @@
               Member
             </div>
             <span class="member-badge" id="totalPlaysBadge" style="background:rgba(168,85,247,0.15);border-color:rgba(168,85,247,0.35);">
-              🎵 0 Plays
+              <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg> 0 Plays
             </span>
           </div>
           <div class="fields" style="margin-top:14px;">
@@ -464,7 +466,7 @@
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
               Save Changes
             </button>
-            <span class="save-msg" id="saveMsg">✓ Saved!</span>
+            <span class="save-msg" id="saveMsg"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#check"></use></svg> Saved!</span>
           </div>
         </div>
       </div>
@@ -473,17 +475,17 @@
     <!-- Stats Row -->
     <div class="stats-row section">
       <div class="stat-card">
-        <div class="stat-icon">❤️</div>
+        <div class="stat-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#heart"></use></svg></div>
         <div class="stat-label">Liked Songs</div>
         <div class="stat-value" id="statLiked">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">🎵</div>
+        <div class="stat-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg></div>
         <div class="stat-label">Total Plays</div>
         <div class="stat-value" id="statPlays">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-icon">📅</div>
+        <div class="stat-icon"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#calendar"></use></svg></div>
         <div class="stat-label">Member Since</div>
         <div class="stat-value" id="statSince" style="font-size:18px;line-height:1.3;">—</div>
       </div>
@@ -520,17 +522,17 @@
       </div>
       <div class="quick-grid">
         <a class="quick-card" href="/">
-          <div class="quick-icon purple">🎵</div>
+          <div class="quick-icon purple"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg></div>
           <div class="quick-title">Go to Player</div>
           <div class="quick-desc">Jump back into the music experience</div>
         </a>
         <a class="quick-card" href="/songs.html">
-          <div class="quick-icon pink">🔍</div>
+          <div class="quick-icon pink"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#search"></use></svg></div>
           <div class="quick-title">Browse Songs</div>
           <div class="quick-desc">Explore the full Nymix library</div>
         </a>
         <a class="quick-card" href="/discover.html">
-          <div class="quick-icon teal">✨</div>
+          <div class="quick-icon teal"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg></div>
           <div class="quick-title">Discover</div>
           <div class="quick-desc">Find new artists & trending tracks</div>
         </a>
@@ -542,7 +544,7 @@
 
 <!-- Toast -->
 <div class="toast" id="toast">
-  <span id="toastIcon">✓</span>
+  <span id="toastIcon"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#check"></use></svg></span>
   <span id="toastMsg">Done</span>
 </div>
 
@@ -551,6 +553,7 @@
      CONFIG
   ═══════════════════════════════════════════════ */
   const API = '/api';
+  const iconMarkup = name => `<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#${name}"></use></svg>`;
 
   function getToken() { return localStorage.getItem('nx_token'); }
 
@@ -566,7 +569,7 @@
     const t = document.getElementById('toast');
     const i = document.getElementById('toastIcon');
     const m = document.getElementById('toastMsg');
-    i.textContent = type === 'success' ? '✓' : '✕';
+    i.innerHTML = iconMarkup(type === 'success' ? 'check' : 'close');
     m.textContent = msg;
     t.className = 'toast ' + type + ' show';
     clearTimeout(toastTimer);
@@ -651,7 +654,7 @@
     document.getElementById('profileRole').value  = role.charAt(0).toUpperCase() + role.slice(1);
 
     // Badges & stats
-    document.getElementById('totalPlaysBadge').textContent = '🎵 ' + plays + ' Plays';
+    document.getElementById('totalPlaysBadge').innerHTML = `${iconMarkup('play')} ${plays} Plays`;
     document.getElementById('statPlays').textContent       = plays.toLocaleString();
     document.getElementById('statSince').textContent       = since ? new Date(since).toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : '—';
   }
@@ -702,14 +705,14 @@
       document.getElementById('statLiked').textContent = songs.length.toLocaleString();
       renderLiked(songs);
     } catch (e) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">❤️</div><p>Could not load liked songs.</p></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">${iconMarkup('heart')}</div><p>Could not load liked songs.</p></div>`;
     }
   }
 
   function renderLiked(songs) {
     const container = document.getElementById('likedContainer');
     if (!songs.length) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🎶</div><p>No liked songs yet — go heart something!</p></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">${iconMarkup('music')}</div><p>No liked songs yet.</p></div>`;
       return;
     }
     const list = document.createElement('div');
@@ -725,8 +728,8 @@
       row.className = 'song-row';
       row.innerHTML = `
         ${thumb
-          ? `<img class="song-thumb" src="${thumb}" alt="${title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="song-thumb-placeholder" style="display:none">🎵</div>`
-          : `<div class="song-thumb-placeholder">🎵</div>`
+          ? `<img class="song-thumb" src="${thumb}" alt="${title}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="song-thumb-placeholder" style="display:none">${iconMarkup('music')}</div>`
+          : `<div class="song-thumb-placeholder">${iconMarkup('music')}</div>`
         }
         <div class="song-info">
           <div class="song-title">${escHtml(title)}</div>
@@ -767,7 +770,7 @@
     const count = document.querySelectorAll('#likedContainer .song-row').length;
     document.getElementById('statLiked').textContent = count.toLocaleString();
     if (count === 0) {
-      document.getElementById('likedContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">🎶</div><p>No liked songs yet — go heart something!</p></div>`;
+      document.getElementById('likedContainer').innerHTML = `<div class="empty-state"><div class="empty-icon">${iconMarkup('music')}</div><p>No liked songs yet.</p></div>`;
     }
   }
 
@@ -783,14 +786,14 @@
       const history = (data.history || data.plays || data || []).slice(0, 20);
       renderHistory(history);
     } catch (e) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🕒</div><p>Could not load play history.</p></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">${iconMarkup('clock')}</div><p>Could not load play history.</p></div>`;
     }
   }
 
   function renderHistory(history) {
     const container = document.getElementById('historyContainer');
     if (!history.length) {
-      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🕒</div><p>No play history yet — start listening!</p></div>`;
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">${iconMarkup('clock')}</div><p>No play history yet — start listening.</p></div>`;
       return;
     }
     const table = document.createElement('table');
@@ -818,8 +821,8 @@
         <td>
           <div style="display:flex;align-items:center;gap:10px;">
             ${thumb
-              ? `<img class="h-thumb" src="${thumb}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="h-thumb-ph" style="display:none">🎵</div>`
-              : `<div class="h-thumb-ph">🎵</div>`
+              ? `<img class="h-thumb" src="${thumb}" alt="" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="h-thumb-ph" style="display:none">${iconMarkup('music')}</div>`
+              : `<div class="h-thumb-ph">${iconMarkup('music')}</div>`
             }
             <span class="h-title">${escHtml(title)}</span>
           </div>

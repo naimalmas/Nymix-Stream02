@@ -149,7 +149,7 @@ function renderFriends() {
     copy.append(name, preview);
     const arrow = document.createElement('span');
     arrow.className = 'thread-arrow';
-    arrow.textContent = '›';
+    arrow.innerHTML = '<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right"></use></svg>';
     thread.append(avatar, copy, arrow);
     thread.addEventListener('click', () => selectFriend(friend));
     return thread;

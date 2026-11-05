@@ -2,11 +2,13 @@
 
 Nymix is an Express-backed music app with separate User, Admin, and Super Admin dashboards.
 
-## Social features
+## Messages and friends
 
-Signed-in members get friend suggestions ranked by mutual connections, can search for members by name or email, and can send or accept friend requests. The direct-message inbox is the social home: from a friend's conversation, members can send a Tic-tac-toe challenge, play on an embedded board, search for a song, and invite the friend into synced playback without leaving the chat. Friends can also join a listening room and use its room chat. Social data is stored with the app state in PostgreSQL on Vercel and in ignored local JSON files during development; updates use short-interval polling.
+Signed-in members get friend suggestions ranked by mutual connections, can search for members by name or email, and can send or accept friend requests. The direct-message inbox is the Nymix home for conversations: from a friend's chat, members can send a Tic-tac-toe challenge, play on an embedded board, search for a song, and invite the friend into synced playback without leaving the chat. Friends can also join a listening room and use its room chat. Conversation data is stored with the app state in PostgreSQL on Vercel and in ignored local JSON files during development; updates use short-interval polling.
 
-Open **Friends & Games** in the music app, or go directly to `/social.html`. A friend relationship is required before private chats, listening rooms, or games can be joined.
+Open **Messages** in Nymix, or go directly to `/social.html`. A friend relationship is required before private chats, listening rooms, or games can be joined.
+
+The Nymix home page features recent videos from the [Naim Almas Official YouTube channel](https://www.youtube.com/@naimalmasofficial). The server uses the configured YouTube Data API key and caches the channel playlist for 15 minutes.
 
 ## Local development
 
