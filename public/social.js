@@ -4,12 +4,15 @@ const state = {
   friends: [],
   requests: [],
   gameInvites: [],
+  roomInvites: [],
   suggestions: [],
   rooms: [],
   games: [],
   activeFriend: null,
   activeRoom: null,
+  activeRoomFriendId: null,
   activeGame: null,
+  activeGameFriendId: null,
   chatMessages: [],
   chatAfter: 0,
   youtubeReady: false,
@@ -108,6 +111,7 @@ function setPanel(panelName) {
 
 function renderFriends() {
   $('friend-count').textContent = String(state.friends.length);
+  $('discover-friend-count').textContent = String(state.friends.length);
   renderList($('friends-list'), state.friends, 'Your friends will show up here.', friend =>
     makePerson(friend, [
       makeButton('Message', () => selectFriend(friend), 'primary'),
@@ -123,9 +127,33 @@ function renderFriends() {
       }, 'danger'),
     ]),
   );
-  renderList($('chat-friends'), state.friends, 'Add a friend to start chatting.', friend =>
-    makePerson(friend, [makeButton(state.activeFriend?.id === friend.id ? 'Selected' : 'Message', () => selectFriend(friend), 'primary')]),
-  );
+  const query = $('thread-search').value.trim().toLocaleLowerCase();
+  renderList($('chat-friends'), state.friends.filter(friend =>
+    !query || friend.name.toLocaleLowerCase().includes(query),
+  ), 'No conversations yet. Find a friend to start chatting.', friend => {
+    const thread = document.createElement('button');
+    thread.type = 'button';
+    thread.className = `thread-row${state.activeFriend?.id === friend.id ? ' active' : ''}`;
+    thread.setAttribute('aria-current', state.activeFriend?.id === friend.id ? 'true' : 'false');
+    const avatar = document.createElement('span');
+    avatar.className = 'thread-avatar';
+    avatar.textContent = friend.name.trim().slice(0, 1).toUpperCase();
+    const copy = document.createElement('span');
+    copy.className = 'thread-copy';
+    const name = document.createElement('strong');
+    name.textContent = friend.name;
+    const preview = document.createElement('span');
+    preview.textContent = state.activeFriend?.id === friend.id && state.chatMessages.length
+      ? state.chatMessages[state.chatMessages.length - 1].text
+      : 'Start a conversation';
+    copy.append(name, preview);
+    const arrow = document.createElement('span');
+    arrow.className = 'thread-arrow';
+    arrow.textContent = '›';
+    thread.append(avatar, copy, arrow);
+    thread.addEventListener('click', () => selectFriend(friend));
+    return thread;
+  });
 }
 
 function renderRequests() {
@@ -230,7 +258,9 @@ function renderGameInvites() {
         try {
           const game = await post(`/games/${encodeURIComponent(invite.code)}/join`);
           state.activeGame = game.code;
-          setPanel('games');
+          state.activeGameFriendId = invite.hostId;
+          const friend = state.friends.find(item => item.id === invite.hostId);
+          if (friend) await selectFriend(friend);
           renderGame(game);
           await refreshOverview();
         } catch (error) { showNotice(error.message, true); }
@@ -249,13 +279,108 @@ function renderGameInvites() {
 
 async function challengeFriend(friend) {
   try {
+    await selectFriend(friend);
     const game = await post('/games', { inviteeId: friend.id });
     state.activeGame = game.code;
-    setPanel('games');
+    state.activeGameFriendId = friend.id;
     renderGame(game);
     await refreshOverview();
-    showNotice(`Tic-tac-toe invite sent to ${friend.name}.`);
+    showNotice(`Game invite sent to ${friend.name}.`);
   } catch (error) { showNotice(error.message, true); }
+}
+
+function renderChatInvites() {
+  const container = $('chat-invites');
+  container.replaceChildren();
+  if (!state.activeFriend) return;
+  const gameInvites = state.gameInvites.filter(invite => invite.hostId === state.activeFriend.id);
+  const roomInvites = state.roomInvites.filter(invite => invite.hostId === state.activeFriend.id);
+  gameInvites.forEach(invite => {
+    const card = document.createElement('div');
+    card.className = 'chat-invite game-invite';
+    const text = document.createElement('span');
+    text.innerHTML = `<strong>${escapeHtml(invite.hostName)}</strong> invited you to play <strong>Tic-tac-toe</strong>`;
+    const actions = document.createElement('div');
+    actions.className = 'invite-actions';
+    actions.append(
+      makeButton('Play now', async () => {
+        try {
+          const game = await post(`/games/${encodeURIComponent(invite.code)}/join`);
+          state.activeGame = game.code;
+          state.activeGameFriendId = invite.hostId;
+          renderGame(game);
+          await refreshOverview();
+        } catch (error) { showNotice(error.message, true); }
+      }, 'primary'),
+      makeButton('Decline', async () => {
+        try {
+          await post(`/games/${encodeURIComponent(invite.code)}/decline`);
+          await refreshOverview();
+        } catch (error) { showNotice(error.message, true); }
+      }),
+    );
+    card.append(text, actions);
+    container.appendChild(card);
+  });
+  roomInvites.forEach(invite => {
+    const card = document.createElement('div');
+    card.className = 'chat-invite room-invite';
+    const text = document.createElement('span');
+    text.innerHTML = `<strong>${escapeHtml(invite.hostName)}</strong> invited you to listen to <strong>${escapeHtml(invite.song?.title || 'a song')}</strong>`;
+    const actions = document.createElement('div');
+    actions.className = 'invite-actions';
+    actions.append(
+      makeButton('Listen now', () => joinListenRoom(invite.code, invite.hostId), 'primary'),
+      makeButton('Later', async () => {
+        try {
+          await post(`/listen-rooms/${encodeURIComponent(invite.code)}/decline`);
+          await refreshOverview();
+        } catch (error) { showNotice(error.message, true); }
+      }),
+    );
+    card.append(text, actions);
+    container.appendChild(card);
+  });
+  if (state.activeGame && state.activeGameFriendId === state.activeFriend.id) {
+    $('inline-game').hidden = false;
+  }
+}
+
+function escapeHtml(value) {
+  const element = document.createElement('span');
+  element.textContent = String(value || '');
+  return element.innerHTML;
+}
+
+function renderInlineGame(game) {
+  const visible = Boolean(state.activeFriend && state.activeGameFriendId === state.activeFriend.id);
+  $('inline-game').hidden = !visible;
+  if (!visible) return;
+  const players = game.members.map(member => `${member.name} (${member.symbol})`);
+  if (game.invitedUserName) players.push(`${game.invitedUserName} (O)`);
+  $('inline-game-title').textContent = players.join(' vs ') || 'Tic-tac-toe';
+  $('inline-game-code').textContent = game.status === 'waiting' ? 'Waiting for your friend…' : `Room ${game.code}`;
+  $('inline-game-status').textContent = game.status === 'waiting' ? 'Invite sent in this chat.'
+    : game.status === 'draw' ? 'It’s a draw!'
+      : game.status === 'done' ? `${game.members.find(member => member.id === game.winner)?.name || 'A player'} wins!`
+        : game.turn === state.user.id ? 'Your turn' : `${game.members.find(member => member.id === game.turn)?.name || 'Friend'}’s turn`;
+  const board = $('inline-game-board');
+  board.replaceChildren();
+  game.board.forEach((value, index) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `board-cell${value ? ` ${value.toLowerCase()}` : ''}`;
+    button.setAttribute('role', 'gridcell');
+    button.setAttribute('aria-label', value ? `Square ${index + 1}: ${value}` : `Square ${index + 1}, empty`);
+    button.textContent = value || '';
+    button.disabled = game.status !== 'playing' || game.turn !== state.user.id || Boolean(value);
+    button.addEventListener('click', async () => {
+      try { renderGame(await post(`/games/${encodeURIComponent(game.code)}/moves`, { index })); }
+      catch (error) { showNotice(error.message, true); }
+    });
+    board.appendChild(button);
+  });
+  $('inline-game-reset').hidden = game.hostId !== state.user.id || game.members.length !== 2;
 }
 
 function renderMessages(container, messages, emptyText) {
@@ -284,11 +409,17 @@ async function selectFriend(friend) {
   state.chatMessages = [];
   state.chatAfter = 0;
   $('chat-title').textContent = friend.name;
+  $('chat-avatar').textContent = friend.name.trim().slice(0, 1).toUpperCase();
   $('chat-input').disabled = false;
   $('chat-send').disabled = false;
+  $('chat-game-button').disabled = false;
+  $('chat-listen-button').disabled = false;
+  $('inline-game').hidden = state.activeGameFriendId !== friend.id;
+  $('chat-listen-activity').querySelector('.listen-card').hidden = state.activeRoomFriendId !== friend.id;
   setPanel('chat');
   await refreshChat(true);
   renderFriends();
+  renderChatInvites();
 }
 
 async function refreshChat(initial = false) {
@@ -300,6 +431,7 @@ async function refreshChat(initial = false) {
   state.chatMessages.sort((a, b) => a.ts - b.ts);
   state.chatAfter = Math.max(state.chatAfter, ...state.chatMessages.map(message => message.ts), 0);
   renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+  renderFriends();
 }
 
 async function refreshOverview() {
@@ -307,11 +439,13 @@ async function refreshOverview() {
   state.friends = data.friends;
   state.requests = data.requests;
   state.gameInvites = data.gameInvites || [];
+  state.roomInvites = data.roomInvites || [];
   state.rooms = data.rooms;
   state.games = data.games;
   renderFriends();
   renderRequests();
   renderGameInvites();
+  renderChatInvites();
   renderRooms();
   renderGames();
 }
@@ -384,32 +518,37 @@ function renderSongResults(songs) {
           showNotice(`Now playing ${song.title} for the room.`);
         } catch (error) { showNotice(error.message, true); }
       } else {
-        await createListenRoom(song);
+        if (!state.activeFriend) return showNotice('Choose a friend before starting a listening room.', true);
+        await createListenRoom(song, state.activeFriend.id);
       }
     });
     return button;
   });
 }
 
-async function createListenRoom(song) {
+async function createListenRoom(song, inviteeId = state.activeFriend?.id) {
   try {
-    const room = await post('/listen-rooms', { song });
+    if (!inviteeId) return showNotice('Choose a friend to invite to listen.', true);
+    const room = await post('/listen-rooms', { song, inviteeId });
     state.activeRoom = room.code;
-    setPanel('listen');
+    state.activeRoomFriendId = inviteeId;
+    $('chat-song-picker').hidden = true;
+    setPanel('chat');
     await refreshOverview();
     await refreshListenRoom();
-    showNotice(`Listening room ${room.code} created. Share the code with a friend.`);
+    showNotice(`Listening invite sent to ${state.activeFriend.name}.`);
   } catch (error) { showNotice(error.message, true); }
 }
 
-async function joinListenRoom(code) {
+async function joinListenRoom(code, hostId = state.activeFriend?.id) {
   try {
     const room = await post(`/listen-rooms/${encodeURIComponent(code.trim().toUpperCase())}/join`);
     state.activeRoom = room.code;
-    setPanel('listen');
+    state.activeRoomFriendId = hostId;
+    setPanel('chat');
     await refreshOverview();
     await refreshListenRoom();
-    showNotice(`Joined room ${room.code}.`);
+    showNotice('You joined the listening room in this chat.');
   } catch (error) { showNotice(error.message, true); }
 }
 
@@ -458,6 +597,8 @@ async function refreshListenRoom() {
   try {
     const room = await api(`/listen-rooms/${encodeURIComponent(state.activeRoom)}`);
     state.lastRoom = room;
+    $('chat-listen-activity').querySelector('.listen-card').hidden =
+      !state.activeFriend || state.activeRoomFriendId !== state.activeFriend.id;
     $('room-title').textContent = room.song?.title || `Room ${room.code}`;
     $('room-code-display').textContent = `Room code: ${room.code} · Host: ${room.hostName}`;
     $('room-members').textContent = `${room.members.length} listening`;
@@ -479,7 +620,9 @@ async function refreshListenRoom() {
   } catch (error) {
     if (error.message.includes('not found')) {
       state.activeRoom = null;
+      state.activeRoomFriendId = null;
       state.lastRoom = null;
+      $('chat-listen-activity').querySelector('.listen-card').hidden = true;
       $('room-title').textContent = 'No room selected';
       $('room-code-display').textContent = '';
       $('room-members').textContent = '';
@@ -534,6 +677,7 @@ function renderGame(game) {
   });
   $('game-reset').disabled = game.hostId !== state.user.id || game.members.length !== 2;
   $('game-leave').disabled = false;
+  renderInlineGame(game);
 }
 
 async function refreshActiveGame() {
@@ -548,6 +692,7 @@ async function refreshActiveGame() {
       $('game-board').replaceChildren();
       $('game-reset').disabled = true;
       $('game-leave').disabled = true;
+      $('inline-game').hidden = true;
     }
   }
 }
@@ -568,6 +713,36 @@ async function refreshSocial() {
 }
 
 document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => setPanel(tab.dataset.panel)));
+
+$('discover-from-inbox').addEventListener('click', () => setPanel('people'));
+
+$('thread-search').addEventListener('input', renderFriends);
+
+$('chat-game-button').addEventListener('click', () => {
+  if (state.activeFriend) challengeFriend(state.activeFriend);
+});
+
+$('chat-listen-button').addEventListener('click', () => {
+  if (!state.activeFriend) return;
+  $('chat-song-picker').hidden = false;
+  $('song-search').focus();
+});
+
+$('chat-song-close').addEventListener('click', () => {
+  $('chat-song-picker').hidden = true;
+});
+
+$('inline-game-close').addEventListener('click', () => {
+  state.activeGame = null;
+  state.activeGameFriendId = null;
+  $('inline-game').hidden = true;
+});
+
+$('inline-game-reset').addEventListener('click', async () => {
+  if (!state.activeGame) return;
+  try { renderGame(await post(`/games/${encodeURIComponent(state.activeGame)}/reset`)); }
+  catch (error) { showNotice(error.message, true); }
+});
 
 $('sign-out').addEventListener('click', () => {
   localStorage.removeItem('nx_token');
@@ -612,6 +787,7 @@ $('chat-form').addEventListener('submit', async event => {
 
 $('song-search-form').addEventListener('submit', async event => {
   event.preventDefault();
+  if (!state.activeFriend) return showNotice('Choose a friend to listen together.', true);
   const query = $('song-search').value.trim();
   if (!query) return;
   try {
@@ -656,9 +832,11 @@ $('room-leave').addEventListener('click', async () => {
   try {
     await deleteRequest(`/listen-rooms/${encodeURIComponent(state.activeRoom)}`);
     state.activeRoom = null;
+    state.activeRoomFriendId = null;
     state.lastRoom = null;
     state.playbackSignature = '';
     if (state.playerReady) state.player.stopVideo();
+    $('chat-listen-activity').querySelector('.listen-card').hidden = true;
     $('room-title').textContent = 'No room selected';
     $('room-code-display').textContent = '';
     $('room-members').textContent = '';
@@ -736,6 +914,12 @@ window.onYouTubeIframeAPIReady = () => {
   state.youtubeReady = true;
   if (state.lastRoom) ensureRoomPlayer(state.lastRoom);
 };
+
+const chatListenCard = document.querySelector('#panel-listen .listen-card');
+if (chatListenCard) {
+  $('chat-listen-activity').appendChild(chatListenCard);
+  chatListenCard.hidden = true;
+}
 
 if (!token() || !state.user || state.user.role !== 'user') {
   window.location.href = '/login.html';

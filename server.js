@@ -405,8 +405,12 @@ app.get('/api/social/overview', userAuth, (req, res) => {
   const gameInvites = social.games.filter(game =>
     game.invitedUserId === req.user.id && game.status === 'waiting' && game.createdAt > Date.now() - 86400000 &&
     areFriends(game.hostId, req.user.id),
-  ).map(game => ({ code: game.code, hostName: game.hostName, createdAt: game.createdAt }));
-  res.json({ friends, requests, rooms, games, gameInvites });
+  ).map(game => ({ code: game.code, hostId: game.hostId, hostName: game.hostName, createdAt: game.createdAt }));
+  const roomInvites = social.listenRooms.filter(room =>
+    room.invitedUserId === req.user.id && room.createdAt > Date.now() - 86400000 &&
+    areFriends(room.hostId, req.user.id),
+  ).map(room => ({ code: room.code, hostId: room.hostId, hostName: room.hostName, song: room.song, createdAt: room.createdAt }));
+  res.json({ friends, requests, rooms, games, gameInvites, roomInvites });
 });
 
 app.get('/api/users/suggestions', userAuth, (req, res) => {
@@ -568,11 +572,24 @@ app.post('/api/listen-rooms', userAuth, (req, res) => {
   const social = getSocialState();
   social.listenRooms = social.listenRooms.filter(room => Date.now() - room.createdAt < 86400000);
   if (social.listenRooms.length >= 100) return res.status(429).json({ error: 'There are too many active listening rooms; try again later' });
+  const invitee = req.body.inviteeId
+    ? rd('users.json').find(account => account.id === req.body.inviteeId && account.role === 'user' && !account.banned)
+    : null;
+  if (req.body.inviteeId && !invitee) return res.status(404).json({ error: 'Friend not found' });
+  if (invitee && !areFriends(req.user.id, invitee.id)) {
+    return res.status(403).json({ error: 'You must be friends before inviting someone to listen' });
+  }
+  if (invitee && social.listenRooms.some(room =>
+    room.hostId === req.user.id && room.invitedUserId === invitee.id,
+  )) {
+    return res.status(409).json({ error: 'You already have a pending listening invite for this friend' });
+  }
   const used = new Set(social.listenRooms.map(room => room.code));
   const room = {
     code: randomCode(used),
     hostId: req.user.id,
     hostName: req.user.name,
+    ...(invitee ? { invitedUserId: invitee.id, invitedUserName: invitee.name } : {}),
     song: cleanSong(req.body.song),
     playing: false,
     position: 0,
@@ -589,15 +606,32 @@ app.post('/api/listen-rooms/:code/join', userAuth, (req, res) => {
   const social = getSocialState();
   const room = social.listenRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room) return res.status(404).json({ error: 'Listening room not found' });
+  if (room.invitedUserId && room.invitedUserId !== req.user.id) {
+    return res.status(403).json({ error: 'This listening invite was sent to someone else' });
+  }
   if (room.hostId !== req.user.id && !areFriends(room.hostId, req.user.id)) {
     return res.status(403).json({ error: 'You must be friends with the host to join' });
   }
   if (!memberOf(room, req.user.id)) {
     if (room.members.length >= 10) return res.status(409).json({ error: 'Listening room is full' });
     room.members.push({ id: req.user.id, name: req.user.name });
+    delete room.invitedUserId;
+    delete room.invitedUserName;
     wd('social.json', social);
   }
   res.json(room);
+});
+
+app.post('/api/listen-rooms/:code/decline', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.listenRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || room.invitedUserId !== req.user.id) {
+    return res.status(404).json({ error: 'Listening invite not found' });
+  }
+  delete room.invitedUserId;
+  delete room.invitedUserName;
+  wd('social.json', social);
+  res.json({ ok: true });
 });
 
 app.get('/api/listen-rooms/:code', userAuth, (req, res) => {

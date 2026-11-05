@@ -14,10 +14,8 @@
   <header class="topbar">
     <a class="brand" href="/" aria-label="Nymix home"><span class="brand-icon" aria-hidden="true">♫</span><span>Nymix <span class="brand-social">Social</span></span></a>
     <nav aria-label="Social features">
-      <button class="tab active" data-panel="people"><span aria-hidden="true">✦</span> Discover</button>
-      <button class="tab" data-panel="chat"><span aria-hidden="true">▤</span> Messages</button>
-      <button class="tab" data-panel="listen"><span aria-hidden="true">♫</span> Listen together</button>
-      <button class="tab" data-panel="games"><span aria-hidden="true">▦</span> Games</button>
+      <button class="tab active" data-panel="chat"><span aria-hidden="true">▤</span> Messages</button>
+      <button class="tab" data-panel="people"><span aria-hidden="true">✦</span> Discover</button>
     </nav>
     <div class="account">
       <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
@@ -29,7 +27,7 @@
   <main>
     <p class="notice" id="notice" role="status" aria-live="polite"></p>
 
-    <section class="panel active" id="panel-people">
+    <section class="panel" id="panel-people">
       <section class="discover-hero" aria-labelledby="discover-title">
         <div class="hero-copy">
           <p class="eyebrow">YOUR PEOPLE, YOUR PLAYLIST</p>
@@ -70,7 +68,7 @@
           <article class="card side-card">
             <div class="card-heading">
               <div><p class="eyebrow">YOUR CIRCLE</p><h2>Friends</h2></div>
-              <span class="count" id="friend-count">0</span>
+              <span class="count" id="discover-friend-count">0</span>
             </div>
             <div id="friends-list" class="stack friend-stack"></div>
           </article>
@@ -89,19 +87,62 @@
       </div>
     </section>
 
-    <section class="panel" id="panel-chat">
-      <div class="columns chat-layout">
-        <article class="card">
-          <div class="card-heading"><div><p class="eyebrow">PRIVATE MESSAGES</p><h2>Friends</h2></div></div>
-          <div id="chat-friends" class="stack empty-state">Add a friend to start chatting.</div>
-        </article>
+    <section class="panel active" id="panel-chat">
+      <div class="inbox-layout">
+        <aside class="card inbox-sidebar" aria-label="Direct messages">
+          <div class="inbox-sidebar-heading">
+            <div><p class="eyebrow">YOUR PEOPLE</p><h1>Messages</h1></div>
+            <span class="count" id="friend-count">0</span>
+          </div>
+          <label class="sr-only" for="thread-search">Filter conversations</label>
+          <input id="thread-search" class="thread-search" type="search" placeholder="Search friends…" autocomplete="off" />
+          <div id="chat-friends" class="thread-list"></div>
+          <button type="button" class="discover-link" id="discover-from-inbox">Find people <span aria-hidden="true">→</span></button>
+        </aside>
         <article class="card chat-card">
-          <div class="card-heading"><div><p class="eyebrow">CONVERSATION</p><h2 id="chat-title">Choose a friend</h2></div></div>
-          <div id="chat-messages" class="messages empty-state">Your private conversation will appear here.</div>
+          <header class="conversation-header">
+            <div class="conversation-person">
+              <span class="conversation-avatar" id="chat-avatar">♫</span>
+              <div><p class="eyebrow">DIRECT MESSAGE</p><h2 id="chat-title">Choose a friend</h2></div>
+            </div>
+            <div class="conversation-actions" aria-label="Things to do together">
+              <button type="button" class="button secondary" id="chat-game-button" disabled><span aria-hidden="true">✕</span> Play</button>
+              <button type="button" class="button secondary" id="chat-listen-button" disabled><span aria-hidden="true">♫</span> Listen</button>
+            </div>
+          </header>
+          <div id="chat-activities" class="chat-activities">
+            <div id="chat-invites" class="chat-invites"></div>
+            <section class="inline-activity inline-game" id="inline-game" hidden>
+              <div class="activity-heading">
+                <div><p class="eyebrow">PLAY TOGETHER</p><h3 id="inline-game-title">Tic-tac-toe</h3></div>
+                <button type="button" class="icon-button" id="inline-game-close" aria-label="Close game">×</button>
+              </div>
+              <p class="game-status" id="inline-game-status"></p>
+              <div class="board" id="inline-game-board" role="grid" aria-label="Tic-tac-toe board"></div>
+              <div class="inline-game-controls">
+                <span class="room-meta" id="inline-game-code"></span>
+                <button type="button" class="button secondary" id="inline-game-reset" hidden>Play again</button>
+              </div>
+            </section>
+            <section class="inline-activity song-picker" id="chat-song-picker" hidden>
+              <div class="activity-heading">
+                <div><p class="eyebrow">LISTEN TOGETHER</p><h3>Pick a song</h3></div>
+                <button type="button" class="icon-button" id="chat-song-close" aria-label="Close song search">×</button>
+              </div>
+              <form id="song-search-form" class="inline-form">
+                <label class="sr-only" for="song-search">Search songs</label>
+                <input id="song-search" autocomplete="off" placeholder="Search songs on YouTube…" />
+                <button class="button" type="submit">Search</button>
+              </form>
+              <div id="song-results" class="song-picker-results"></div>
+            </section>
+            <div id="chat-listen-activity"></div>
+          </div>
+          <div id="chat-messages" class="messages conversation-messages">Choose a friend to start chatting.</div>
           <form id="chat-form" class="inline-form message-form">
             <label class="sr-only" for="chat-input">Message</label>
-            <input id="chat-input" maxlength="1000" placeholder="Write a message…" disabled />
-            <button class="button" id="chat-send" type="submit" disabled>Send</button>
+            <input id="chat-input" maxlength="1000" placeholder="Message…" disabled />
+            <button class="button send-button" id="chat-send" type="submit" disabled aria-label="Send message">Send</button>
           </form>
         </article>
       </div>
@@ -111,12 +152,6 @@
       <div class="columns listen-layout">
         <article class="card">
           <div class="card-heading"><div><p class="eyebrow">PICK THE MUSIC</p><h2>Start a listening room</h2></div></div>
-          <form id="song-search-form" class="inline-form">
-            <label class="sr-only" for="song-search">Search songs</label>
-            <input id="song-search" autocomplete="off" placeholder="Search songs on YouTube…" />
-            <button class="button" type="submit">Search</button>
-          </form>
-          <div id="song-results" class="stack empty-state">Search for a song, then choose it to start your room.</div>
           <form id="room-join-form" class="inline-form join-form">
             <label class="sr-only" for="room-code">Listening room code</label>
             <input id="room-code" maxlength="8" placeholder="Enter a friend's room code" />
