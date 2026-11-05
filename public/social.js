@@ -35,6 +35,8 @@ const state = {
   voiceStream: null,
   voiceStartedAt: 0,
   voiceTimeout: null,
+  profileTarget: null,
+  profilePhoto: '',
   callSignalError: '',
   youtubeReady: false,
   player: null,
@@ -95,6 +97,175 @@ function makeButton(label, action, style = 'secondary') {
   return button;
 }
 
+function setAvatar(element, profile) {
+  const label = (profile?.name || '?').trim().slice(0, 1).toUpperCase();
+  element.replaceChildren();
+  element.textContent = label || '?';
+  const avatar = profile?.avatar;
+  if (typeof avatar !== 'string' || avatar.length > 180000 ||
+      !/^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(avatar)) return;
+  const image = document.createElement('img');
+  image.className = 'avatar-image';
+  image.alt = '';
+  image.src = avatar;
+  image.addEventListener('error', () => { image.remove(); }, { once: true });
+  element.appendChild(image);
+}
+
+async function openProfile(profileOrId) {
+  try {
+    const id = typeof profileOrId === 'string' ? profileOrId : profileOrId?.id;
+    if (!id) throw new Error('Profile not found');
+    const profile = await api(`/users/${encodeURIComponent(id)}/profile`);
+    const isOwnProfile = profile.id === state.user.id;
+    state.profileTarget = profile;
+    state.profilePhoto = profile.avatar || '';
+    $('profile-title').textContent = isOwnProfile ? 'Your profile' : `${profile.name}'s profile`;
+    $('profile-display-name').textContent = profile.name;
+    $('profile-name').value = profile.name;
+    $('profile-bio').value = profile.bio || '';
+    $('profile-name').readOnly = !isOwnProfile;
+    $('profile-bio').readOnly = !isOwnProfile;
+    $('profile-photo-input').disabled = !isOwnProfile;
+    $('profile-photo-label').hidden = !isOwnProfile;
+    $('profile-remove-photo').hidden = !isOwnProfile || !profile.avatar;
+    $('profile-save').hidden = !isOwnProfile;
+    $('profile-notice').textContent = '';
+    setAvatar($('profile-dialog-avatar'), profile);
+    const joined = profile.createdAt ? new Date(profile.createdAt).toLocaleDateString([], { month: 'long', year: 'numeric' }) : '';
+    const plays = Number(profile.totalPlays) || 0;
+    $('profile-meta').textContent = isOwnProfile ? '' : [joined && `Member since ${joined}`, `${plays} ${plays === 1 ? 'play' : 'plays'}`].filter(Boolean).join(' · ');
+    $('profile-dashboard').hidden = !isOwnProfile;
+    if (isOwnProfile) await loadProfileDashboard(profile);
+    const action = $('profile-action');
+    action.hidden = isOwnProfile || profile.relation === 'sent';
+    if (!isOwnProfile && profile.relation === 'received') {
+      action.hidden = false;
+      action.textContent = 'View request';
+      action.disabled = false;
+    } else if (!isOwnProfile && profile.relation === 'friends') {
+      action.textContent = 'Message';
+      action.disabled = false;
+    } else if (!isOwnProfile && profile.relation === 'none') {
+      action.textContent = 'Add friend';
+      action.disabled = false;
+    }
+    $('profile-dialog').showModal();
+  } catch (error) {
+    showNotice(error.message, true);
+  }
+}
+
+function renderDashboardSongs(container, songs, emptyText, { liked = false } = {}) {
+  container.replaceChildren();
+  if (!songs.length) {
+    const empty = document.createElement('p');
+    empty.className = 'profile-song-empty';
+    empty.textContent = emptyText;
+    container.appendChild(empty);
+    return;
+  }
+  songs.forEach(song => {
+    const row = document.createElement('div');
+    row.className = 'profile-song-row';
+    const songId = song.id || song.songId || song.videoId || song.video_id || '';
+    const image = document.createElement('img');
+    image.alt = '';
+    image.loading = 'lazy';
+    if (/^[\w-]{11}$/.test(songId)) image.src = `https://img.youtube.com/vi/${encodeURIComponent(songId)}/default.jpg`;
+    else image.hidden = true;
+    const copy = document.createElement('span');
+    copy.className = 'profile-song-copy';
+    const title = document.createElement('strong');
+    title.textContent = song.title || song.songTitle || 'Unknown song';
+    const detail = document.createElement('small');
+    detail.textContent = song.artist || song.songArtist || 'YouTube';
+    copy.append(title, detail);
+    row.append(image, copy);
+    if (liked && songId) {
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'profile-song-remove';
+      remove.setAttribute('aria-label', `Remove ${title.textContent} from liked songs`);
+      remove.textContent = '×';
+      remove.addEventListener('click', async () => {
+        remove.disabled = true;
+        try {
+          await post(`/user/liked/${encodeURIComponent(songId)}`, song);
+          await loadProfileDashboard(state.profileTarget);
+        } catch (error) {
+          $('profile-notice').textContent = error.message;
+          $('profile-notice').classList.add('error');
+          remove.disabled = false;
+        }
+      });
+      row.appendChild(remove);
+    } else if (!liked) {
+      const playedAt = song.timestamp || song.playedAt || song.played_at || song.createdAt;
+      if (playedAt) {
+        const time = document.createElement('small');
+        time.className = 'profile-song-time';
+        time.textContent = formatThreadTime(new Date(playedAt).getTime());
+        row.appendChild(time);
+      }
+    }
+    container.appendChild(row);
+  });
+}
+
+async function loadProfileDashboard(profile) {
+  $('profile-liked-list').textContent = 'Loading…';
+  $('profile-history-list').textContent = 'Loading…';
+  try {
+    const [liked, history] = await Promise.all([api('/user/liked'), api('/user/history')]);
+    if (!Array.isArray(liked) || !Array.isArray(history)) throw new Error('Invalid dashboard response');
+    $('profile-liked-count').textContent = liked.length.toLocaleString();
+    $('profile-play-count').textContent = (Number(profile.totalPlays) || 0).toLocaleString();
+    $('profile-member-since').textContent = profile.createdAt
+      ? new Date(profile.createdAt).toLocaleDateString([], { month: 'short', year: 'numeric' })
+      : '—';
+    renderDashboardSongs($('profile-liked-list'), liked, 'No liked songs yet.', { liked: true });
+    renderDashboardSongs($('profile-history-list'), history.slice(0, 20), 'No play history yet.');
+  } catch (error) {
+    $('profile-liked-list').textContent = 'Could not load liked songs.';
+    $('profile-history-list').textContent = 'Could not load play history.';
+    $('profile-notice').textContent = error.message;
+    $('profile-notice').classList.add('error');
+  }
+}
+
+async function compressProfilePhoto(file) {
+  if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type) || file.size > 10 * 1024 * 1024) {
+    throw new Error('Choose a JPG, PNG, WebP or GIF image under 10 MB.');
+  }
+  const bitmap = await createImageBitmap(file);
+  try {
+    if (bitmap.width * bitmap.height > 40000000) throw new Error('Choose an image smaller than 40 megapixels.');
+    const canvas = document.createElement('canvas');
+    const size = Math.min(384, bitmap.width, bitmap.height);
+    canvas.width = size;
+    canvas.height = size;
+    const context = canvas.getContext('2d');
+    if (!context) throw new Error('Could not process this image.');
+    const crop = Math.min(bitmap.width, bitmap.height);
+    context.drawImage(bitmap, (bitmap.width - crop) / 2, (bitmap.height - crop) / 2, crop, crop, 0, 0, size, size);
+    for (const quality of [0.8, 0.68, 0.55, 0.42]) {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', quality));
+      if (blob && blob.size <= 128 * 1024) {
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error('Could not read the processed photo.'));
+          reader.readAsDataURL(blob);
+        });
+      }
+    }
+  } finally {
+    bitmap.close();
+  }
+  throw new Error('This image is too large to use as a profile photo (maximum 128 KB after compression).');
+}
+
 function makePerson(profile, actions = []) {
   const row = document.createElement('div');
   row.className = 'person';
@@ -102,7 +273,7 @@ function makePerson(profile, actions = []) {
   info.className = 'person-info';
   const avatar = document.createElement('span');
   avatar.className = 'person-avatar';
-  avatar.textContent = (profile.name || '?').trim().charAt(0).toUpperCase();
+  setAvatar(avatar, profile);
   const nameWrap = document.createElement('span');
   const name = document.createElement('span');
   name.className = 'person-name';
@@ -136,6 +307,7 @@ function renderFriends() {
   $('discover-friend-count').textContent = String(state.friends.length);
   renderList($('friends-list'), state.friends, 'Your friends will show up here.', friend =>
     makePerson(friend, [
+      makeButton('Profile', () => openProfile(friend)),
       makeButton('Message', () => selectFriend(friend), 'primary'),
       makeButton('Play', () => challengeFriend(friend)),
       makeButton('Remove', async () => {
@@ -164,7 +336,7 @@ function renderFriends() {
     thread.setAttribute('aria-current', state.activeFriend?.id === friend.id ? 'true' : 'false');
     const avatar = document.createElement('span');
     avatar.className = 'thread-avatar';
-    avatar.textContent = friend.name.trim().slice(0, 1).toUpperCase();
+    setAvatar(avatar, friend);
     const copy = document.createElement('span');
     copy.className = 'thread-copy';
     const topline = document.createElement('span');
@@ -206,6 +378,7 @@ function renderRequests() {
   renderList($('requests-list'), state.requests, 'No pending requests.', request => {
     const actions = request.direction === 'incoming'
       ? [
+          makeButton('Profile', () => openProfile(request.userId)),
           makeButton('Accept', async () => {
             try {
               await put(`/friends/${encodeURIComponent(request.id)}`, { status: 'accepted' });
@@ -235,7 +408,7 @@ function renderUserCards(container, users, emptyText) {
     top.className = 'user-card-top';
     const avatar = document.createElement('span');
     avatar.className = 'profile-avatar';
-    avatar.textContent = (profile.name || '?').trim().slice(0, 1).toUpperCase();
+    setAvatar(avatar, profile);
     const copy = document.createElement('div');
     copy.className = 'profile-copy';
     const name = document.createElement('h3');
@@ -250,6 +423,7 @@ function renderUserCards(container, users, emptyText) {
     top.append(avatar, copy);
     const actions = document.createElement('div');
     actions.className = 'profile-actions';
+    actions.appendChild(makeButton('View profile', () => openProfile(profile)));
     let action;
     if (profile.relation === 'friends') {
       action = makeButton('Message', () => selectFriend(profile), 'primary');
@@ -482,7 +656,7 @@ function renderMessages(container, messages, emptyText) {
       group.className = `message-group${message.from === state.user.id ? ' mine' : ' theirs'}`;
       const avatar = document.createElement('span');
       avatar.className = 'message-group-avatar';
-      avatar.textContent = (message.fromName || state.activeFriend?.name || '?').trim().slice(0, 1).toUpperCase();
+      setAvatar(avatar, message.from === state.user.id ? state.user : state.activeFriend);
       const body = document.createElement('div');
       body.className = 'message-group-body';
       group.append(avatar, body);
@@ -913,7 +1087,7 @@ async function selectFriend(friend) {
   state.chatAfter = 0;
   $('chat-title').textContent = friend.name;
   $('chat-subtitle').textContent = 'Your Nymix friend';
-  $('chat-avatar').textContent = friend.name.trim().slice(0, 1).toUpperCase();
+  setAvatar($('chat-avatar'), friend);
   $('inbox-layout').classList.add('conversation-open');
   $('chat-input').disabled = false;
   $('chat-send').disabled = false;
@@ -1281,6 +1455,97 @@ $('sign-out').addEventListener('click', () => {
   window.location.href = '/login.html';
 });
 
+$('account-profile-button').addEventListener('click', () => openProfile(state.user.id));
+$('chat-profile-button').addEventListener('click', () => {
+  if (state.activeFriend) openProfile(state.activeFriend.id);
+});
+$('profile-close').addEventListener('click', () => $('profile-dialog').close());
+$('profile-cancel').addEventListener('click', () => $('profile-dialog').close());
+$('profile-dialog').addEventListener('click', event => {
+  if (event.target === $('profile-dialog')) $('profile-dialog').close();
+});
+$('profile-photo-input').addEventListener('change', async event => {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    state.profilePhoto = await compressProfilePhoto(file);
+    setAvatar($('profile-dialog-avatar'), { ...state.profileTarget, avatar: state.profilePhoto });
+    $('profile-remove-photo').hidden = false;
+    $('profile-notice').textContent = 'Photo ready. Save changes to update your profile.';
+    $('profile-notice').classList.remove('error');
+  } catch (error) {
+    $('profile-notice').textContent = error.message;
+    $('profile-notice').classList.add('error');
+  } finally {
+    input.value = '';
+  }
+});
+$('profile-remove-photo').addEventListener('click', () => {
+  state.profilePhoto = '';
+  setAvatar($('profile-dialog-avatar'), { ...state.profileTarget, avatar: '' });
+  $('profile-remove-photo').hidden = true;
+  $('profile-notice').textContent = 'Photo removed. Save changes to update your profile.';
+  $('profile-notice').classList.remove('error');
+});
+$('profile-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  const name = $('profile-name').value.trim();
+  const bio = $('profile-bio').value.trim();
+  if (!name) {
+    $('profile-notice').textContent = 'Name cannot be empty.';
+    $('profile-notice').classList.add('error');
+    return;
+  }
+  $('profile-save').disabled = true;
+  try {
+    const result = await put('/user/profile', { name, bio, avatar: state.profilePhoto });
+    state.user = { ...state.user, ...result.user };
+    state.profileTarget = { ...state.profileTarget, ...result.user };
+    localStorage.setItem('nx_user', JSON.stringify(state.user));
+    $('account-name').textContent = state.user.name;
+    setAvatar($('account-avatar'), state.user);
+    $('profile-display-name').textContent = state.user.name;
+    $('profile-notice').textContent = 'Profile updated.';
+    $('profile-notice').classList.remove('error');
+    window.parent.postMessage({ type: 'nymix-profile-updated', user: state.user }, window.location.origin);
+    await refreshOverview().catch(error => showNotice(error.message, true));
+  } catch (error) {
+    $('profile-notice').textContent = error.message;
+    $('profile-notice').classList.add('error');
+  } finally {
+    $('profile-save').disabled = false;
+  }
+});
+$('profile-action').addEventListener('click', async () => {
+  const profile = state.profileTarget;
+  if (!profile || profile.id === state.user.id) return;
+  if (profile.relation === 'friends') {
+    const friend = state.friends.find(item => item.id === profile.id) || profile;
+    $('profile-dialog').close();
+    await selectFriend(friend);
+  } else if (profile.relation === 'received') {
+    $('profile-dialog').close();
+    setPanel('people');
+    $('requests-list').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  } else if (profile.relation === 'none') {
+    const button = $('profile-action');
+    button.disabled = true;
+    try {
+      await post(`/friends/request/${encodeURIComponent(profile.id)}`);
+      profile.relation = 'sent';
+      button.textContent = 'Request sent';
+      showNotice(`Friend request sent to ${profile.name}.`);
+      await refreshSocial();
+      await refreshSuggestions().catch(error => showNotice(error.message, true));
+    } catch (error) {
+      button.disabled = false;
+      $('profile-notice').textContent = error.message;
+      $('profile-notice').classList.add('error');
+    }
+  }
+});
+
 $('user-search-form').addEventListener('submit', async event => {
   event.preventDefault();
   const query = $('user-search').value.trim();
@@ -1472,6 +1737,10 @@ const initialPanel = new URLSearchParams(window.location.search).get('panel');
 if (initialPanel === 'people' || initialPanel === 'chat') setPanel(initialPanel);
 window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || event.source !== window.parent) return;
+  if (event.data?.type === 'nymix-social-open-profile') {
+    openProfile(state.user.id);
+    return;
+  }
   if (event.data?.type === 'nymix-social-panel' && ['people', 'chat'].includes(event.data.panel)) {
     setPanel(event.data.panel);
   }
@@ -1488,7 +1757,7 @@ if (!token() || !state.user || state.user.role !== 'user') {
   else window.location.href = '/login.html';
 } else {
   $('account-name').textContent = state.user.name || state.user.email || 'Member';
-  $('account-avatar').textContent = (state.user.name || state.user.email || '?').trim().slice(0, 1).toUpperCase();
+    setAvatar($('account-avatar'), state.user);
   refreshSocial();
   refreshSuggestions().catch(error => showNotice(error.message, true));
   pollCallSignals().catch(error => showNotice(error.message, true));

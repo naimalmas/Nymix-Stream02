@@ -19,8 +19,10 @@
       <button class="tab" data-panel="people"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Discover</button>
     </nav>
     <div class="account">
-      <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
-      <span id="account-name"></span>
+      <button type="button" class="account-profile-button" id="account-profile-button" aria-label="View your profile">
+        <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
+        <span id="account-name"></span>
+      </button>
       <button class="button secondary" id="sign-out">Sign out</button>
     </div>
   </header>
@@ -105,10 +107,10 @@
         <article class="card chat-card" id="chat-card">
           <header class="conversation-header">
             <button type="button" class="icon-button inbox-back-button" id="back-to-inbox" aria-label="Back to messages"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-left"></use></svg></button>
-            <div class="conversation-person">
+            <button type="button" class="conversation-person profile-link" id="chat-profile-button" aria-label="View profile">
               <span class="conversation-avatar" id="chat-avatar"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#users"></use></svg></span>
               <div><h2 id="chat-title">Your messages</h2><p class="conversation-subtitle" id="chat-subtitle">Select a friend to start chatting</p></div>
-            </div>
+            </button>
             <div class="conversation-actions" aria-label="Things to do together">
               <button type="button" class="button secondary" id="chat-game-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#gamepad"></use></svg> Play</button>
               <button type="button" class="button secondary" id="chat-listen-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#headphones"></use></svg> Listen</button>
@@ -233,6 +235,45 @@
       </div>
     </section>
   </main>
+  <dialog class="profile-dialog" id="profile-dialog" aria-labelledby="profile-title">
+    <form class="profile-form" id="profile-form">
+      <header class="profile-dialog-header">
+        <div><p class="eyebrow">NYMIX PROFILE</p><h2 id="profile-title">Your profile</h2></div>
+        <button type="button" class="icon-button" id="profile-close" aria-label="Close profile"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button>
+      </header>
+      <div class="profile-photo-row">
+        <span class="profile-dialog-avatar" id="profile-dialog-avatar"></span>
+        <div class="profile-photo-controls">
+          <strong id="profile-display-name"></strong>
+          <label class="button secondary profile-photo-button" id="profile-photo-label" for="profile-photo-input">Change photo</label>
+          <button type="button" class="text-button profile-remove-photo" id="profile-remove-photo">Remove photo</button>
+          <input class="sr-only" id="profile-photo-input" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+          <span class="profile-photo-hint" id="profile-photo-hint">JPG, PNG, WebP or GIF · up to 10 MB</span>
+        </div>
+      </div>
+      <label class="profile-field" for="profile-name">Name<input id="profile-name" type="text" maxlength="40" autocomplete="name" required /></label>
+      <label class="profile-field" for="profile-bio">About<textarea id="profile-bio" maxlength="160" rows="3" placeholder="A little about you…"></textarea></label>
+      <p class="profile-meta" id="profile-meta"></p>
+      <p class="notice profile-notice" id="profile-notice" role="status" aria-live="polite"></p>
+      <section class="profile-dashboard" id="profile-dashboard" hidden aria-label="Your listening dashboard">
+        <h3>Your listening dashboard</h3>
+        <div class="profile-stats">
+          <div><span>Liked songs</span><strong id="profile-liked-count">0</strong></div>
+          <div><span>Total plays</span><strong id="profile-play-count">0</strong></div>
+          <div><span>Member since</span><strong id="profile-member-since">—</strong></div>
+        </div>
+        <div class="profile-dashboard-columns">
+          <section><h4>Recently played</h4><div class="profile-song-list" id="profile-history-list"></div></section>
+          <section><h4>Liked songs</h4><div class="profile-song-list" id="profile-liked-list"></div></section>
+        </div>
+      </section>
+      <footer class="profile-dialog-actions">
+        <button type="button" class="button secondary" id="profile-action" hidden></button>
+        <button type="button" class="button secondary" id="profile-cancel">Close</button>
+        <button type="submit" class="button" id="profile-save">Save changes</button>
+      </footer>
+    </form>
+  </dialog>
   <script src="/social.js"></script>
 </body>
 </html>

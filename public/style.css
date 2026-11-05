@@ -128,10 +128,12 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   border-radius:12px; padding:10px 12px;
 }
 .user-avatar {
+  position:relative; overflow:hidden;
   width:34px; height:34px; background:linear-gradient(135deg,#7c3aed,#ec4899);
   border-radius:50%; display:flex; align-items:center; justify-content:center;
   font-size:14px; font-weight:700; flex-shrink:0;
 }
+.user-avatar-image { position:absolute; inset:0; width:100%; height:100%; border-radius:inherit; object-fit:cover; }
 .user-name { font-size:12px; font-weight:600; }
 .user-plan { font-size:10px; color:var(--text3); }
 .settings-btn {
@@ -595,4 +597,67 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 }
 .sg-card, .sl-row, .played-item, .genre-card, .radio-card {
   animation: fadeUp 0.3s ease both;
+}
+
+@media (max-width: 1100px) {
+  .app { grid-template-columns: minmax(190px, var(--sidebar-w)) minmax(0,1fr); }
+  .app > .right-panel { display:none; }
+}
+@media (max-width: 820px) {
+  html, body { min-height:100%; overflow:hidden; }
+  .app { grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); height:100dvh; min-height:0; }
+  .sidebar { min-width:0; flex-direction:row; align-items:center; gap:8px; padding:7px 10px; border-right:0; border-bottom:1px solid var(--border); overflow-x:auto; }
+  .logo { flex:0 0 auto; margin:0; padding:0 3px; }
+  .logo span, .sidebar > .search-box, .sidebar > .nav-section-label, .sidebar .nav-menu:nth-of-type(2) { display:none; }
+  .sidebar > .nav-menu:first-of-type { min-width:0; flex-direction:row; gap:3px; }
+  .nav-link { justify-content:center; padding:8px; font-size:0; }
+  .nav-link .nav-icon { width:20px; height:20px; }
+  .nav-link .badge-new, .nav-link .dot-blue { display:none; }
+  .sidebar-bottom { flex:0 0 auto; margin:0 0 0 auto; }
+  .sidebar-bottom .user-profile { gap:5px; padding:4px 6px; }
+  .sidebar-bottom .user-info { display:none; }
+  .sidebar-bottom .user-avatar { width:30px; height:30px; }
+  .sidebar-bottom .user-menu-button { width:28px; height:28px; }
+  .center { min-height:0; }
+  .center-topbar { min-height:44px; padding:8px 14px 4px; }
+  .view { min-height:0; padding:0 14px 12px; }
+  .view-messages.active { padding:0; }
+  .player-bar { grid-template-columns:auto 1fr auto; gap:8px; padding:7px 12px max(7px, env(safe-area-inset-bottom)); }
+  .player-left, .player-right { gap:4px; }
+  .player-center { justify-content:center; gap:4px; }
+  .play-pause-btn { width:36px; height:36px; }
+  .p-ctrl-btn { padding:5px; }
+  .p-ctrl-btn .ui-icon { width:16px; height:16px; }
+  .vol-range { width:54px; }
+  .player-progress-wrap { gap:7px; }
+  .hero-banner { height:200px; }
+  .search-grid { grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); gap:10px; }
+}
+@media (max-width: 540px) {
+  .sidebar { gap:4px; padding:6px; }
+  .sidebar > .nav-menu:first-of-type { flex:1 1 auto; justify-content:space-between; }
+  .nav-link { min-width:36px; padding:7px 5px; }
+  .sidebar-bottom { margin-left:4px; }
+  .sidebar-bottom .user-profile { padding:3px; background:transparent; border:0; }
+  .sidebar-bottom .user-profile > div:last-child { gap:0; }
+  .sidebar-bottom .user-menu-button:not(#profile-view-btn) { display:none; }
+  .center-topbar { padding-right:10px; padding-left:10px; }
+  .center-topbar .nav-arrow { width:26px; height:26px; }
+  .view { padding-right:10px; padding-left:10px; }
+  .section-big-title { font-size:27px; }
+  .hero-banner { height:190px; margin-bottom:18px; }
+  .hero-content { left:0; padding:15px; }
+  .hero-title { font-size:20px; }
+  .hero-actions .btn-play-hero, .hero-actions .btn-follow { padding:8px 14px; font-size:12px; }
+  .playlist-header { align-items:flex-start; gap:8px; }
+  .playlist-header h2 { font-size:16px; }
+  .playlist-table thead th { padding-right:5px; padding-left:5px; font-size:8px; }
+  .playlist-table tbody td { padding:8px 5px; font-size:11px; }
+  .playlist-table thead th:nth-child(3), .playlist-table tbody td:nth-child(3),
+  .playlist-table thead th:nth-child(4), .playlist-table tbody td:nth-child(4),
+  .playlist-table thead th:nth-child(5), .playlist-table tbody td:nth-child(5) { display:none; }
+  .player-bar { grid-template-columns:1fr; gap:4px; padding:5px 10px max(6px, env(safe-area-inset-bottom)); }
+  .player-left, .player-right { display:none; }
+  .player-center { grid-row:1; }
+  .player-progress-wrap { grid-row:2; }
 }

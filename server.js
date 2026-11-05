@@ -396,14 +396,34 @@ app.get('/api/user/history', auth, (req, res) => {
 app.put('/api/user/profile', auth, async (req, res) => {
   try {
     const { name, avatar, bio } = req.body;
+    if (name !== undefined && (typeof name !== 'string' || !name.trim() || name.trim().length > 40)) {
+      return res.status(400).json({ error: 'Name must be between 1 and 40 characters' });
+    }
+    if (bio !== undefined && (typeof bio !== 'string' || bio.trim().length > 160)) {
+      return res.status(400).json({ error: 'About section must be 160 characters or fewer' });
+    }
+    if (avatar !== undefined && typeof avatar !== 'string') {
+      return res.status(400).json({ error: 'Invalid profile photo' });
+    }
+    if (avatar) {
+      const photo = /^data:image\/(?:jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(avatar);
+      const image = photo ? Buffer.from(photo[1], 'base64') : null;
+      const imageType = image?.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) ? 'jpeg'
+        : image?.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])) ? 'png'
+          : image?.toString('ascii', 0, 4) === 'RIFF' && image.toString('ascii', 8, 12) === 'WEBP' ? 'webp' : '';
+      if (!photo || image.length > 128 * 1024 || image.toString('base64').replace(/=+$/, '') !== photo[1].replace(/=+$/, '') ||
+          imageType !== photo[0].match(/^data:image\/(jpeg|png|webp);/)[1]) {
+        return res.status(400).json({ error: 'Profile photo must be a JPEG, PNG or WebP image under 128 KB' });
+      }
+    }
     const users = rd('users.json');
     const u = users.find(u => u.id === req.user.id);
     if (!u) return res.status(404).json({ error: 'Not found' });
-    if (name)   u.name   = name;
+    if (name !== undefined) u.name = name.trim();
     if (avatar !== undefined) u.avatar = avatar;
-    if (bio !== undefined)    u.bio    = bio;
+    if (bio !== undefined) u.bio = bio.trim();
     wd('users.json', users);
-    res.json({ ok: true });
+    res.json({ ok: true, user: { id: u.id, name: u.name, email: u.email, role: u.role, avatar: u.avatar || '', bio: u.bio || '' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -455,7 +475,7 @@ app.get('/api/social/overview', userAuth, (req, res) => {
     .map(relation => {
       const incoming = relation.user2 === req.user.id;
       const account = users.find(user => user.id === (incoming ? relation.user1 : relation.user2));
-      return account ? { ...safeProfile(account), id: relation.id, direction: incoming ? 'incoming' : 'outgoing' } : null;
+      return account ? { ...safeProfile(account), id: relation.id, userId: account.id, direction: incoming ? 'incoming' : 'outgoing' } : null;
     }).filter(Boolean);
   const social = getSocialState();
   const messages = rd('messages.json');
@@ -509,6 +529,21 @@ app.get('/api/users/suggestions', userAuth, (req, res) => {
     .slice(0, 12)
     .map(({ createdAt, ...profile }) => profile);
   res.json(suggestions);
+});
+
+app.get('/api/users/:userId/profile', userAuth, (req, res) => {
+  const account = rd('users.json').find(user => user.id === req.params.userId && !user.banned && user.role === 'user');
+  if (!account) return res.status(404).json({ error: 'Profile not found' });
+  const relation = getFriendship(rd('friends.json'), req.user.id, account.id);
+  res.json({
+    ...safeProfile(account),
+    bio: account.bio || '',
+    createdAt: account.createdAt || '',
+    totalPlays: account.totalPlays || 0,
+    relation: relation?.status === 'accepted' ? 'friends'
+      : relation?.status === 'pending' ? (relation.user1 === req.user.id ? 'sent' : 'received')
+        : 'none',
+  });
 });
 
 app.get('/api/users/search', userAuth, (req, res) => {

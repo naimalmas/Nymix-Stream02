@@ -628,11 +628,27 @@ function updateUserMenu() {
         <div style="margin-left:auto;display:flex;gap:4px">
           ${u.role === 'admin'
             ? `<button onclick="window.open('/admin/','_blank')" title="Admin" class="user-menu-button">${iconSvg('shield')}</button>` : ''}
-          <button onclick="window.open('/user/','_blank')" title="Dashboard" class="user-menu-button">${iconSvg('user')}</button>
+          <button title="Profile & dashboard" aria-label="Profile and dashboard" id="profile-view-btn" class="user-menu-button">${iconSvg('user')}</button>
           <button title="Settings" id="settings-btn" class="user-menu-button">${iconSvg('settings')}</button>
           <button onclick="logout()" title="Logout" class="user-menu-button">${iconSvg('close')}</button>
         </div>
       </div>`;
+    const avatar = sb.querySelector('.user-avatar');
+    const initials = (u.name || '?').trim().slice(0, 1).toUpperCase();
+    avatar.textContent = initials;
+    if (typeof u.avatar === 'string' && u.avatar.length <= 180000 &&
+        /^data:image\/(?:jpeg|png|webp);base64,[A-Za-z0-9+/]+={0,2}$/.test(u.avatar)) {
+      const image = document.createElement('img');
+      image.className = 'user-avatar-image';
+      image.alt = '';
+      image.src = u.avatar;
+      image.addEventListener('error', () => image.remove(), { once: true });
+      avatar.appendChild(image);
+    }
+    $('profile-view-btn')?.addEventListener('click', () => {
+      showView('messages');
+      $('social-portal')?.contentWindow?.postMessage({ type: 'nymix-social-open-profile' }, window.location.origin);
+    });
   } else {
     sb.innerHTML = `
       <div class="user-profile" style="cursor:pointer" onclick="window.location.href='/login.html'">
@@ -689,6 +705,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
 
   updateUserMenu();
+  window.addEventListener('message', event => {
+    if (event.origin !== window.location.origin || event.source !== $('social-portal')?.contentWindow) return;
+    if (event.data?.type === 'nymix-profile-updated' && event.data.user?.id === user()?.id) {
+      localStorage.setItem('nx_user', JSON.stringify(event.data.user));
+      updateUserMenu();
+    }
+  });
 
   // Register navigation before awaited startup requests so the sidebar stays responsive.
   document.querySelectorAll('.nav-link').forEach(a => {
