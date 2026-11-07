@@ -23,9 +23,11 @@ class ApiService {
   );
   static final String _baseUrl = _configuredBaseUrl.isNotEmpty
       ? _configuredBaseUrl
-      : defaultTargetPlatform == TargetPlatform.android
-          ? 'http://10.0.2.2:3000/api'
-          : 'http://localhost:3000/api';
+      : kReleaseMode
+          ? 'https://naim-eight.vercel.app/api'
+          : defaultTargetPlatform == TargetPlatform.android
+              ? 'http://10.0.2.2:3000/api'
+              : 'http://localhost:3000/api';
 
   static final ApiService _instance = ApiService._internal();
 

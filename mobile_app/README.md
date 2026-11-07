@@ -25,9 +25,10 @@ available in the existing repository; the mobile app shares the Node backend.
    flutter run -d <emulator-id>
    ```
 
-The Android emulator connects to the host machine through
-`http://10.0.2.2:3000/api`. For other targets the default is
-`http://localhost:3000/api`. Override it with
+Release builds use the production API at
+`https://naim-eight.vercel.app/api` by default. Debug builds connect to the
+local backend: Android emulators use `http://10.0.2.2:3000/api`, while other
+targets use `http://localhost:3000/api`. Override either default with
 `--dart-define=API_BASE_URL=https://your-api.example/api`.
 
 Create an account from the app's registration form, or sign in with an existing
