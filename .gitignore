@@ -3,3 +3,13 @@ node_modules/
 data/*
 !data/*.example.json
 .vercel
+
+# Flutter / mobile app build artifacts
+mobile_app/.flutter-plugins-dependencies
+mobile_app/.dart_tool/
+mobile_app/.packages
+mobile_app/.pub-cache/
+mobile_app/build/
+mobile_app/.idea/
+mobile_app/.vscode/
+mobile_app/*.iml
