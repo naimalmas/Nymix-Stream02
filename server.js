@@ -216,7 +216,11 @@ const superAdminAuth = roleAuth('super_admin');
 app.get('/api/movies', (req, res) => {
   const catalog = rd('config.json').movieCatalog;
   res.set('Cache-Control', 'no-store');
-  res.json(Array.isArray(catalog) ? catalog : []);
+  const legacyGenres = { 'ড্রামা': 'Drama', 'অ্যাডভেঞ্চার': 'Adventure', 'কমেডি': 'Comedy', 'থ্রিলার': 'Thriller', 'ডকুমেন্টারি': 'Documentary', 'অন্যান্য': 'Other' };
+  res.json(Array.isArray(catalog) ? catalog.map(movie => ({
+    ...movie,
+    genre: legacyGenres[movie.genre] || movie.genre,
+  })) : []);
 });
 
 app.post('/api/admin/movies', adminAuth, (req, res) => {
