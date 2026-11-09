@@ -65,8 +65,8 @@
       const thumbnail = movie.thumbnailData || movie.thumbnailUrl;
       return `<article class="movie-row">
         ${thumbnail ? `<img class="movie-art" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" />` : '<div class="movie-art" aria-hidden="true">N</div>'}
-        <div class="movie-details"><strong>${escapeHtml(movie.title)}${movie.featured ? ' <span class="featured-badge">FEATURED</span>' : ''}</strong><span>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</span>${thumbnail ? '' : '<small class="thumbnail-missing">Thumbnail needs upload</small>'}</div>
-        ${movie.promoEmbedUrl ? `<button class="feature-button" type="button" data-feature="${escapeHtml(movie.id)}" data-featured="${movie.featured ? 'true' : 'false'}">${movie.featured ? 'Remove promo' : 'Feature on home'}</button>` : ''}
+        <div class="movie-details"><strong>${escapeHtml(movie.title)}${movie.featured ? ' <span class="featured-badge">FEATURED</span>' : ''}</strong><span>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</span>${thumbnail ? '' : '<small class="thumbnail-missing">Thumbnail needs upload</small>'}${movie.featured && !movie.promoEmbedUrl ? '<small class="promo-missing">Promo trailer needs Bunny IDs</small>' : ''}</div>
+        ${movie.promoEmbedUrl || movie.featured ? `<button class="feature-button" type="button" data-feature="${escapeHtml(movie.id)}" data-featured="${movie.featured ? 'true' : 'false'}">${movie.featured ? 'Remove feature' : 'Feature on home'}</button>` : ''}
         <button class="edit-button" type="button" data-edit="${escapeHtml(movie.id)}">Edit</button>
         <button class="delete-button" type="button" data-delete="${escapeHtml(movie.id)}" aria-label="Remove ${escapeHtml(movie.title)}">Remove</button>
       </article>`;

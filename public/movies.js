@@ -95,7 +95,7 @@
       const catalog = await response.json();
       if (!Array.isArray(catalog)) throw new Error('Movie catalog response is invalid');
       movies = catalog.filter(movie => movie && typeof movie.id === 'string' && typeof movie.title === 'string' && typeof movie.embedUrl === 'string');
-      renderFeaturedMovie(movies.find(movie => movie.featured && movie.promoEmbedUrl));
+      renderFeaturedMovie(movies.find(movie => movie.featured));
       watchlist = watchlist.filter(id => movies.some(movie => movie.id === id));
       save(WATCHLIST_KEY, watchlist);
       renderFilters();
@@ -154,6 +154,7 @@
     if (!movie) {
       hero.classList.remove('has-promo');
       image.removeAttribute('src');
+      watchButton.hidden = true;
       return;
     }
     $('#hero-label').textContent = 'NOW FEATURING';
@@ -162,13 +163,21 @@
     $('#hero-note').textContent = `${movie.genre} · ${movie.year}`;
     $('#hero-promo-caption').textContent = movie.title;
     $('#hero-promo-caption').hidden = false;
-    image.src = movie.thumbnailData || movie.thumbnailUrl || '';
+    const thumbnail = movie.thumbnailData || movie.thumbnailUrl || '';
+    image.src = thumbnail;
     hero.classList.add('has-promo');
+    hero.classList.toggle('has-promo-image', Boolean(thumbnail));
     watchButton.hidden = false;
-    watchButton.onclick = () => {
-      $('#promo-player').innerHTML = `<iframe class="promo-video" src="${escapeHtml(movie.promoEmbedUrl)}" title="${escapeHtml(`${movie.title} trailer`)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
-      promoDialog.showModal();
-    };
+    if (movie.promoEmbedUrl) {
+      watchButton.innerHTML = '<span aria-hidden="true">▶</span> Watch trailer';
+      watchButton.onclick = () => {
+        $('#promo-player').innerHTML = `<iframe class="promo-video" src="${escapeHtml(movie.promoEmbedUrl)}" title="${escapeHtml(`${movie.title} trailer`)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+        promoDialog.showModal();
+      };
+    } else {
+      watchButton.innerHTML = '<span aria-hidden="true">▶</span> Watch movie';
+      watchButton.onclick = () => showMovie(movie);
+    }
   }
 
   filters.addEventListener('click', event => {

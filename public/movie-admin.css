@@ -49,6 +49,7 @@ main { padding-top:36px; }
 .movie-art { flex:0 0 43px; width:43px; height:54px; display:grid; place-items:center; border-radius:6px; object-fit:cover; background:linear-gradient(145deg,#6a3d55,#c46b71 55%,#332237); color:#fbe2e8; font-size:19px; }
 .movie-details { flex:1; min-width:0; }.movie-details strong { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:15px; }.movie-details span { color:var(--muted); font-size:12px; }
 .movie-details .thumbnail-missing { display:block; margin-top:3px; color:#f0c77c; font-size:11px; }
+.movie-details .promo-missing { display:block; margin-top:3px; color:#f0c77c; font-size:11px; }
 .delete-button { border:1px solid #f166782e; border-radius:7px; padding:6px 9px; background:#f1667810; color:#f395a0; cursor:pointer; font-size:12px; }
 .delete-button:hover { background:#f1667825; }
 .edit-button { border:1px solid #ffffff24; border-radius:7px; padding:6px 9px; background:#ffffff0b; color:#e4dfea; cursor:pointer; font-size:12px; }
