@@ -705,11 +705,17 @@ function showView(name, syncPortal = true) {
   else stopFeaturedPackRotation();
   const portal = $('social-portal');
   if (name === 'home') {
-    portal.style.height = '';
-    $('home-feed-area').appendChild(portal);
+    const homeFeedArea = $('home-feed-area');
+    if (portal.parentElement !== homeFeedArea) {
+      portal.style.height = '';
+      homeFeedArea.appendChild(portal);
+    }
   } else if (viewName === 'messages') {
-    portal.style.height = '100%';
-    $('messages-portal-area').appendChild(portal);
+    const messagesPortalArea = $('messages-portal-area');
+    if (portal.parentElement !== messagesPortalArea) {
+      portal.style.height = '100%';
+      messagesPortalArea.appendChild(portal);
+    }
   }
   if ((viewName === 'messages' || name === 'home') && syncPortal) {
     portal?.contentWindow?.postMessage({
@@ -1010,7 +1016,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('social-portal')?.addEventListener('load', () => {
     const activeView = document.querySelector('.nav-link.active')?.dataset.view;
-    if (activeView === 'home' || activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'reels' || activeView === 'profile') showView(activeView);
+    if (activeView === 'home' || activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'reels' || activeView === 'profile') {
+      showView(activeView);
+    }
   });
 
   await loadLiked();
