@@ -81,6 +81,7 @@ function switchTab(t){
   document.getElementById('form-register').style.display = t==='register'?'block':'none';
 }
 function dashboardPath(role){
+  if(new URLSearchParams(window.location.search).get('next')==='movies' && (role==='admin'||role==='super_admin')) return '/movie-admin.html';
   if(role==='super_admin') return '/super-admin/';
   if(role==='admin') return '/admin/';
   return '/';

@@ -213,6 +213,54 @@ const adminAuth = (req, res, next) => auth(req, res, () => {
 });
 const superAdminAuth = roleAuth('super_admin');
 
+app.get('/api/movies', (req, res) => {
+  const catalog = rd('config.json').movieCatalog;
+  res.set('Cache-Control', 'no-store');
+  res.json(Array.isArray(catalog) ? catalog : []);
+});
+
+app.post('/api/admin/movies', adminAuth, (req, res) => {
+  const { title, year, genre, description, libraryId, videoId } = req.body && typeof req.body === 'object' ? req.body : {};
+  const cleanTitle = typeof title === 'string' ? title.trim() : '';
+  const cleanGenre = typeof genre === 'string' ? genre.trim() : '';
+  const cleanDescription = typeof description === 'string' ? description.trim() : '';
+  const cleanLibraryId = typeof libraryId === 'string' ? libraryId.trim() : '';
+  const cleanVideoId = typeof videoId === 'string' ? videoId.trim() : '';
+  const allowedGenres = new Set(['ড্রামা', 'অ্যাডভেঞ্চার', 'কমেডি', 'থ্রিলার', 'ডকুমেন্টারি', 'অন্যান্য']);
+  if (!cleanTitle || cleanTitle.length > 80) return res.status(400).json({ error: 'Movie title is required and must be 80 characters or fewer' });
+  if (!Number.isInteger(year) || year < 1888 || year > 2100) return res.status(400).json({ error: 'Enter a valid release year' });
+  if (!allowedGenres.has(cleanGenre)) return res.status(400).json({ error: 'Choose a supported movie genre' });
+  if (cleanDescription.length > 240) return res.status(400).json({ error: 'Description must be 240 characters or fewer' });
+  if (!/^[A-Za-z0-9_-]+$/.test(cleanLibraryId) || !/^[A-Za-z0-9_-]+$/.test(cleanVideoId)) {
+    return res.status(400).json({ error: 'Enter valid Bunny Stream Library and Video IDs' });
+  }
+  const config = rd('config.json');
+  const catalog = Array.isArray(config.movieCatalog) ? config.movieCatalog : [];
+  if (catalog.length >= 500) return res.status(409).json({ error: 'Movie catalog is full' });
+  const movie = {
+    id: crypto.randomUUID(),
+    title: cleanTitle,
+    year,
+    genre: cleanGenre,
+    description: cleanDescription,
+    embedUrl: `https://iframe.mediadelivery.net/embed/${encodeURIComponent(cleanLibraryId)}/${encodeURIComponent(cleanVideoId)}`,
+    demo: false,
+  };
+  config.movieCatalog = [...catalog, movie];
+  wd('config.json', config);
+  res.status(201).json(movie);
+});
+
+app.delete('/api/admin/movies/:movieId', adminAuth, (req, res) => {
+  const config = rd('config.json');
+  const catalog = Array.isArray(config.movieCatalog) ? config.movieCatalog : [];
+  const updated = catalog.filter(movie => movie.id !== req.params.movieId);
+  if (updated.length === catalog.length) return res.status(404).json({ error: 'Movie not found' });
+  config.movieCatalog = updated;
+  wd('config.json', config);
+  res.json({ ok: true });
+});
+
 // ══════════════════════════════════════════════════════
 //  AUTH
 // ══════════════════════════════════════════════════════

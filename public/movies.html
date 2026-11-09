@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0c12" />
+  <meta name="description" content="Nymix Cinema — আপনার অনুমোদিত সিনেমার জন্য একটি সুন্দর ওয়েব পোর্টাল।" />
+  <title>Nymix Cinema</title>
+  <link rel="stylesheet" href="/movies.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/movies.html" aria-label="Nymix Cinema home">
+      <span class="brand-mark" aria-hidden="true">N</span>
+      <span>Nymix <b>Cinema</b></span>
+    </a>
+    <nav class="main-nav" aria-label="প্রধান নেভিগেশন">
+      <a class="active" href="#home">হোম</a>
+      <a href="#catalog">সিনেমা</a>
+      <button type="button" id="watchlist-nav">আমার তালিকা <span id="watchlist-count">0</span></button>
+    </nav>
+    <a class="back-link" href="/">♫ <span>মিউজিকে ফিরুন</span></a>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="hero-shade"></div>
+      <div class="hero-copy">
+        <p class="eyebrow"><span class="live-dot"></span> NYMIX ORIGINAL EXPERIENCE</p>
+        <h1>গল্প শুরু হোক<br /><span>আপনার পর্দায়</span></h1>
+        <p class="hero-description">আপনার নিজের বা লাইসেন্সপ্রাপ্ত সিনেমা এক জায়গায় সাজিয়ে দেখুন। আপনার পছন্দের গল্প, আপনার নিজস্ব সংগ্রহ।</p>
+        <div class="hero-actions">
+          <a class="button button-primary" href="#catalog"><span aria-hidden="true">▶</span> সিনেমা দেখুন</a>
+        </div>
+        <p class="hero-note">পছন্দের সিনেমাটি বেছে নিয়ে দেখা শুরু করুন।</p>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="poster poster-back"></div>
+        <div class="poster poster-front"><span>YOUR<br />NEXT<br /><b>STORY</b></span></div>
+        <span class="art-spark spark-one">✦</span><span class="art-spark spark-two">✧</span>
+      </div>
+      <div class="hero-bottom"><span>NYMIX CINEMA</span><span>আপনার গল্পের জায়গা</span></div>
+    </section>
+
+    <section class="catalog-section" id="catalog">
+      <div class="section-heading">
+        <div><p class="eyebrow">আপনার জন্য বাছাই</p><h2 id="catalog-title">জনপ্রিয় সিনেমা</h2></div>
+        <label class="search-field">
+          <span aria-hidden="true">⌕</span>
+          <input id="movie-search" type="search" placeholder="সিনেমা খুঁজুন..." autocomplete="off" />
+        </label>
+      </div>
+      <div class="filters" id="genre-filters" aria-label="ধরন অনুযায়ী বাছাই"></div>
+      <div class="movie-grid" id="movie-grid" aria-live="polite"></div>
+      <p class="empty-state" id="empty-state" hidden>এই নামে কোনো সিনেমা পাওয়া যায়নি। অন্য কিছু লিখে খুঁজুন।</p>
+    </section>
+
+    <section class="hosting-note">
+      <div class="hosting-icon" aria-hidden="true">↗</div>
+      <div><h2>সিনেমা দেখুন দায়িত্ব নিয়ে</h2><p>এই পোর্টালে শুধু মালিকের অনুমতি থাকা বা লাইসেন্সপ্রাপ্ত কনটেন্ট প্রকাশ করা হয়।</p></div>
+    </section>
+  </main>
+
+  <footer><a class="brand brand-small" href="/movies.html"><span class="brand-mark">N</span><span>Nymix <b>Cinema</b></span></a><p>শুধু নিজের বা ব্যবহারের অনুমতি থাকা কনটেন্ট যোগ করুন।</p></footer>
+
+  <dialog class="movie-dialog" id="movie-dialog" aria-labelledby="dialog-title">
+    <button class="dialog-close" type="button" id="dialog-close" aria-label="বন্ধ করুন">×</button>
+    <div id="movie-detail"></div>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="/movies.js"></script>
+</body>
+</html>

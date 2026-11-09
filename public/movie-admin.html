@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#111019" />
+  <meta name="description" content="Nymix Cinema administrator movie dashboard." />
+  <title>Nymix Cinema — Dashboard</title>
+  <link rel="stylesheet" href="/movie-admin.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="topbar">
+      <a class="brand" href="/movies.html"><span class="brand-mark">N</span><span>Nymix <b>Cinema</b></span></a>
+      <div class="top-actions">
+        <span class="admin-name" id="admin-name">অ্যাডমিন</span>
+        <a class="button button-muted" href="/movies.html">সিনেমা পোর্টাল</a>
+        <button class="button button-muted" id="logout" type="button">লগআউট</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="page-heading">
+        <div><p class="eyebrow">NYMIX CINEMA · ADMIN</p><h1>সিনেমা ড্যাশবোর্ড</h1><p>সিনেমা যোগ, প্রকাশ ও ক্যাটালগ পরিচালনা করুন।</p></div>
+        <div class="total-card"><span>ক্যাটালগে সিনেমা</span><strong id="movie-count">—</strong></div>
+      </section>
+
+      <section class="dashboard-grid">
+        <section class="panel form-panel">
+          <div class="panel-heading"><div><p class="eyebrow">নতুন কনটেন্ট</p><h2>সিনেমা যোগ করুন</h2></div><span class="step-badge">01</span></div>
+          <p class="panel-intro">প্রথমে Bunny Stream-এ ভিডিও আপলোড করুন। এরপর ভিডিওর Library ID ও Video ID এখানে দিন।</p>
+          <form id="movie-form">
+            <label>সিনেমার নাম<input name="title" required maxlength="80" placeholder="সিনেমার নাম লিখুন" /></label>
+            <div class="form-row">
+              <label>প্রকাশের বছর<input name="year" type="number" min="1888" max="2100" value="2026" required /></label>
+              <label>ধরন<select name="genre"><option>ড্রামা</option><option>অ্যাডভেঞ্চার</option><option>কমেডি</option><option>থ্রিলার</option><option>ডকুমেন্টারি</option><option>অন্যান্য</option></select></label>
+            </div>
+            <label>সংক্ষিপ্ত বিবরণ<textarea name="description" rows="3" maxlength="240" placeholder="সিনেমাটি সম্পর্কে কয়েকটি কথা"></textarea></label>
+            <div class="field-help"><strong>Bunny Stream তথ্য</strong><span>Dashboard → Videos-এ ভিডিও খুলে ID কপি করুন।</span></div>
+            <label>Library ID<input name="libraryId" required inputmode="numeric" placeholder="উদাহরণ: 123456" /></label>
+            <label>Video ID<input name="videoId" required placeholder="Bunny ভিডিওর ID" /></label>
+            <label class="consent"><input name="licensed" type="checkbox" required /><span>এই ভিডিওটি আমার নিজের অথবা এটি প্রকাশ করার অনুমতি আমার আছে।</span></label>
+            <p class="form-message" id="form-message" role="status" hidden></p>
+            <button class="button button-primary submit-button" type="submit"><span aria-hidden="true">＋</span> সিনেমা প্রকাশ করুন</button>
+          </form>
+        </section>
+
+        <section class="panel catalog-panel">
+          <div class="panel-heading"><div><p class="eyebrow">প্রকাশিত কনটেন্ট</p><h2>সিনেমার তালিকা</h2></div><button class="refresh-button" id="refresh" type="button">রিফ্রেশ</button></div>
+          <p class="panel-intro">এখানে যোগ করা সিনেমাগুলো সিনেমা দেখার পোর্টালে দেখা যাবে।</p>
+          <div class="movie-list" id="movie-list" aria-live="polite"></div>
+          <p class="list-message" id="list-message">ক্যাটালগ লোড হচ্ছে…</p>
+        </section>
+      </section>
+
+      <aside class="notice"><strong>মনে রাখবেন:</strong> Bunny Stream-এ আপনার অনুমোদিত ভিডিওই প্রকাশ করুন। এই ড্যাশবোর্ডে ভিডিও আপলোড হয় না—এখানে শুধু Bunny Stream ভিডিওর তথ্য যোগ হয়।</aside>
+    </main>
+  </div>
+  <script src="/movie-admin.js"></script>
+</body>
+</html>
