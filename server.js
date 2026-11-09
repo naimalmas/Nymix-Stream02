@@ -1473,6 +1473,46 @@ app.get('/api/calls/signals', userAuth, (req, res) => {
 app.get('/api/calls/config', userAuth, (req, res) => {
   const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
   const turnUrls = (process.env.TURN_URLS || process.env.TURN_URL || '').split(',').map(url => url.trim()).filter(Boolean);
+  res.set('Cache-Control', 'no-store');
+  const meteredApp = process.env.METERED_TURN_APP;
+  const meteredApiKey = process.env.METERED_TURN_API_KEY;
+  if (Boolean(meteredApp) !== Boolean(meteredApiKey)) {
+    console.error('Metered TURN configuration is incomplete');
+    return res.status(503).json({ error: 'TURN relay configuration is incomplete' });
+  }
+  if (meteredApp && meteredApiKey) {
+    if (!/^[a-z0-9][a-z0-9-]*$/i.test(meteredApp)) {
+      console.error('Metered TURN app name is invalid');
+      return res.status(503).json({ error: 'TURN relay configuration is invalid' });
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const endpoint = new URL(`https://${meteredApp}.metered.live/api/v1/turn/credentials`);
+    endpoint.searchParams.set('apiKey', meteredApiKey);
+    fetch(endpoint.toString(), { signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) {
+          console.error(`Metered TURN credentials request failed with status ${response.status}`);
+          return res.status(502).json({ error: 'TURN relay credentials are unavailable' });
+        }
+        const iceServers = await response.json();
+        if (!Array.isArray(iceServers) || !iceServers.length || iceServers.some(server =>
+          !server || !(typeof server.urls === 'string' || (Array.isArray(server.urls) && server.urls.every(url => typeof url === 'string'))) ||
+          (server.username !== undefined && typeof server.username !== 'string') ||
+          (server.credential !== undefined && typeof server.credential !== 'string')
+        )) {
+          console.error('Metered TURN credentials response has an invalid format');
+          return res.status(502).json({ error: 'TURN relay credentials are invalid' });
+        }
+        res.json({ iceServers });
+      })
+      .catch(error => {
+        console.error('Could not fetch Metered TURN credentials:', error.name);
+        if (!res.headersSent) res.status(502).json({ error: 'TURN relay credentials are unavailable' });
+      })
+      .finally(() => clearTimeout(timeout));
+    return;
+  }
   if (turnUrls.length && process.env.TURN_SECRET) {
     const expiresAt = Math.floor(Date.now() / 1000) + 3600;
     const username = `${expiresAt}:${req.user.id}`;

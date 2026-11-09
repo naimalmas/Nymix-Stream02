@@ -42,7 +42,8 @@ Configure these environment variables for Production, Preview, and Development a
 - `SUPER_ADMIN_PASSWORD`: initial Super Admin password, at least 12 characters.
 - `YOUTUBE_API_KEY`: YouTube Data API key for full search. Search returns up to 50 songs per page with a “Load more songs” button. Without a key, only matching featured songs are available.
 - `GOOGLE_CLIENT_ID` (optional): Google OAuth Web client ID for Google sign-in. Configure the matching authorized JavaScript origins in Google Cloud Console.
-- `TURN_URLS` (optional): comma-separated TURN server URLs for audio calls. Without a TURN server, calls rely on STUN and may not connect on restrictive networks.
-- `TURN_SECRET` (optional): shared secret for Coturn REST API credentials. Configure it with `TURN_URLS` to issue short-lived TURN credentials to signed-in users.
+- `METERED_TURN_APP` and `METERED_TURN_API_KEY` (optional): app subdomain and API key from a [Metered Open Relay account](https://dashboard.metered.ca/signup?tool=turnserver). The server fetches temporary ICE credentials without exposing the API key to browsers. Metered currently advertises 20 GB of free TURN usage per month; usage beyond the free allowance may require a paid plan.
+- `TURN_URLS` (optional): comma-separated TURN server URLs for a self-hosted Coturn relay.
+- `TURN_SECRET` (optional): shared secret for Coturn REST API credentials. Configure it with `TURN_URLS` to issue short-lived TURN credentials to signed-in users. Metered settings take precedence when both providers are configured.
 
 Never commit database URLs, API keys, JWT secrets, or live `data/*.json` files. The Super Admin account is seeded once when the database state is first initialized; later deployments do not overwrite existing accounts.
