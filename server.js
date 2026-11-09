@@ -744,6 +744,7 @@ const getSocialState = () => {
   state.chatPlayback ||= {};
   state.notificationReads ||= {};
   state.callSignals ||= [];
+  state.watchRooms ||= [];
   return state;
 };
 const randomCode = used => {
@@ -759,6 +760,182 @@ const cleanSong = song => ({
   thumb: `https://img.youtube.com/vi/${song.id}/mqdefault.jpg`,
 });
 const memberOf = (room, userId) => room.members.some(member => member.id === userId);
+
+const watchRoomForMember = (room, userId) => room.members.some(member => member.id === userId);
+const validWatchSource = source => {
+  if (!source || typeof source !== 'object' || !['youtube', 'drive', 'screen', 'file'].includes(source.type)) return false;
+  if (source.type === 'screen' || source.type === 'file') return true;
+  if (typeof source.url !== 'string' || source.url.length > 2048) return false;
+  try {
+    const url = new URL(source.url);
+    if (url.protocol !== 'https:') return false;
+    if (source.type === 'youtube') {
+      return ['youtube.com', 'www.youtube.com', 'youtu.be', 'm.youtube.com'].includes(url.hostname) &&
+        (/^[\w-]{11}$/.test(url.pathname.split('/').filter(Boolean).pop() || '') ||
+          /^[\w-]{11}$/.test(url.searchParams.get('v') || ''));
+    }
+    if (!['drive.google.com', 'docs.google.com'].includes(url.hostname)) return false;
+    const fileId = url.pathname.match(/\/file\/d\/([\w-]+)/)?.[1];
+    const queryId = ['/', '/open', '/uc'].includes(url.pathname)
+      ? url.searchParams.get('id')
+      : null;
+    return /^[\w-]{10,}$/.test(fileId || queryId || '');
+  } catch {
+    return false;
+  }
+};
+
+app.get('/api/watch-rooms', userAuth, (req, res) => {
+  const rooms = getSocialState().watchRooms.filter(room =>
+    room.createdAt > Date.now() - 24 * 60 * 60 * 1000 &&
+    (watchRoomForMember(room, req.user.id) || room.invitedUserIds.includes(req.user.id)),
+  );
+  res.json(rooms.map(room => ({
+    code: room.code,
+    hostId: room.hostId,
+    hostName: room.hostName,
+    members: room.members,
+    createdAt: room.createdAt,
+    invited: !watchRoomForMember(room, req.user.id),
+  })));
+});
+
+app.post('/api/watch-rooms', userAuth, (req, res) => {
+  const friendIds = Array.isArray(req.body?.friendIds) ? [...new Set(req.body.friendIds)] : [];
+  if (!friendIds.length || friendIds.length > 7 || friendIds.some(id => typeof id !== 'string' || !areFriends(req.user.id, id))) {
+    return res.status(400).json({ error: 'Invite 1–7 friends to create a private room' });
+  }
+  const social = getSocialState();
+  social.watchRooms = social.watchRooms.filter(room => room.createdAt > Date.now() - 24 * 60 * 60 * 1000);
+  if (social.watchRooms.length >= 100) return res.status(429).json({ error: 'There are too many active watch rooms; try again later' });
+  const used = new Set(social.watchRooms.map(room => room.code));
+  const room = {
+    code: randomCode(used),
+    hostId: req.user.id,
+    hostName: req.user.name,
+    invitedUserIds: friendIds,
+    members: [{ id: req.user.id, name: req.user.name }],
+    source: null,
+    sourceUpdatedAt: Date.now(),
+    createdAt: Date.now(),
+    signals: [],
+    messages: [],
+  };
+  social.watchRooms.push(room);
+  wd('social.json', social);
+  res.status(201).json({ code: room.code, hostId: room.hostId, hostName: room.hostName, members: room.members });
+});
+
+app.post('/api/watch-rooms/:code/join', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || room.createdAt < Date.now() - 24 * 60 * 60 * 1000) return res.status(404).json({ error: 'Watch room not found or expired' });
+  if (!watchRoomForMember(room, req.user.id)) {
+    if (!room.invitedUserIds.includes(req.user.id) || !areFriends(room.hostId, req.user.id)) {
+      return res.status(403).json({ error: 'This private room is only for invited friends' });
+    }
+    if (room.members.length >= 8) return res.status(409).json({ error: 'This watch room is full' });
+    room.members.push({ id: req.user.id, name: req.user.name });
+    room.invitedUserIds = room.invitedUserIds.filter(id => id !== req.user.id);
+    wd('social.json', social);
+  }
+  const { signals, messages, invitedUserIds, ...publicRoom } = room;
+  res.json(publicRoom);
+});
+
+app.get('/api/watch-rooms/:code', userAuth, (req, res) => {
+  const room = getSocialState().watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Join this private watch room first' });
+  const { signals, invitedUserIds, ...publicRoom } = room;
+  res.json(publicRoom);
+});
+
+app.put('/api/watch-rooms/:code/source', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || room.hostId !== req.user.id) return res.status(404).json({ error: 'Only the room host can change playback' });
+  if (req.body?.source === null) {
+    room.source = null;
+    room.sourceUpdatedAt = Date.now();
+    room.signals = [];
+    wd('social.json', social);
+    return res.json({ source: null, sourceUpdatedAt: room.sourceUpdatedAt });
+  }
+  if (!validWatchSource(req.body?.source)) return res.status(400).json({ error: 'Choose a supported YouTube, Google Drive, screen-share, or local-file source' });
+  const title = typeof req.body.source.title === 'string' ? req.body.source.title.trim().slice(0, 120) : '';
+  room.source = { type: req.body.source.type, ...(req.body.source.url ? { url: req.body.source.url } : {}), title };
+  room.sourceUpdatedAt = Date.now();
+  room.signals = [];
+  wd('social.json', social);
+  res.json({ source: room.source, sourceUpdatedAt: room.sourceUpdatedAt });
+});
+
+app.get('/api/watch-rooms/:code/chat', userAuth, (req, res) => {
+  const room = getSocialState().watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
+  res.json(room.messages.slice(-100));
+});
+
+app.post('/api/watch-rooms/:code/chat', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
+  const text = typeof req.body?.text === 'string' ? req.body.text.trim() : '';
+  if (!text || text.length > 500) return res.status(400).json({ error: 'Message must be between 1 and 500 characters' });
+  const message = { id: crypto.randomUUID(), userId: req.user.id, userName: req.user.name, text, createdAt: Date.now() };
+  room.messages.push(message);
+  room.messages = room.messages.slice(-100);
+  wd('social.json', social);
+  res.status(201).json(message);
+});
+
+app.get('/api/watch-rooms/:code/signals', userAuth, (req, res) => {
+  const room = getSocialState().watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
+  const after = Number(req.query.after) || Date.now() - 15000;
+  res.json(room.signals.filter(signal => signal.to === req.user.id && signal.createdAt >= after).slice(-100));
+});
+
+app.post('/api/watch-rooms/:code/signals', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  const { to, type, description, candidate } = req.body || {};
+  if (!room || !watchRoomForMember(room, req.user.id) || !watchRoomForMember(room, to) || to === req.user.id) {
+    return res.status(404).json({ error: 'Watch room participant not found' });
+  }
+  if (!['offer', 'answer', 'ice'].includes(type)) return res.status(400).json({ error: 'Invalid connection signal' });
+  const signal = { id: crypto.randomUUID(), from: req.user.id, to, type, createdAt: Date.now() };
+  if (type === 'offer' || type === 'answer') {
+    if (!description || description.type !== type || typeof description.sdp !== 'string' || description.sdp.length > 20000) {
+      return res.status(400).json({ error: 'Invalid connection description' });
+    }
+    signal.description = { type, sdp: description.sdp };
+  } else {
+    if (candidate !== null && (!candidate || typeof candidate.candidate !== 'string' || candidate.candidate.length > 2048)) {
+      return res.status(400).json({ error: 'Invalid network candidate' });
+    }
+    signal.candidate = candidate;
+  }
+  room.signals = room.signals.filter(item => item.createdAt > Date.now() - 15 * 60 * 1000).slice(-499);
+  room.signals.push(signal);
+  wd('social.json', social);
+  res.status(201).json({ ok: true, id: signal.id });
+});
+
+app.delete('/api/watch-rooms/:code', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
+  if (room.hostId === req.user.id) {
+    social.watchRooms = social.watchRooms.filter(item => item.code !== room.code);
+  } else {
+    room.members = room.members.filter(member => member.id !== req.user.id);
+    room.invitedUserIds = [...new Set([...room.invitedUserIds, req.user.id])];
+    room.signals = room.signals.filter(signal => signal.from !== req.user.id && signal.to !== req.user.id);
+  }
+  wd('social.json', social);
+  res.json({ ok: true });
+});
 
 app.get('/api/social/overview', userAuth, (req, res) => {
   const users = rd('users.json');

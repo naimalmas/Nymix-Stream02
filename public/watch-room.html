@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0b0c12" />
+  <meta name="description" content="A private Nymix Watch Together room." />
+  <title>Private room · Nymix Watch</title>
+  <link rel="stylesheet" href="/watch-together.css" />
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/movies.html"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></a>
+    <nav><a href="/movies.html">My rooms</a></nav>
+    <div class="account"><span id="account-name"></span><button class="button button-quiet" id="leave-room" type="button">Leave room</button></div>
+  </header>
+  <main class="room-shell">
+    <header class="room-top">
+      <div><span class="room-code-label" id="room-code">PRIVATE ROOM</span><h1 id="room-title">Movie night</h1></div>
+      <div class="room-top-actions"><button class="button button-quiet" id="copy-invite" type="button">Copy invite</button><button class="button button-quiet" id="end-room" type="button" hidden>End room</button></div>
+    </header>
+    <div class="room-layout">
+      <section>
+        <div class="watch-panel">
+          <div class="watch-stage" id="watch-stage">
+            <div class="watch-empty" id="watch-empty"><span>▶</span><strong>Settle in together</strong><p>The room host can share a screen, add an official video link, or play a local video.</p></div>
+          </div>
+          <div class="stage-status"><span class="live-pill">PRIVATE WATCH ROOM</span><span id="playback-status">Waiting for the host to start playback</span></div>
+        </div>
+        <section class="source-panel" id="source-panel" hidden>
+          <h2>Start watching</h2>
+          <p>Choose an authorized source. Only the host controls the shared screen or local video.</p>
+          <form class="source-form" id="source-form">
+            <label>Playback source
+              <select id="source-type">
+                <option value="screen">Share a browser tab or screen</option>
+                <option value="youtube">YouTube link</option>
+                <option value="drive">Google Drive video link</option>
+                <option value="file">Video file from this device</option>
+              </select>
+            </label>
+            <label id="source-url-field">Video link
+              <input id="source-url" type="url" maxlength="2048" placeholder="Paste an official YouTube or Drive link" />
+            </label>
+            <label id="source-file-field" class="file-input">Video file
+              <input id="source-file" type="file" accept="video/*" />
+            </label>
+            <button class="button button-primary source-submit" id="source-submit" type="submit">Set up playback</button>
+          </form>
+          <div class="host-tools" id="host-tools" hidden>
+            <button class="button button-quiet" id="share-screen" type="button">▣ Share tab / screen</button>
+            <button class="button button-quiet" id="stop-sharing" type="button" hidden>Stop sharing</button>
+            <label class="button button-quiet file-picker" id="file-picker" hidden for="source-file">Choose local video</label>
+          </div>
+          <p class="share-note">Sharing a third-party page requires you to open it yourself and select that browser tab in the share dialog. The portal does not extract or bypass protected streams. Audio is not available as a separate group call yet.</p>
+        </section>
+      </section>
+      <aside class="chat-panel">
+        <header class="chat-header"><h2>Room chat</h2><p>Only invited room members can read messages.</p></header>
+        <div class="member-row" id="member-list" style="padding:10px 12px 0"></div>
+        <div class="chat-messages" id="chat-messages" aria-live="polite"><p class="muted">Loading chat…</p></div>
+        <form class="chat-form" id="chat-form"><input id="chat-input" maxlength="500" placeholder="Say something nice…" autocomplete="off" required /><button class="button button-primary" type="submit" aria-label="Send message">Send</button></form>
+      </aside>
+    </div>
+  </main>
+  <div class="room-toast" id="room-toast" role="status" aria-live="polite"></div>
+  <video id="local-video" playsinline muted hidden></video>
+  <script src="/watch-room.js"></script>
+</body>
+</html>

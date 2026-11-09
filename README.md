@@ -14,11 +14,11 @@ The Nymix home page features recent videos from the [Naim Almas Official YouTube
 
 The home page also rotates between Nymix Picks and Prokash Hits featured music packs, using uploads from the [Prokash YouTube channel](https://www.youtube.com/channel/UCh0udHXRXh-wxmX65ZOzVZw). The banner's arrows and dots let listeners switch packs manually; the song list and Play button follow the selected pack.
 
-## Movie portal
+## Watch together
 
-Open `/movies.html` to browse the public Nymix Cinema catalog. Movie management is separate at `/movie-admin.html`; it is not linked from the viewer portal and is limited to Admin and Super Admin accounts. Open the dashboard URL directly and sign in with an administrator account when prompted. The server rejects movie-management requests from regular users. Movies added, edited, or removed from the dashboard are saved in local `data/config.json`, shared with the public catalog, and persisted in PostgreSQL on Vercel. Choose a JPG, PNG, or WebP thumbnail from your device; the dashboard resizes it before saving it with the movie. Editing a movie keeps its current thumbnail unless you choose a replacement.
+Open `/movies.html` to start a private Watch Together room. Sign in, select 1–7 accepted friends, and create a room; only those invited friends can join. Room chat, membership, playback selection, and WebRTC signaling are stored in the existing local JSON state or PostgreSQL state on Vercel.
 
-Upload a movie that you own or are licensed to distribute to Bunny Stream first. In the movie dashboard, enter its Bunny Stream Library ID and Video ID along with the listing details. The dashboard registers the Bunny embed player in the catalog; it does not upload the movie file itself. To show a homepage promo, upload that trailer to Bunny Stream too, enter its Library ID and Video ID, and select the homepage feature option. Only one movie can be featured at a time. Do not add copyrighted movies without distribution permission.
+The room host can share a browser tab/screen, paste a YouTube or Google Drive playback link, or play a local video from their device and relay it directly to room members. Screen/file sharing uses browser WebRTC peer connections rather than uploading the movie to the server; peer connectivity depends on the participants' networks, and restrictive networks may need a TURN service. Audio/video calling is not included in this watch-room version. Google Drive/YouTube embeds use each provider's official player and do not provide synchronized transport controls. Only use videos you own or have permission to share; protected third-party streams are not extracted or bypassed.
 
 ## Local development
 

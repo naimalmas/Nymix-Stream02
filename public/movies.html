@@ -4,76 +4,52 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#0b0c12" />
-  <meta name="description" content="Browse the Nymix Cinema movie catalog." />
-  <title>Nymix Cinema</title>
-  <link rel="stylesheet" href="/movies.css" />
+  <meta name="description" content="Private movie nights with friends." />
+  <title>Nymix Watch Together</title>
+  <link rel="stylesheet" href="/watch-together.css" />
 </head>
 <body>
   <header class="topbar">
-    <a class="brand" href="/movies.html" aria-label="Nymix Cinema home">
-      <span class="brand-mark" aria-hidden="true">N</span>
-      <span>Nymix <b>Cinema</b></span>
-    </a>
-    <nav class="main-nav" aria-label="Main navigation">
-      <a class="active" href="#home">Home</a>
-      <a href="#catalog">Movies</a>
-      <button type="button" id="watchlist-nav">My List <span id="watchlist-count">0</span></button>
-    </nav>
-    <a class="back-link" href="/">♫ <span>Back to music</span></a>
+    <a class="brand" href="/movies.html"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></a>
+    <nav><a href="#rooms">My rooms</a><a href="#invite">Friends</a></nav>
+    <div class="account"><span id="account-name"></span><button class="button button-quiet" id="sign-out" type="button">Sign out</button></div>
   </header>
-
   <main>
-    <section class="hero" id="home">
-      <div class="hero-shade"></div>
+    <section class="hero">
+      <div class="hero-glow"></div>
       <div class="hero-copy">
-        <p class="eyebrow"><span class="live-dot"></span><span id="hero-label">NYMIX CINEMA</span></p>
-        <h1 id="hero-title">Your next story<br /><span>starts here.</span></h1>
-        <p class="hero-description" id="hero-description">Explore the collection and settle in for a great movie experience.</p>
-        <div class="hero-actions">
-          <button class="button button-primary" type="button" id="hero-watch-promo" hidden><span aria-hidden="true">▶</span> Watch trailer</button>
-          <a class="button button-primary" href="#catalog"><span aria-hidden="true">▶</span> Explore movies</a>
-        </div>
-        <p class="hero-note" id="hero-note">Choose a movie and start watching.</p>
+        <p class="eyebrow"><span class="live-dot"></span> PRIVATE ROOMS · BETTER TOGETHER</p>
+        <h1>Movie night,<br /><span>your people.</span></h1>
+        <p>Start a private room, invite friends, share a screen or play a link together. Chat while you watch.</p>
+        <a class="button button-primary" href="#invite">＋ Create a room</a>
       </div>
-      <div class="hero-art" id="hero-art" aria-hidden="true">
-        <img class="hero-promo-image" id="hero-promo-image" alt="" />
-        <div class="hero-promo-empty"><span>NYMIX</span><strong>CINEMA</strong></div>
-        <div class="hero-promo-caption" id="hero-promo-caption" hidden></div>
-      </div>
-      <div class="hero-bottom"><span>NYMIX CINEMA</span><span>Stories worth watching</span></div>
+      <div class="hero-art" aria-hidden="true"><div class="screen-card"><span>▶</span><strong>YOUR ROOM</strong><small>friends · film · chat</small></div><i>✦</i></div>
+      <div class="hero-foot"><span>WATCH TOGETHER</span><span>PRIVATE BY DESIGN</span></div>
     </section>
 
-    <section class="catalog-section" id="catalog">
-      <div class="section-heading">
-        <div><p class="eyebrow">THE COLLECTION</p><h2 id="catalog-title">Movies</h2></div>
-        <label class="search-field">
-          <span aria-hidden="true">⌕</span>
-          <input id="movie-search" type="search" placeholder="Search movies..." autocomplete="off" />
-        </label>
-      </div>
-      <div class="filters" id="genre-filters" aria-label="Filter by genre"></div>
-      <div class="movie-grid" id="movie-grid" aria-live="polite"></div>
-      <p class="empty-state" id="empty-state" hidden></p>
+    <section class="content-grid">
+      <section class="panel friends-panel" id="invite">
+        <header class="section-heading"><div><p class="eyebrow">YOUR PEOPLE</p><h2>Invite friends</h2><p>Rooms are private. Only friends you invite can join.</p></div><span class="section-icon">✦</span></header>
+        <div class="friends-list" id="friends-list"><p class="muted">Loading your friends…</p></div>
+        <div class="panel-footer"><span id="selection-count">Select friends to start a room.</span><button class="button button-primary" id="create-room" type="button" disabled>Create private room</button></div>
+        <p class="form-message" id="page-message" role="status" hidden></p>
+      </section>
+
+      <section class="panel rooms-panel" id="rooms">
+        <header class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2>My rooms</h2><p>Invites and rooms you have joined.</p></div><button class="button button-quiet" id="refresh-rooms" type="button">Refresh</button></header>
+        <div class="room-list" id="room-list"><p class="muted">Loading rooms…</p></div>
+      </section>
     </section>
 
-    <section class="hosting-note">
-      <div class="hosting-icon" aria-hidden="true">▶</div>
-      <div><h2>Made for movie nights</h2><p>Discover and enjoy the movies in the Nymix Cinema collection.</p></div>
+    <section class="feature-row">
+      <article><span>▣</span><div><strong>Share a screen</strong><p>Broadcast a browser tab or screen. Everyone watches the host's shared view.</p></div></article>
+      <article><span>↗</span><div><strong>Bring a link</strong><p>Use official YouTube or Google Drive playback links.</p></div></article>
+      <article><span>▰</span><div><strong>Play a local video</strong><p>The host can play a video from their device and share it live with the room.</p></div></article>
+      <article><span>☰</span><div><strong>Chat as you watch</strong><p>Room chat is for you and the friends invited to that room.</p></div></article>
     </section>
+    <p class="legal-note">Only share videos you own or are allowed to show. Third-party sites must be opened and played by you; this portal does not download or bypass their access controls. Screen sharing works best on desktop Chrome or Edge. Audio calling is not included yet.</p>
   </main>
-
-  <footer><a class="brand brand-small" href="/movies.html"><span class="brand-mark">N</span><span>Nymix <b>Cinema</b></span></a><p>© Nymix Cinema</p></footer>
-
-  <dialog class="movie-dialog" id="movie-dialog" aria-labelledby="dialog-title">
-    <button class="dialog-close" type="button" id="dialog-close" aria-label="Close movie">×</button>
-    <div id="movie-detail"></div>
-  </dialog>
-  <dialog class="promo-dialog" id="promo-dialog" aria-label="Movie promo trailer">
-    <button class="dialog-close" type="button" id="promo-close" aria-label="Close trailer">×</button>
-    <div id="promo-player"></div>
-  </dialog>
-
-  <div class="toast" id="toast" role="status" aria-live="polite"></div>
-  <script src="/movies.js"></script>
+  <footer><span class="brand brand-small"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></span><span>Good films. Good company.</span></footer>
+  <script src="/watch-together.js"></script>
 </body>
 </html>
