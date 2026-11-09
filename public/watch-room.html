@@ -6,15 +6,29 @@
   <meta name="theme-color" content="#0b0c12" />
   <meta name="description" content="A private Nymix Watch Together room." />
   <title>Private room · Nymix Watch</title>
-  <link rel="stylesheet" href="/watch-together.css?v=20261109-1758" />
+  <link rel="stylesheet" href="/watch-together.css?v=20261109-1856" />
 </head>
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Back to Nymix main portal"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></a>
     <nav aria-label="Watch navigation"><a href="/">← Main portal</a><a href="/movies.html">My rooms</a></nav>
-    <div class="account"><span id="account-name"></span><button class="button button-quiet" id="leave-room" type="button">Leave room</button></div>
+    <div class="account"><span id="account-name"></span><button class="button button-quiet" id="leave-room" type="button" hidden>Leave room</button></div>
   </header>
-  <main class="room-shell">
+  <main class="guest-join-shell" id="guest-join-shell" hidden>
+    <section class="guest-join-card">
+      <p class="eyebrow">YOU'RE INVITED</p>
+      <h1>Join this watch party</h1>
+      <p>Enter a name to join without creating an account. You can watch, chat, and turn on your mic or camera when you are ready.</p>
+      <form class="guest-join-form" id="guest-join-form">
+        <label for="guest-name">Your name</label>
+        <input id="guest-name" name="name" maxlength="32" autocomplete="nickname" required />
+        <button class="button button-primary" id="guest-join-submit" type="submit">Join as guest</button>
+        <p class="guest-join-error" id="guest-join-error" role="status" aria-live="polite"></p>
+      </form>
+      <p class="guest-join-note">Guest accounts cannot control playback or end the room.</p>
+    </section>
+  </main>
+  <main class="room-shell" id="room-shell" hidden>
     <header class="room-top">
       <div><span class="room-code-label" id="room-code">PRIVATE ROOM</span><h1 id="room-title">Movie night</h1><p class="room-invite-note">Anyone with the invite link can join while this room is active.</p></div>
       <div class="room-top-actions"><button class="button button-quiet" id="copy-invite" type="button">Copy invite link</button><button class="button button-quiet" id="end-room" type="button" hidden>End room</button></div>
@@ -74,6 +88,6 @@
   </main>
   <div class="room-toast" id="room-toast" role="status" aria-live="polite"></div>
   <video id="local-video" playsinline muted hidden></video>
-  <script src="/watch-room.js"></script>
+  <script src="/watch-room.js?v=20261109-1856"></script>
 </body>
 </html>

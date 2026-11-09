@@ -858,6 +858,35 @@ const cleanSong = song => ({
 const memberOf = (room, userId) => room.members.some(member => member.id === userId);
 
 const watchRoomForMember = (room, userId) => room.members.some(member => member.id === userId);
+const watchRoomAuth = (req, res, next) => {
+  const authorization = req.headers.authorization || '';
+  const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
+  if (!token) return res.status(401).json({ error: 'No token' });
+
+  let claims;
+  try { claims = jwt.verify(token, SECRET); }
+  catch { return res.status(401).json({ error: 'Invalid token' }); }
+
+  if (claims.type === 'watch_guest') {
+    if (req.params.code && claims.roomCode !== String(req.params.code).toUpperCase()) {
+      return res.status(403).json({ error: 'Guest session is limited to its watch room' });
+    }
+    const room = getSocialState().watchRooms.find(item =>
+      item.code === claims.roomCode && item.createdAt > Date.now() - 24 * 60 * 60 * 1000,
+    );
+    const member = room?.members.find(item => item.id === claims.memberId && item.guest === true);
+    if (!member) return res.status(401).json({ error: 'Guest session is no longer active' });
+    req.user = { id: member.id, name: member.name, role: 'guest', guest: true };
+    return next();
+  }
+
+  const account = rd('users.json').find(user => user.id === claims.id);
+  if (!account || account.banned) return res.status(401).json({ error: 'Account unavailable' });
+  if (account.role !== 'user') return res.status(403).json({ error: 'Insufficient permissions' });
+  req.user = { id: account.id, name: account.name, email: account.email, role: account.role };
+  next();
+};
+
 const validWatchSource = source => {
   if (!source || typeof source !== 'object' || !['youtube', 'drive', 'screen', 'file'].includes(source.type)) return false;
   if (source.type === 'screen' || source.type === 'file') return true;
@@ -938,11 +967,39 @@ app.post('/api/watch-rooms/:code/invite-link', userAuth, (req, res) => {
   res.json({ inviteToken: room.inviteToken });
 });
 
-app.post('/api/watch-rooms/:code/join', userAuth, (req, res) => {
+app.post('/api/watch-rooms/:code/join', (req, res) => {
   const social = getSocialState();
   const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || room.createdAt < Date.now() - 24 * 60 * 60 * 1000) return res.status(404).json({ error: 'Watch room not found or expired' });
-  if (!watchRoomForMember(room, req.user.id)) {
+
+  const authorization = req.headers.authorization || '';
+  let claims = null;
+  if (authorization) {
+    if (!authorization.startsWith('Bearer ')) return res.status(401).json({ error: 'Invalid token' });
+    const rawToken = authorization.slice(7).trim();
+    if (rawToken) {
+      try { claims = jwt.verify(rawToken, SECRET); }
+      catch { return res.status(401).json({ error: 'Invalid token' }); }
+    }
+  }
+
+  if (claims?.type === 'watch_guest') {
+    const member = claims.roomCode === room.code
+      ? room.members.find(item => item.id === claims.memberId && item.guest === true)
+      : null;
+    if (!member) return res.status(401).json({ error: 'Guest session is no longer active' });
+    const { signals, messages, invitedUserIds, inviteToken, ...publicRoom } = room;
+    return res.json({ ...publicRoom, guestId: member.id, guestSessionToken: authorization.slice(7) });
+  }
+
+  if (claims) {
+    const account = rd('users.json').find(user => user.id === claims.id);
+    if (!account || account.banned) return res.status(401).json({ error: 'Account unavailable' });
+    if (account.role !== 'user') return res.status(403).json({ error: 'Insufficient permissions' });
+    req.user = { id: account.id, name: account.name, email: account.email, role: account.role };
+  }
+
+  if (req.user && !watchRoomForMember(room, req.user.id)) {
     const inviteToken = req.body?.inviteToken;
     const linkIsValid = typeof inviteToken === 'string' &&
       /^[a-f0-9]{64}$/i.test(inviteToken) &&
@@ -957,11 +1014,34 @@ app.post('/api/watch-rooms/:code/join', userAuth, (req, res) => {
     if (isFriendInvite) room.invitedUserIds = room.invitedUserIds.filter(id => id !== req.user.id);
     wd('social.json', social);
   }
+
+  if (!req.user) {
+    const inviteToken = req.body?.inviteToken;
+    const linkIsValid = typeof inviteToken === 'string' &&
+      /^[a-f0-9]{64}$/i.test(inviteToken) &&
+      /^[a-f0-9]{64}$/i.test(room.inviteToken || '') &&
+      crypto.timingSafeEqual(Buffer.from(inviteToken, 'hex'), Buffer.from(room.inviteToken, 'hex'));
+    if (!linkIsValid) return res.status(403).json({ error: 'Ask the host for a valid room invite link' });
+    if (room.members.length >= 8) return res.status(409).json({ error: 'This watch room is full' });
+    const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+    if (!name || name.length > 32) return res.status(400).json({ error: 'Guest name must be between 1 and 32 characters' });
+    const member = { id: `guest-${crypto.randomUUID()}`, name, guest: true };
+    room.members.push(member);
+    wd('social.json', social);
+    const guestSessionToken = jwt.sign(
+      { type: 'watch_guest', roomCode: room.code, memberId: member.id },
+      SECRET,
+      { expiresIn: '24h' },
+    );
+    const { signals, messages, invitedUserIds, inviteToken: roomInviteToken, ...publicRoom } = room;
+    return res.json({ ...publicRoom, guestId: member.id, guestSessionToken });
+  }
+
   const { signals, messages, invitedUserIds, inviteToken, ...publicRoom } = room;
   res.json(publicRoom);
 });
 
-app.get('/api/watch-rooms/:code', userAuth, (req, res) => {
+app.get('/api/watch-rooms/:code', watchRoomAuth, (req, res) => {
   const room = getSocialState().watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Join this private watch room first' });
   const { signals, invitedUserIds, inviteToken, ...publicRoom } = room;
@@ -988,13 +1068,13 @@ app.put('/api/watch-rooms/:code/source', userAuth, (req, res) => {
   res.json({ source: room.source, sourceUpdatedAt: room.sourceUpdatedAt });
 });
 
-app.get('/api/watch-rooms/:code/chat', userAuth, (req, res) => {
+app.get('/api/watch-rooms/:code/chat', watchRoomAuth, (req, res) => {
   const room = getSocialState().watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
   res.json(room.messages.slice(-100));
 });
 
-app.post('/api/watch-rooms/:code/chat', userAuth, (req, res) => {
+app.post('/api/watch-rooms/:code/chat', watchRoomAuth, (req, res) => {
   const social = getSocialState();
   const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
@@ -1007,14 +1087,14 @@ app.post('/api/watch-rooms/:code/chat', userAuth, (req, res) => {
   res.status(201).json(message);
 });
 
-app.get('/api/watch-rooms/:code/signals', userAuth, (req, res) => {
+app.get('/api/watch-rooms/:code/signals', watchRoomAuth, (req, res) => {
   const room = getSocialState().watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
   const after = Number(req.query.after) || Date.now() - 15000;
   res.json(room.signals.filter(signal => signal.to === req.user.id && signal.createdAt >= after).slice(-100));
 });
 
-app.post('/api/watch-rooms/:code/signals', userAuth, (req, res) => {
+app.post('/api/watch-rooms/:code/signals', watchRoomAuth, (req, res) => {
   const social = getSocialState();
   const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
   const { to, type, description, candidate } = req.body || {};
@@ -1024,6 +1104,9 @@ app.post('/api/watch-rooms/:code/signals', userAuth, (req, res) => {
   }
   if (!['offer', 'answer', 'ice'].includes(type)) return res.status(400).json({ error: 'Invalid connection signal' });
   if (!['media', 'call'].includes(channel)) return res.status(400).json({ error: 'Invalid connection channel' });
+  if (req.user.guest && channel === 'media' && type === 'offer') {
+    return res.status(403).json({ error: 'Guests cannot start the shared playback connection' });
+  }
   const signal = { id: crypto.randomUUID(), from: req.user.id, to, type, channel, createdAt: Date.now() };
   if (type === 'offer' || type === 'answer') {
     if (!description || description.type !== type || typeof description.sdp !== 'string' || description.sdp.length > 20000) {
@@ -1042,7 +1125,7 @@ app.post('/api/watch-rooms/:code/signals', userAuth, (req, res) => {
   res.status(201).json({ ok: true, id: signal.id });
 });
 
-app.delete('/api/watch-rooms/:code', userAuth, (req, res) => {
+app.delete('/api/watch-rooms/:code', watchRoomAuth, (req, res) => {
   const social = getSocialState();
   const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Watch room not found' });
@@ -1050,7 +1133,7 @@ app.delete('/api/watch-rooms/:code', userAuth, (req, res) => {
     social.watchRooms = social.watchRooms.filter(item => item.code !== room.code);
   } else {
     room.members = room.members.filter(member => member.id !== req.user.id);
-    room.invitedUserIds = [...new Set([...room.invitedUserIds, req.user.id])];
+    if (!req.user.guest) room.invitedUserIds = [...new Set([...room.invitedUserIds, req.user.id])];
     room.signals = room.signals.filter(signal => signal.from !== req.user.id && signal.to !== req.user.id);
   }
   wd('social.json', social);
@@ -1497,7 +1580,7 @@ app.get('/api/calls/signals', userAuth, (req, res) => {
   res.json(social.callSignals.filter(signal => signal.to === req.user.id).slice(-100));
 });
 
-app.get('/api/calls/config', userAuth, (req, res) => {
+app.get('/api/calls/config', watchRoomAuth, (req, res) => {
   res.set('Cache-Control', 'no-store');
   const meteredApp = process.env.METERED_TURN_APP;
   const meteredApiKey = process.env.METERED_TURN_API_KEY;

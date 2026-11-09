@@ -1,17 +1,20 @@
 (() => {
   const $ = selector => document.querySelector(selector);
-  const token = () => localStorage.getItem('nx_token');
+  const accountToken = () => localStorage.getItem('nx_token');
   const params = new URLSearchParams(location.search);
   const code = (params.get('code') || '').toUpperCase();
   const inviteToken = params.get('invite') || '';
   const loginUrl = () => `/login.html?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
-  const user = (() => {
+  let guestSessionToken = sessionStorage.getItem(`nx_watch_guest_${code}`) || '';
+  const token = () => accountToken() || guestSessionToken;
+  const readUser = () => {
     try { return JSON.parse(localStorage.getItem('nx_user') || 'null'); }
     catch (error) {
       console.error('Could not read the signed-in user.', error);
       return null;
     }
-  })();
+  };
+  let user = readUser();
   const peers = new Map();
   const callPeers = new Map();
   const callPeerPromises = new Map();
@@ -35,19 +38,25 @@
   })[char]);
 
   async function api(path, options = {}) {
+    const currentToken = token();
     const response = await fetch(path, {
       ...options,
       headers: {
         ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-        Authorization: `Bearer ${token()}`,
+        ...(currentToken ? { Authorization: `Bearer ${currentToken}` } : {}),
       },
     });
     const result = await response.json();
     if (response.status === 401) {
-      localStorage.removeItem('nx_token');
-      localStorage.removeItem('nx_user');
-      window.location.replace(loginUrl());
-      throw new Error('Please sign in again.');
+      if (guestSessionToken) {
+        sessionStorage.removeItem(`nx_watch_guest_${code}`);
+        guestSessionToken = '';
+      } else if (accountToken()) {
+        localStorage.removeItem('nx_token');
+        localStorage.removeItem('nx_user');
+        window.location.replace(loginUrl());
+      }
+      throw new Error(result.error || 'Your room session has expired.');
     }
     if (!response.ok) throw new Error(result.error || `Request failed (${response.status})`);
     return result;
@@ -108,7 +117,7 @@
     stage.innerHTML = '<video id="remote-video" autoplay playsinline controls></video>';
     $('#playback-status').textContent = source.type === 'screen' ? 'The host is sharing a browser tab or screen' : 'The host is playing a local video';
     const video = $('#remote-video');
-    if (room.hostId === user.id && localStream) {
+    if (room.hostId === user?.id && localStream) {
       video.srcObject = localStream;
       video.muted = false;
       video.play().catch(error => console.warn('Host preview awaits a play gesture.', error));
@@ -129,8 +138,9 @@
     $('#end-room').hidden = room.hostId !== user?.id;
     $('#leave-room').hidden = room.hostId === user?.id;
     $('#source-panel').hidden = room.hostId !== user?.id;
+    $('#copy-invite').hidden = Boolean(user?.guest);
     $('#member-list').innerHTML = room.members.map(member =>
-      `<span class="member-chip">${escapeHtml(member.name)}${member.id === room.hostId ? ' · host' : ''}</span>`,
+      `<span class="member-chip">${escapeHtml(member.name)}${member.id === room.hostId ? ' · host' : member.guest ? ' · guest' : ''}</span>`,
     ).join('');
     if (room.sourceUpdatedAt !== sourceUpdatedAt) {
       sourceUpdatedAt = room.sourceUpdatedAt;
@@ -202,7 +212,7 @@
     $('#stop-sharing').hidden = true;
     peers.forEach(peer => peer.connection.close());
     peers.clear();
-    if (room.hostId === user.id) {
+    if (room.hostId === user?.id) {
       try { await setSource(null); }
       catch (error) {
         console.error('Could not stop the shared room source.', error);
@@ -266,7 +276,7 @@
     const connection = new RTCPeerConnection({ iceServers: await loadIceServers() });
     const peer = { connection, remoteStream: new MediaStream(), candidates: [] };
     peers.set(peerId, peer);
-    if (room.hostId === user.id && localStream) {
+    if (room.hostId === user?.id && localStream) {
       localStream.getTracks().forEach(track => connection.addTrack(track, localStream));
     }
     connection.onicecandidate = event => {
@@ -318,7 +328,7 @@
     </article>`];
 
     for (const member of members) {
-      if (member.id === user.id) continue;
+      if (member.id === user?.id) continue;
       const peer = callPeers.get(member.id);
       const remote = peer?.remoteStream;
       const videoOn = remote?.getVideoTracks().some(track => track.readyState === 'live');
@@ -415,8 +425,8 @@
   async function syncCallConnections() {
     if (!room || !Object.values(callTracks).some(track => track?.readyState === 'live' && track.enabled)) return;
     for (const member of room.members) {
-      if (member.id === user.id || callPeers.has(member.id)) continue;
-      const initiator = String(user.id) < String(member.id);
+      if (member.id === user?.id || callPeers.has(member.id)) continue;
+      const initiator = String(user?.id) < String(member.id);
       try { await createCallPeer(member.id, initiator); }
       catch (error) {
         console.error(`Could not connect voice/video to ${member.name}.`, error);
@@ -495,9 +505,9 @@
   }
 
   async function syncPeerConnections() {
-    if (room.hostId !== user.id || !localStream) return;
+    if (room.hostId !== user?.id || !localStream) return;
     for (const member of room.members) {
-      if (member.id === user.id || peers.has(member.id)) continue;
+      if (member.id === user?.id || peers.has(member.id)) continue;
       try { await createPeer(member.id, true); }
       catch (error) {
         console.error(`Could not connect to ${member.name}.`, error);
@@ -558,7 +568,7 @@
   function renderMessages(messages) {
     const list = $('#chat-messages');
     const atBottom = list.scrollHeight - list.scrollTop - list.clientHeight < 60;
-    list.innerHTML = messages.map(message => `<article class="chat-message${message.userId === user.id ? ' mine' : ''}">
+    list.innerHTML = messages.map(message => `<article class="chat-message${message.userId === user?.id ? ' mine' : ''}">
       <strong>${escapeHtml(message.userName)}</strong><p>${escapeHtml(message.text)}</p>
     </article>`).join('') || '<p class="muted">Say hello to your friends.</p>';
     if (atBottom) list.scrollTop = list.scrollHeight;
@@ -574,42 +584,91 @@
     }
   }
 
-  async function initialize() {
-    if (!token()) {
-      window.location.replace(loginUrl());
-      return;
+  function showGuestJoin(message = '') {
+    $('#guest-join-shell').hidden = false;
+    $('#room-shell').hidden = true;
+    $('#guest-join-error').textContent = message;
+    $('#guest-join-submit').disabled = !inviteToken;
+  }
+
+  async function enterRoom(guestName = '') {
+    const body = {};
+    if (inviteToken) body.inviteToken = inviteToken;
+    if (guestName) body.name = guestName;
+    room = await api(`/api/watch-rooms/${encodeURIComponent(code)}/join`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+    if (room.guestSessionToken) {
+      guestSessionToken = room.guestSessionToken;
+      sessionStorage.setItem(`nx_watch_guest_${code}`, guestSessionToken);
+      const guest = room.members.find(member => member.id === room.guestId);
+      if (!guest) throw new Error('Could not identify your guest session.');
+      user = { ...guest, guest: true };
+      history.replaceState(null, '', `/watch-room.html?code=${encodeURIComponent(code)}`);
+    } else {
+      user = readUser();
     }
+
+    $('#guest-join-shell').hidden = true;
+    $('#room-shell').hidden = false;
+    sourceUpdatedAt = room.sourceUpdatedAt;
+    renderRoom(room);
+    $('#room-code').textContent = `PRIVATE ROOM · ${room.code}`;
+    await refreshRoom();
+    await refreshChat();
+    if (room.hostId === user?.id) {
+      sourceInputChanged();
+      $('#host-tools').hidden = false;
+      $('#end-room').hidden = false;
+      $('#source-panel').hidden = false;
+    }
+    roomTimer = setInterval(refreshRoom, 2500);
+    chatTimer = setInterval(refreshChat, 2200);
+    signalTimer = setInterval(pollSignals, 1400);
+    pollSignals();
+  }
+
+  async function initialize() {
     if (!/^[A-F0-9]{8}$/.test(code)) {
       window.location.replace('/movies.html');
       return;
     }
+    if (!token()) {
+      showGuestJoin(inviteToken ? '' : 'Open an active invite link from the room host.');
+      return;
+    }
     try {
-      $('#account-name').textContent = user?.name || '';
-      room = await api(`/api/watch-rooms/${encodeURIComponent(code)}/join`, {
-        method: 'POST',
-        body: JSON.stringify(inviteToken ? { inviteToken } : {}),
-      });
-      sourceUpdatedAt = room.sourceUpdatedAt;
-      renderRoom(room);
-      $('#room-code').textContent = `PRIVATE ROOM · ${room.code}`;
-      await refreshRoom();
-      await refreshChat();
-      if (room.hostId === user.id) {
-        sourceInputChanged();
-        $('#host-tools').hidden = false;
-        $('#end-room').hidden = false;
-        $('#source-panel').hidden = false;
-      }
-      roomTimer = setInterval(refreshRoom, 2500);
-      chatTimer = setInterval(refreshChat, 2200);
-      signalTimer = setInterval(pollSignals, 1400);
-      pollSignals();
+      await enterRoom();
     } catch (error) {
       console.error('Could not join private watch room.', error);
+      if (!accountToken()) {
+        showGuestJoin(error.message || 'Could not join the room.');
+        return;
+      }
       showToast(error.message || 'Could not join the room.');
       setTimeout(() => window.location.replace('/movies.html'), 2200);
     }
   }
+
+  $('#guest-join-form').addEventListener('submit', async event => {
+    event.preventDefault();
+    const name = $('#guest-name').value.trim();
+    if (!name || name.length > 32) {
+      $('#guest-join-error').textContent = 'Enter a name of up to 32 characters.';
+      return;
+    }
+    const submit = $('#guest-join-submit');
+    submit.disabled = true;
+    $('#guest-join-error').textContent = '';
+    try {
+      await enterRoom(name);
+    } catch (error) {
+      console.error('Could not join as a guest.', error);
+      $('#guest-join-error').textContent = error.message || 'Could not join the room.';
+      submit.disabled = !inviteToken;
+    }
+  });
 
   $('#source-type').addEventListener('change', sourceInputChanged);
   $('#toggle-mic').addEventListener('click', async event => {
