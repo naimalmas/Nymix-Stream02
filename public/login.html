@@ -90,8 +90,15 @@ function switchTab(t){
   document.getElementById('form-register').style.display = t==='register'?'block':'none';
 }
 function dashboardPath(role){
-  if(new URLSearchParams(window.location.search).get('next')==='movies' && (role==='admin'||role==='super_admin')) return '/movie-admin.html';
-  if(new URLSearchParams(window.location.search).get('next')==='movies' && role==='user') return '/movies.html';
+  const next=new URLSearchParams(window.location.search).get('next');
+  if(next==='movies' && (role==='admin'||role==='super_admin')) return '/movie-admin.html';
+  if(next==='movies' && role==='user') return '/movies.html';
+  if(role==='user' && next){
+    try{
+      const target=new URL(next,window.location.origin);
+      if(target.origin===window.location.origin && target.pathname==='/watch-room.html') return target.pathname+target.search;
+    }catch(error){console.error('Could not restore the requested watch room after login.',error);}
+  }
   if(role==='super_admin') return '/super-admin/';
   if(role==='admin') return '/admin/';
   return '/';

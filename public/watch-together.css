@@ -83,6 +83,7 @@ footer { display:flex; align-items:center; justify-content:space-between; gap:15
 .room-shell { max-width:1500px; margin:auto; padding:24px clamp(14px,3vw,42px) 40px; }
 .room-top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:17px; }
 .room-top h1 { margin:3px 0 0; font:800 24px Manrope,sans-serif; }
+.room-invite-note { margin:5px 0 0; color:#aaa7b8; font-size:11px; }
 .room-code-label { color:#f4aec4; font:800 11px Manrope,sans-serif; letter-spacing:1.7px; }
 .room-layout { display:grid; grid-template-columns:minmax(0,1.8fr) minmax(290px,.78fr); gap:16px; align-items:start; }
 .watch-panel,.chat-panel,.source-panel { min-width:0; overflow:hidden; border:1px solid var(--line); border-radius:14px; background:linear-gradient(145deg,#191a22,#13141b); }
@@ -119,6 +120,21 @@ footer { display:flex; align-items:center; justify-content:space-between; gap:15
 .host-tools { display:flex; flex-wrap:wrap; gap:9px; margin-top:12px; }
 .host-tools .button { min-height:36px; font-size:12px; }
 .share-note { margin:9px 0 0; color:#aaa7b2; font-size:11px; line-height:1.5; }
+.call-panel { margin-top:16px; padding:16px; border:1px solid var(--line); border-radius:14px; background:linear-gradient(145deg,#191a22,#13141b); }
+.call-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.call-heading h2 { margin:0; font:800 16px Manrope,sans-serif; }
+.call-heading p,.call-note { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.5; }
+.call-controls { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
+.call-controls .button { min-height:36px; font-size:12px; }
+.call-controls .button[aria-pressed="true"] { border-color:#ec6890; background:#e94c7b24; color:#ffd5e1; }
+.call-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:9px; margin-top:12px; }
+.call-tile { position:relative; min-width:0; overflow:hidden; aspect-ratio:16/10; display:grid; place-items:center; border:1px solid #ffffff16; border-radius:10px; background:radial-gradient(ellipse at 60% 35%,#39263c,#111219 75%); }
+.call-tile video { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; background:#0b0c12; }
+.call-tile video[hidden] { display:none; }
+.call-avatar { width:46px; height:46px; display:grid; place-items:center; border:1px solid #ffffff20; border-radius:50%; background:linear-gradient(140deg,#d820a4,#7b35c0); color:#fff; font:800 17px Manrope,sans-serif; }
+.call-tile-caption { position:absolute; right:0; bottom:0; left:0; padding:18px 9px 8px; background:linear-gradient(transparent,#07070bd9); color:#fff; font-size:11px; }
+.call-tile audio { display:none; }
+.call-note { margin-top:10px; }
 .member-row { display:flex; flex-wrap:wrap; gap:7px; }
 .member-chip { padding:6px 9px; border:1px solid #ffffff14; border-radius:99px; background:#ffffff08; color:#ddd8e3; font-size:11px; }
 .room-toast { position:fixed; z-index:6; bottom:20px; left:50%; max-width:calc(100vw - 24px); padding:10px 14px; transform:translate(-50%,20px); opacity:0; border:1px solid #ffffff25; border-radius:9px; background:#25232c; color:white; pointer-events:none; transition:.2s; }
@@ -451,6 +467,7 @@ main { max-width:1420px; padding:16px clamp(12px,2.4vw,27px) 28px; }
 .invite-heading>div>p:last-child { margin:5px 0 0; color:#9693a8; font-size:10px; line-height:1.45; }
 .invite-heading .section-icon { width:28px; height:28px; flex:0 0 auto; border:0; border-radius:8px; background:#63268445; color:#d979e0; font-size:13px; }
 .friends-panel .friends-list { display:grid; flex:1; align-content:start; gap:7px; min-height:85px; max-height:245px; overflow:auto; padding:1px 2px 3px 1px; }
+.friends-panel .friends-empty { align-self:center; margin:0; padding:12px; border:1px dashed #ffffff1c; border-radius:9px; color:#aaa7b8; font-size:10px; line-height:1.55; text-align:left; }
 .friends-panel .friend-option { min-width:0; min-height:48px; padding:7px 8px; gap:7px; border-color:#ffffff0d; border-radius:9px; background:#ffffff04; }
 .friends-panel .friend-option:hover { border-color:#a930b455; background:#9e20a311; }
 .friends-panel .friend-option:has(input:checked) { border-color:#c531cc88; background:#a91cb521; }
@@ -535,4 +552,35 @@ main { max-width:1420px; padding:16px clamp(12px,2.4vw,27px) 28px; }
   main { padding-right:10px; padding-left:10px; }
   .friends-panel .friends-list { grid-template-columns:minmax(0,1fr); }
   .feature-row { grid-template-columns:minmax(0,1fr); }
+}
+
+.watch-layout { align-items:start; }
+.hero { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.08fr); grid-template-rows:minmax(0,1fr) auto; align-items:center; min-height:340px; }
+.hero-copy { grid-column:1; grid-row:1; align-self:center; padding:24px 12px 20px 24px; }
+.hero h1 { font-size:clamp(29px,3vw,42px); line-height:1.08; letter-spacing:-1.6px; }
+.hero-copy>p:not(.eyebrow) { max-width:32ch; margin:11px 0 17px; font-size:13px; line-height:1.65; }
+.hero-actions .button { min-height:39px; padding:0 15px; font-size:11px; }
+.hero-art { grid-column:2; grid-row:1; align-self:stretch; width:auto; height:auto; min-height:225px; margin:14px 14px 12px 0; }
+.hangout-photo img { object-position:center; }
+.photo-caption { right:12px; bottom:11px; left:12px; }
+.hero-foot { grid-column:1/-1; grid-row:2; }
+.friends-panel { align-self:start; }
+.friends-panel .friends-list { flex:0 1 auto; min-height:0; max-height:258px; }
+.friends-panel .panel-footer { margin-top:9px; }
+@media(max-width:900px) {
+  .watch-layout { grid-template-columns:minmax(0,1fr); }
+  .hero { min-height:330px; }
+  .hero-art { min-height:230px; }
+  .friends-panel .friends-list { grid-template-columns:repeat(2,minmax(0,1fr)); max-height:230px; }
+}
+@media(max-width:600px) {
+  .hero { grid-template-columns:minmax(0,1fr); grid-template-rows:auto auto auto; min-height:0; }
+  .hero-copy { grid-column:1; grid-row:1; padding:20px 18px 14px; }
+  .hero h1 { font-size:clamp(30px,8vw,38px); }
+  .hero-copy>p:not(.eyebrow) { max-width:38ch; font-size:12px; }
+  .hero-art { grid-column:1; grid-row:2; width:auto; min-height:0; height:clamp(165px,48vw,225px); margin:0 10px 10px; }
+  .hero-foot { grid-column:1; grid-row:3; }
+}
+@media(max-width:390px) {
+  .friends-panel .friends-list { grid-template-columns:minmax(0,1fr); }
 }

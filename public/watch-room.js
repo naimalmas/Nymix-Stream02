@@ -3,6 +3,8 @@
   const token = () => localStorage.getItem('nx_token');
   const params = new URLSearchParams(location.search);
   const code = (params.get('code') || '').toUpperCase();
+  const inviteToken = params.get('invite') || '';
+  const loginUrl = () => `/login.html?next=${encodeURIComponent(`${location.pathname}${location.search}`)}`;
   const user = (() => {
     try { return JSON.parse(localStorage.getItem('nx_user') || 'null'); }
     catch (error) {
@@ -11,9 +13,15 @@
     }
   })();
   const peers = new Map();
+  const callPeers = new Map();
+  const callPeerPromises = new Map();
+  const callTracks = { audio: null, video: null };
   const seenSignals = new Set();
   let room;
   let localStream = null;
+  let localCallStream = new MediaStream();
+  let callMemberSignature = '';
+  let renderedCallSignature = '';
   let sourceUpdatedAt = 0;
   let roomTimer;
   let chatTimer;
@@ -38,7 +46,7 @@
     if (response.status === 401) {
       localStorage.removeItem('nx_token');
       localStorage.removeItem('nx_user');
-      window.location.replace('/login.html?next=movies');
+      window.location.replace(loginUrl());
       throw new Error('Please sign in again.');
     }
     if (!response.ok) throw new Error(result.error || `Request failed (${response.status})`);
@@ -114,6 +122,7 @@
   }
 
   function renderRoom(nextRoom) {
+    const previousMembers = callMemberSignature;
     room = nextRoom;
     $('#room-code').textContent = `PRIVATE ROOM · ${room.code}`;
     $('#account-name').textContent = user?.name || '';
@@ -126,6 +135,15 @@
     if (room.sourceUpdatedAt !== sourceUpdatedAt) {
       sourceUpdatedAt = room.sourceUpdatedAt;
       renderSource(room.source);
+    }
+    const nextMembers = room.members.map(member => member.id).sort().join('|');
+    if (nextMembers !== previousMembers) {
+      callMemberSignature = nextMembers;
+      renderCallTiles(true);
+      syncCallConnections().catch(error => {
+        console.error('Could not connect room voice and video.', error);
+        showToast('Could not connect voice and video. Please try again.');
+      });
     }
   }
 
@@ -236,10 +254,10 @@
     return config.iceServers || [{ urls: 'stun:stun.l.google.com:19302' }];
   }
 
-  async function sendSignal(to, type, payload = {}) {
+  async function sendSignal(to, type, payload = {}, channel = 'media') {
     await api(`/api/watch-rooms/${encodeURIComponent(code)}/signals`, {
       method: 'POST',
-      body: JSON.stringify({ to, type, ...payload }),
+      body: JSON.stringify({ to, type, channel, ...payload }),
     });
   }
 
@@ -275,6 +293,205 @@
       await sendSignal(peerId, 'offer', { description: connection.localDescription });
     }
     return peer;
+  }
+
+  function renderCallTiles(force = false) {
+    if (!room) return;
+    const members = room.members;
+    const signature = [
+      members.map(member => member.id).sort().join('|'),
+      ...[...callPeers.entries()].map(([id, peer]) =>
+        `${id}:${peer.connection.connectionState}:${peer.remoteStream.getTracks().map(track => `${track.id}-${track.readyState}-${track.enabled}`).join(',')}`,
+      ),
+      ...Object.entries(callTracks).map(([kind, track]) => `${kind}:${track?.readyState}:${track?.enabled}`),
+    ].join(';');
+    if (!force && signature === renderedCallSignature) return;
+    renderedCallSignature = signature;
+
+    const localVideoOn = callTracks.video?.readyState === 'live' && callTracks.video.enabled;
+    const localAudioOn = callTracks.audio?.readyState === 'live' && callTracks.audio.enabled;
+    const localInitial = escapeHtml((user?.name || 'You').slice(0, 1).toUpperCase());
+    const tiles = [`<article class="call-tile" data-local-tile>
+      <video autoplay playsinline muted${localVideoOn ? '' : ' hidden'}></video>
+      <span class="call-avatar"${localVideoOn ? ' hidden' : ''}>${localInitial}</span>
+      <span class="call-tile-caption">You · mic ${localAudioOn ? 'on' : 'off'}${localVideoOn ? ' · camera on' : ''}</span>
+    </article>`];
+
+    for (const member of members) {
+      if (member.id === user.id) continue;
+      const peer = callPeers.get(member.id);
+      const remote = peer?.remoteStream;
+      const videoOn = remote?.getVideoTracks().some(track => track.readyState === 'live');
+      const audioOn = remote?.getAudioTracks().some(track => track.readyState === 'live');
+      tiles.push(`<article class="call-tile" data-peer-id="${escapeHtml(member.id)}">
+        <video autoplay playsinline muted${videoOn ? '' : ' hidden'}></video>
+        <audio autoplay></audio>
+        <span class="call-avatar"${videoOn ? ' hidden' : ''}>${escapeHtml((member.name || '?').slice(0, 1).toUpperCase())}</span>
+        <span class="call-tile-caption">${escapeHtml(member.name)} · ${audioOn ? 'mic on' : 'not on call'}${videoOn ? ' · camera on' : ''}</span>
+      </article>`);
+    }
+
+    const grid = $('#call-grid');
+    grid.innerHTML = tiles.join('');
+    const localVideo = grid.querySelector('[data-local-tile] video');
+    if (localVideoOn && localVideo) {
+      localVideo.srcObject = localCallStream;
+      localVideo.play().catch(error => console.warn('Local camera preview awaits a play gesture.', error));
+    }
+    for (const tile of grid.querySelectorAll('[data-peer-id]')) {
+      const peer = callPeers.get(tile.dataset.peerId);
+      if (!peer) continue;
+      const video = tile.querySelector('video');
+      const audio = tile.querySelector('audio');
+      if (video) {
+        video.srcObject = peer.remoteStream;
+        video.play().catch(error => console.warn('Remote camera awaits a play gesture.', error));
+      }
+      if (audio) {
+        audio.srcObject = peer.remoteStream;
+        audio.play().catch(error => console.warn('Remote audio awaits a play gesture.', error));
+      }
+    }
+  }
+
+  function updateCallControls() {
+    const micOn = callTracks.audio?.readyState === 'live' && callTracks.audio.enabled;
+    const cameraOn = callTracks.video?.readyState === 'live' && callTracks.video.enabled;
+    const micButton = $('#toggle-mic');
+    const cameraButton = $('#toggle-camera');
+    micButton.textContent = micOn ? 'Turn mic off' : 'Turn mic on';
+    micButton.setAttribute('aria-pressed', String(micOn));
+    cameraButton.textContent = cameraOn ? 'Turn camera off' : 'Turn camera on';
+    cameraButton.setAttribute('aria-pressed', String(cameraOn));
+    $('#call-status').textContent = micOn || cameraOn
+      ? `${micOn ? 'Mic on' : 'Mic off'} · ${cameraOn ? 'Camera on' : 'Camera off'}`
+      : 'Your mic and camera start off. Turn on either when you are ready.';
+  }
+
+  async function createCallPeer(peerId, initiator) {
+    if (callPeers.has(peerId)) return callPeers.get(peerId);
+    if (callPeerPromises.has(peerId)) return callPeerPromises.get(peerId);
+    const creation = (async () => {
+      const connection = new RTCPeerConnection({ iceServers: await loadIceServers() });
+      const peer = {
+        connection,
+        remoteStream: new MediaStream(),
+        candidates: [],
+        audioSender: connection.addTransceiver('audio', { direction: 'sendrecv' }).sender,
+        videoSender: connection.addTransceiver('video', { direction: 'sendrecv' }).sender,
+      };
+      callPeers.set(peerId, peer);
+      if (callTracks.audio) await peer.audioSender.replaceTrack(callTracks.audio);
+      if (callTracks.video) await peer.videoSender.replaceTrack(callTracks.video);
+      connection.onicecandidate = event => {
+        sendSignal(peerId, 'ice', { candidate: event.candidate ? event.candidate.toJSON() : null }, 'call')
+          .catch(error => console.error('Could not send voice/video connection candidate.', error));
+      };
+      connection.ontrack = event => {
+        const stream = event.streams[0];
+        if (stream) peer.remoteStream = stream;
+        else if (!peer.remoteStream.getTracks().some(track => track.id === event.track.id)) peer.remoteStream.addTrack(event.track);
+        renderCallTiles(true);
+      };
+      connection.onconnectionstatechange = () => {
+        renderCallTiles(true);
+        if (connection.connectionState === 'failed') {
+          showToast('Could not connect voice/video. Your network may require a TURN relay.');
+        }
+        if (connection.connectionState === 'closed') callPeers.delete(peerId);
+      };
+      if (initiator) {
+        const offer = await connection.createOffer();
+        await connection.setLocalDescription(offer);
+        await sendSignal(peerId, 'offer', { description: connection.localDescription }, 'call');
+      }
+      return peer;
+    })();
+    callPeerPromises.set(peerId, creation);
+    try { return await creation; }
+    finally { callPeerPromises.delete(peerId); }
+  }
+
+  async function syncCallConnections() {
+    if (!room || !Object.values(callTracks).some(track => track?.readyState === 'live' && track.enabled)) return;
+    for (const member of room.members) {
+      if (member.id === user.id || callPeers.has(member.id)) continue;
+      const initiator = String(user.id) < String(member.id);
+      try { await createCallPeer(member.id, initiator); }
+      catch (error) {
+        console.error(`Could not connect voice/video to ${member.name}.`, error);
+        showToast(`Could not connect voice/video to ${member.name}.`);
+      }
+    }
+    renderCallTiles();
+  }
+
+  async function handleCallSignal(signal) {
+    if (seenSignals.has(signal.id)) return;
+    seenSignals.add(signal.id);
+    if (seenSignals.size > 1000) seenSignals.clear();
+    const peer = await createCallPeer(signal.from, false);
+    const connection = peer.connection;
+    if (signal.type === 'offer') {
+      await connection.setRemoteDescription(signal.description);
+      for (const candidate of peer.candidates.splice(0)) await connection.addIceCandidate(candidate);
+      const answer = await connection.createAnswer();
+      await connection.setLocalDescription(answer);
+      await sendSignal(signal.from, 'answer', { description: connection.localDescription }, 'call');
+    } else if (signal.type === 'answer') {
+      if (connection.signalingState === 'have-local-offer') {
+        await connection.setRemoteDescription(signal.description);
+        for (const candidate of peer.candidates.splice(0)) await connection.addIceCandidate(candidate);
+      }
+    } else if (signal.candidate) {
+      if (connection.remoteDescription) await connection.addIceCandidate(signal.candidate);
+      else peer.candidates.push(signal.candidate);
+    }
+  }
+
+  async function toggleCallTrack(kind) {
+    const currentTrack = callTracks[kind];
+    if (currentTrack?.readyState === 'live') {
+      callTracks[kind] = null;
+      localCallStream.removeTrack(currentTrack);
+      currentTrack.stop();
+      const senderKey = kind === 'audio' ? 'audioSender' : 'videoSender';
+      await Promise.all([...callPeers.values()].map(peer => peer[senderKey].replaceTrack(null)));
+      updateCallControls();
+      renderCallTiles(true);
+      return;
+    }
+
+    try {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Microphone and camera access requires HTTPS or a supported browser on localhost.');
+      }
+      const stream = await navigator.mediaDevices.getUserMedia(kind === 'audio'
+        ? { audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }, video: false }
+        : { audio: false, video: true });
+      const track = stream.getTracks()[0];
+      if (!track) throw new Error(`Could not start the ${kind === 'audio' ? 'microphone' : 'camera'}.`);
+      callTracks[kind] = track;
+      localCallStream.addTrack(track);
+      track.addEventListener('ended', () => {
+        if (callTracks[kind] !== track) return;
+        callTracks[kind] = null;
+        localCallStream.removeTrack(track);
+        const senderKey = kind === 'audio' ? 'audioSender' : 'videoSender';
+        Promise.all([...callPeers.values()].map(peer => peer[senderKey].replaceTrack(null)))
+          .catch(error => console.error(`Could not stop sending the ${kind} track.`, error));
+        updateCallControls();
+        renderCallTiles(true);
+      }, { once: true });
+      await syncCallConnections();
+      const senderKey = kind === 'audio' ? 'audioSender' : 'videoSender';
+      await Promise.all([...callPeers.values()].map(peer => peer[senderKey].replaceTrack(track)));
+      updateCallControls();
+      renderCallTiles(true);
+    } catch (error) {
+      console.error(`Could not turn on the ${kind === 'audio' ? 'microphone' : 'camera'}.`, error);
+      showToast(error.message || `Could not turn on the ${kind === 'audio' ? 'microphone' : 'camera'}. Check browser permissions.`);
+    }
   }
 
   async function syncPeerConnections() {
@@ -316,7 +533,10 @@
     try {
       const signals = await api(`/api/watch-rooms/${encodeURIComponent(code)}/signals?after=${Date.now() - 15000}`);
       for (const signal of signals) {
-        try { await handleSignal(signal); }
+        try {
+          if (signal.channel === 'call') await handleCallSignal(signal);
+          else await handleSignal(signal);
+        }
         catch (error) { console.error('Could not process room connection signal.', error); }
       }
     } catch (error) {
@@ -356,7 +576,7 @@
 
   async function initialize() {
     if (!token()) {
-      window.location.replace('/login.html?next=movies');
+      window.location.replace(loginUrl());
       return;
     }
     if (!/^[A-F0-9]{8}$/.test(code)) {
@@ -365,7 +585,10 @@
     }
     try {
       $('#account-name').textContent = user?.name || '';
-      room = await api(`/api/watch-rooms/${encodeURIComponent(code)}/join`, { method: 'POST', body: '{}' });
+      room = await api(`/api/watch-rooms/${encodeURIComponent(code)}/join`, {
+        method: 'POST',
+        body: JSON.stringify(inviteToken ? { inviteToken } : {}),
+      });
       sourceUpdatedAt = room.sourceUpdatedAt;
       renderRoom(room);
       $('#room-code').textContent = `PRIVATE ROOM · ${room.code}`;
@@ -389,6 +612,18 @@
   }
 
   $('#source-type').addEventListener('change', sourceInputChanged);
+  $('#toggle-mic').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try { await toggleCallTrack('audio'); }
+    finally { button.disabled = false; }
+  });
+  $('#toggle-camera').addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    try { await toggleCallTrack('video'); }
+    finally { button.disabled = false; }
+  });
   $('#source-form').addEventListener('submit', async event => {
     event.preventDefault();
     const type = $('#source-type').value;
@@ -446,8 +681,13 @@
 
   $('#copy-invite').addEventListener('click', async () => {
     try {
-      await navigator.clipboard.writeText(`${location.origin}/watch-room.html?code=${encodeURIComponent(code)}`);
-      showToast('Private room invite link copied. Only invited friends can join.');
+      const { inviteToken: shareToken } = await api(`/api/watch-rooms/${encodeURIComponent(code)}/invite-link`, {
+        method: 'POST',
+        body: '{}',
+      });
+      const invite = new URLSearchParams({ code, invite: shareToken });
+      await navigator.clipboard.writeText(`${location.origin}/watch-room.html?${invite.toString()}`);
+      showToast('Invite link copied. Anyone with this link can join while the room is active.');
     } catch (error) {
       console.error('Could not copy room invite link.', error);
       showToast('Could not copy the invite link in this browser.');
@@ -458,7 +698,9 @@
     if (endRoom && !window.confirm('End this room for everyone?')) return;
     try {
       if (localStream) localStream.getTracks().forEach(track => track.stop());
+      Object.values(callTracks).forEach(track => track?.stop());
       peers.forEach(peer => peer.connection.close());
+      callPeers.forEach(peer => peer.connection.close());
       clearInterval(roomTimer);
       clearInterval(chatTimer);
       clearInterval(signalTimer);
@@ -473,7 +715,9 @@
   $('#end-room').addEventListener('click', () => leaveRoom(true));
   window.addEventListener('beforeunload', () => {
     if (localStream) localStream.getTracks().forEach(track => track.stop());
+    Object.values(callTracks).forEach(track => track?.stop());
     peers.forEach(peer => peer.connection.close());
+    callPeers.forEach(peer => peer.connection.close());
   });
 
   initialize();

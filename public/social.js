@@ -25,6 +25,7 @@ const state = {
   chatAfter: 0,
   call: {
     status: 'idle',
+    kind: 'audio',
     sessionId: null,
     friendId: null,
     peer: null,
@@ -67,6 +68,8 @@ const state = {
   searchTimer: null,
   searchSequence: 0,
   noticeTimer: null,
+  homeFeed: new URLSearchParams(window.location.search).get('home') === '1',
+  homeFeedResizeObserver: null,
 };
 
 const $ = id => document.getElementById(id);
@@ -484,13 +487,23 @@ function renderList(container, items, emptyText, renderItem) {
   items.forEach(item => container.appendChild(renderItem(item)));
 }
 
+function syncEmbeddedHomeHeight() {
+  document.documentElement.classList.toggle('embedded-home', state.homeFeed);
+  if (!state.homeFeed || window.parent === window) return;
+  requestAnimationFrame(() => {
+    const height = document.querySelector('.messages-main')?.scrollHeight || document.documentElement.scrollHeight;
+    window.parent.postMessage({ type: 'nymix-social-feed-resize', height: height + 12 }, window.location.origin);
+  });
+}
+
 function setPanel(panelName, syncParent = true) {
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${panelName}`));
   document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.panel === panelName));
   document.body.classList.toggle('reels-active', panelName === 'reels');
   if (panelName !== 'reels') pauseActiveReel();
+  syncEmbeddedHomeHeight();
   if (syncParent && ['chat', 'people', 'feed', 'profile'].includes(panelName) && window.parent !== window) {
-    window.parent.postMessage({ type: 'nymix-social-navigation', panel: panelName }, window.location.origin);
+    window.parent.postMessage({ type: 'nymix-social-navigation', panel: panelName, homeFeed: state.homeFeed }, window.location.origin);
   }
   if (panelName === 'feed') loadFeed().catch(error => showNotice(error.message, true));
   if (panelName === 'reels') loadReels().catch(error => showNotice(error.message, true));
@@ -1327,11 +1340,11 @@ function updateCallPanel() {
   const friend = state.friends.find(item => item.id === call.friendId);
   $('call-panel').hidden = !active;
   $('call-title').textContent = call.status === 'incoming'
-    ? `${friend?.name || 'Your friend'} is calling`
-    : call.status === 'dialing' ? `Calling ${friend?.name || 'friend'}`
-      : `${friend?.name || 'Friend'} · audio call`;
+    ? `${friend?.name || 'Your friend'} is calling${call.kind === 'video' ? ' · video' : ' · audio'}`
+    : call.status === 'dialing' ? `${call.kind === 'video' ? 'Video' : 'Audio'} calling ${friend?.name || 'friend'}`
+      : `${friend?.name || 'Friend'} · ${call.kind === 'video' ? 'video' : 'audio'} call`;
   $('call-status').textContent = ({
-    incoming: 'Incoming audio call',
+    incoming: `Incoming ${call.kind} call`,
     dialing: 'Ringing…',
     connecting: 'Connecting…',
     active: 'Connected',
@@ -1340,10 +1353,15 @@ function updateCallPanel() {
   $('call-decline').hidden = call.status !== 'incoming';
   $('call-mute').hidden = call.status !== 'active';
   $('call-end').hidden = call.status === 'incoming' || call.status === 'idle';
+  $('call-camera').hidden = call.status !== 'active' || call.kind !== 'video';
+  $('call-video-grid').hidden = call.kind !== 'video' || call.status === 'incoming' || call.status === 'idle';
   $('call-mute').classList.toggle('muted', call.muted);
   $('call-mute').setAttribute('aria-label', call.muted ? 'Unmute microphone' : 'Mute microphone');
   $('call-mute').innerHTML = `<svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#${call.muted ? 'mic-off' : 'mic'}"></use></svg>`;
   $('chat-call-button').disabled = !state.activeFriend || active;
+  $('chat-video-button').disabled = !state.activeFriend || active;
+  $('chat-call-button').setAttribute('aria-label', `Start audio call${state.activeFriend ? ` with ${state.activeFriend.name}` : ''}`);
+  $('chat-video-button').setAttribute('aria-label', `Start video call${state.activeFriend ? ` with ${state.activeFriend.name}` : ''}`);
 }
 
 async function sendCallSignal(type, payload = {}) {
@@ -1355,7 +1373,7 @@ async function sendCallSignal(type, payload = {}) {
 async function createCallPeer() {
   const sessionId = state.call.sessionId;
   const config = await api('/calls/config');
-  if (state.call.sessionId !== sessionId || state.call.finishing || !state.call.localStream) throw new Error('Audio call was cancelled.');
+  if (state.call.sessionId !== sessionId || state.call.finishing || !state.call.localStream) throw new Error('Call was cancelled.');
   const peer = new RTCPeerConnection({ iceServers: config.iceServers });
   state.call.peer = peer;
   state.call.localStream.getTracks().forEach(track => peer.addTrack(track, state.call.localStream));
@@ -1369,8 +1387,14 @@ async function createCallPeer() {
     sendCallSignal('ice', { candidate }).catch(error => showNotice(error.message, true));
   };
   peer.ontrack = event => {
-    $('remote-audio').srcObject = event.streams[0];
-    $('remote-audio').play().catch(() => showNotice('Tap the audio player to hear your friend.'));
+    const stream = event.streams[0];
+    if (state.call.kind === 'video') {
+      $('remote-video').srcObject = stream;
+      $('remote-video').play().catch(() => showNotice('Tap the video to hear your friend.'));
+    } else {
+      $('remote-audio').srcObject = stream;
+      $('remote-audio').play().catch(() => showNotice('Tap the audio player to hear your friend.'));
+    }
   };
   peer.onconnectionstatechange = () => {
     if (state.call.peer !== peer) return;
@@ -1398,42 +1422,46 @@ async function applyPendingCallCandidates() {
   for (const candidate of candidates) await peer.addIceCandidate(candidate);
 }
 
-async function startAudioCall() {
+async function startCall(kind = 'audio') {
   if (!state.activeFriend || state.call.status !== 'idle') return;
   if (!navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === 'undefined') {
-    showNotice('Audio calling is not supported by this browser.', true);
+    showNotice('Audio and video calls require a supported browser and secure connection.', true);
     return;
   }
+  const sessionId = crypto.randomUUID();
   try {
-    const sessionId = crypto.randomUUID();
     state.call = {
-      status: 'dialing', sessionId, friendId: state.activeFriend.id, peer: null,
+      status: 'dialing', kind, sessionId, friendId: state.activeFriend.id, peer: null,
       localStream: null, pendingCandidates: [], outgoingCandidates: [], signalReady: false,
       muted: false, seenSignals: state.call.seenSignals, offer: null, timeout: null,
     };
     updateCallPanel();
     state.call.timeout = setTimeout(() => {
       if (state.call.sessionId === sessionId && state.call.status === 'dialing') {
-        showNotice('No answer. The audio call ended.');
+        showNotice('No answer. The call ended.');
         finishCall(true);
       }
     }, 60000);
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: kind === 'video' });
     if (state.call.sessionId !== sessionId || state.call.finishing) {
       stream.getTracks().forEach(track => track.stop());
       return;
     }
     state.call.localStream = stream;
+    if (kind === 'video') {
+      $('local-video').srcObject = stream;
+      $('local-video').play().catch(error => console.warn('Local camera preview awaits a play gesture.', error));
+    }
     const peer = await createCallPeer();
     const offer = await peer.createOffer();
     await peer.setLocalDescription(offer);
-    await sendCallSignal('offer', { description: peer.localDescription.toJSON() });
+    await sendCallSignal('offer', { description: peer.localDescription.toJSON(), callType: kind });
     state.call.signalReady = true;
     await flushCallCandidates();
     updateCallPanel();
   } catch (error) {
     if (state.call.sessionId === sessionId && !state.call.finishing) {
-      showNotice(error.message || 'Could not start the audio call.', true);
+      showNotice(error.message || `Could not start the ${kind} call.`, true);
       finishCall(false);
     }
   }
@@ -1442,19 +1470,23 @@ async function startAudioCall() {
 async function acceptAudioCall() {
   if (state.call.status !== 'incoming' || !state.call.offer) return;
   if (!navigator.mediaDevices?.getUserMedia || typeof RTCPeerConnection === 'undefined') {
-    showNotice('Audio calling is not supported by this browser.', true);
+    showNotice('Audio and video calls require a supported browser and secure connection.', true);
     return;
   }
   const sessionId = state.call.sessionId;
   try {
     state.call.status = 'connecting';
     updateCallPanel();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: state.call.kind === 'video' });
     if (state.call.sessionId !== sessionId || state.call.finishing) {
       stream.getTracks().forEach(track => track.stop());
       return;
     }
     state.call.localStream = stream;
+    if (state.call.kind === 'video') {
+      $('local-video').srcObject = stream;
+      $('local-video').play().catch(error => console.warn('Local camera preview awaits a play gesture.', error));
+    }
     const peer = await createCallPeer();
     await peer.setRemoteDescription(state.call.offer);
     await applyPendingCallCandidates();
@@ -1466,7 +1498,7 @@ async function acceptAudioCall() {
     updateCallPanel();
   } catch (error) {
     if (state.call.sessionId === sessionId && !state.call.finishing) {
-      showNotice(error.message || 'Could not join the audio call.', true);
+      showNotice(error.message || `Could not join the ${state.call.kind} call.`, true);
       finishCall(true);
     }
   }
@@ -1485,8 +1517,13 @@ async function finishCall(notifyFriend) {
   call.localStream?.getTracks().forEach(track => track.stop());
   $('remote-audio').pause();
   $('remote-audio').srcObject = null;
+  $('local-video').pause();
+  $('local-video').srcObject = null;
+  $('remote-video').pause();
+  $('remote-video').srcObject = null;
+  if (window.parent !== window) window.parent.postMessage({ type: 'nymix-call-ended' }, window.location.origin);
   state.call = {
-    status: 'idle', sessionId: null, friendId: null, peer: null, localStream: null,
+    status: 'idle', kind: 'audio', sessionId: null, friendId: null, peer: null, localStream: null,
     pendingCandidates: [], outgoingCandidates: [], signalReady: false, muted: false,
     seenSignals: call.seenSignals, offer: null, timeout: null,
   };
@@ -1514,8 +1551,14 @@ async function handleCallSignal(signal) {
     }
     state.call.friendId = friend.id;
     state.call.sessionId = signal.sessionId;
+    state.call.kind = signal.callType === 'video' ? 'video' : 'audio';
     state.call.status = 'incoming';
     state.call.offer = signal.description;
+    if (window.parent !== window) window.parent.postMessage({
+      type: 'nymix-call-alert',
+      name: friend.name,
+      kind: state.call.kind,
+    }, window.location.origin);
     await selectFriend(friend);
     updateCallPanel();
     return;
@@ -1535,7 +1578,7 @@ async function handleCallSignal(signal) {
     } catch (error) { showNotice(error.message, true); }
   } else if (signal.type === 'reject' || signal.type === 'end') {
     await finishCall(false);
-    showNotice(signal.type === 'reject' ? `${friend.name} declined the audio call.` : 'Audio call ended.');
+    showNotice(signal.type === 'reject' ? `${friend.name} declined the call.` : 'Call ended.');
   }
 }
 
@@ -1622,6 +1665,7 @@ async function selectFriend(friend) {
   $('chat-game-button').disabled = false;
   $('chat-listen-button').disabled = false;
   $('chat-call-button').disabled = state.call.status !== 'idle';
+  $('chat-video-button').disabled = state.call.status !== 'idle';
   $('inline-game').hidden = state.activeGameFriendId !== friend.id;
   $('chat-listen-activity').querySelector('.listen-card').hidden = state.activeRoomFriendId !== friend.id;
   setPanel('chat');
@@ -2055,7 +2099,8 @@ $('chat-game-button').addEventListener('click', () => {
   if (state.activeFriend) challengeFriend(state.activeFriend);
 });
 
-$('chat-call-button').addEventListener('click', startAudioCall);
+$('chat-call-button').addEventListener('click', () => startCall('audio'));
+$('chat-video-button').addEventListener('click', () => startCall('video'));
 $('call-accept').addEventListener('click', acceptAudioCall);
 $('call-decline').addEventListener('click', async () => {
   try { await sendCallSignal('reject'); }
@@ -2067,6 +2112,13 @@ $('call-mute').addEventListener('click', () => {
   state.call.muted = !state.call.muted;
   state.call.localStream?.getAudioTracks().forEach(track => { track.enabled = !state.call.muted; });
   updateCallPanel();
+});
+$('call-camera').addEventListener('click', () => {
+  const track = state.call.localStream?.getVideoTracks()[0];
+  if (!track) return;
+  track.enabled = !track.enabled;
+  $('call-camera').setAttribute('aria-label', track.enabled ? 'Turn camera off' : 'Turn camera on');
+  $('call-camera').classList.toggle('muted', !track.enabled);
 });
 $('record-voice').addEventListener('click', toggleVoiceRecording);
 
@@ -2485,6 +2537,12 @@ if (chatListenCard) {
 const initialPanel = new URLSearchParams(window.location.search).get('panel');
 if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed' || initialPanel === 'reels') setPanel(initialPanel, false);
 else if (initialPanel === 'profile') setPanel('profile', false);
+syncEmbeddedHomeHeight();
+if (typeof ResizeObserver !== 'undefined') {
+  state.homeFeedResizeObserver = new ResizeObserver(syncEmbeddedHomeHeight);
+  state.homeFeedResizeObserver.observe(document.querySelector('.messages-main'));
+  state.homeFeedResizeObserver.observe($('feed-list'));
+}
 window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || event.source !== window.parent) return;
   if (event.data?.type === 'nymix-social-open-profile') {
@@ -2502,6 +2560,7 @@ window.addEventListener('message', event => {
     return;
   }
   if (event.data?.type === 'nymix-social-panel' && ['people', 'chat', 'feed', 'reels'].includes(event.data.panel)) {
+    if (typeof event.data.homeFeed === 'boolean') state.homeFeed = event.data.homeFeed;
     setPanel(event.data.panel, false);
   } else if (event.data?.type === 'nymix-social-panel' && event.data.panel === 'profile') {
     openProfile(state.user.id, false);

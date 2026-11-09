@@ -4,7 +4,11 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Nymix Messages</title>
-  <script>if (new URLSearchParams(location.search).has('embed')) document.documentElement.classList.add('embedded-portal');</script>
+  <script>
+    const portalParams = new URLSearchParams(location.search);
+    if (portalParams.has('embed')) document.documentElement.classList.add('embedded-portal');
+    if (portalParams.get('home') === '1') document.documentElement.classList.add('embedded-home');
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -104,9 +108,9 @@
     <section class="panel" id="panel-people">
       <section class="discover-hero" aria-labelledby="discover-title">
         <div class="hero-copy">
-          <p class="eyebrow">YOUR PEOPLE, YOUR PLAYLIST</p>
-          <h1 id="discover-title">Find your people.</h1>
-          <p>Meet music lovers, start a conversation, or challenge a friend to a quick game.</p>
+          <p class="eyebrow">FRIENDS &amp; CONNECTIONS</p>
+          <h1 id="discover-title">Find friends.</h1>
+          <p>Find people you know, send a friend request, then connect through chat and calls.</p>
         </div>
         <div class="hero-decoration" aria-hidden="true"><svg class="ui-icon"><use href="/icons.svg#music"></use></svg><i></i><b></b></div>
         <form id="user-search-form" class="discover-search" role="search">
@@ -129,7 +133,7 @@
           </article>
           <article class="card discovery-card" id="suggestions-card">
             <div class="card-heading suggestion-heading">
-              <div><p class="eyebrow">A GOOD PLACE TO START</p><h2>People you may know</h2><p class="section-caption">Fresh faces and friends of friends, picked for you.</p></div>
+              <div><p class="eyebrow">PEOPLE YOU MAY KNOW</p><h2>Find your next friend</h2><p class="section-caption">Suggestions are ranked by mutual friends and recent activity.</p></div>
               <span class="count" id="suggestion-count">0</span>
             </div>
             <div id="suggestions-list" class="discovery-grid" aria-live="polite">
@@ -185,7 +189,8 @@
             <div class="conversation-actions" aria-label="Things to do together">
               <button type="button" class="button secondary" id="chat-game-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#gamepad"></use></svg> Play</button>
               <button type="button" class="button secondary" id="chat-listen-button" disabled><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#headphones"></use></svg> Listen</button>
-              <button type="button" class="button secondary" id="chat-call-button" disabled aria-label="Start audio call"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#phone"></use></svg><span class="call-button-label">Call</span></button>
+                  <button type="button" class="button secondary" id="chat-call-button" disabled aria-label="Start audio call"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#phone"></use></svg><span class="call-button-label">Call</span></button>
+                  <button type="button" class="button secondary" id="chat-video-button" disabled aria-label="Start video call"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#video"></use></svg><span>Video</span></button>
             </div>
           </header>
           <section class="call-panel" id="call-panel" hidden aria-live="polite">
@@ -193,8 +198,13 @@
             <div class="call-actions">
               <button type="button" class="button primary" id="call-accept" hidden>Join call</button>
               <button type="button" class="button secondary" id="call-mute" hidden aria-label="Mute microphone"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#mic"></use></svg></button>
+              <button type="button" class="button secondary" id="call-camera" hidden aria-label="Turn camera off"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#video"></use></svg></button>
               <button type="button" class="button danger" id="call-end" hidden aria-label="End call"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#phone-off"></use></svg> End</button>
               <button type="button" class="button secondary" id="call-decline" hidden>Decline</button>
+            </div>
+            <div class="call-video-grid" id="call-video-grid" hidden>
+              <video id="local-video" autoplay playsinline muted></video>
+              <video id="remote-video" autoplay playsinline></video>
             </div>
             <audio id="remote-audio" autoplay playsinline></audio>
           </section>

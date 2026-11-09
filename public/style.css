@@ -177,10 +177,23 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .notification-item strong { font-size:11px; }
 .notification-item span, .notification-empty { margin:0; color:var(--text3); font-size:10px; line-height:1.45; }
 .notification-empty { padding:18px 15px; text-align:center; }
+.live-call-alert { position:absolute; top:calc(100% + 9px); right:0; z-index:13; width:min(340px,calc(100vw - 24px)); padding:14px; border:1px solid rgba(194,154,255,.25); border-radius:14px; background:#21182c; box-shadow:0 18px 48px rgba(0,0,0,.5); }
+.live-call-alert[hidden] { display:none !important; }
+.live-call-alert strong { display:block; font-size:12px; }
+.live-call-alert p { margin:4px 0 10px; color:var(--text3); font-size:11px; }
+.live-call-alert button { min-height:32px; padding:0 12px; border:0; border-radius:8px; background:linear-gradient(120deg,#9d65ee,#7044d4); color:white; font:inherit; font-size:11px; font-weight:700; cursor:pointer; }
 
 /* Views */
 .view { display:none; flex:1; overflow-y:auto; padding:0 24px 10px; }
 .view.active { display:block; }
+.home-view.active { padding-top:0; }
+.home-promo-sticky { position:sticky; top:0; z-index:5; margin:0 -24px; padding:0 24px 8px; background:linear-gradient(180deg,#100c19 82%,rgba(16,12,25,.94)); backdrop-filter:blur(16px); }
+.home-view .section-big-title { margin:0; padding:5px 0 9px; font-size:24px; }
+.home-view .hero-banner { height:190px; margin-bottom:0; }
+.home-view .playlist-section[hidden] { display:none; }
+.home-feed-area { min-width:0; }
+.home-feed-area iframe { display:block; width:100%; min-height:800px; border:0; background:transparent; }
+.messages-portal-area { display:flex; min-width:0; min-height:0; flex:1; }
 .view-messages.active { display:flex; min-height:0; flex:1; overflow:hidden; padding:0; }
 .view-messages iframe { width:100%; height:100%; min-height:0; flex:1; border:0; background:var(--bg); }
 .app.social-active { grid-template-columns:var(--sidebar-w) minmax(0,1fr); }
@@ -611,6 +624,9 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   .center-topbar { min-height:44px; padding:8px 14px 4px; }
   .notification-toggle { width:34px; height:34px; }
   .view { min-height:0; padding:0 14px 12px; }
+  .home-promo-sticky { margin:0 -14px; padding:0 14px 8px; }
+  .home-view .section-big-title { font-size:21px; }
+  .home-feed-area iframe { min-height:700px; }
   .view-messages.active { padding:0; }
   .player-bar { grid-template-columns:auto 1fr auto; gap:8px; padding:7px 12px max(7px, env(safe-area-inset-bottom)); }
   .player-left, .player-right { gap:4px; }
@@ -627,6 +643,7 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   .center-topbar { padding-right:10px; padding-left:10px; gap:7px; }
   .center-topbar .nav-arrow { width:26px; height:26px; }
   .view { padding-right:10px; padding-left:10px; }
+  .home-promo-sticky { margin-right:-10px; margin-left:-10px; padding-right:10px; padding-left:10px; }
   .section-big-title { font-size:27px; }
   .hero-banner { height:190px; margin-bottom:18px; }
   .hero-carousel-controls { top:9px; right:9px; gap:5px; padding:4px 6px; }

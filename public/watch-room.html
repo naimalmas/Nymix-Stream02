@@ -16,8 +16,8 @@
   </header>
   <main class="room-shell">
     <header class="room-top">
-      <div><span class="room-code-label" id="room-code">PRIVATE ROOM</span><h1 id="room-title">Movie night</h1></div>
-      <div class="room-top-actions"><button class="button button-quiet" id="copy-invite" type="button">Copy invite</button><button class="button button-quiet" id="end-room" type="button" hidden>End room</button></div>
+      <div><span class="room-code-label" id="room-code">PRIVATE ROOM</span><h1 id="room-title">Movie night</h1><p class="room-invite-note">Anyone with the invite link can join while this room is active.</p></div>
+      <div class="room-top-actions"><button class="button button-quiet" id="copy-invite" type="button">Copy invite link</button><button class="button button-quiet" id="end-room" type="button" hidden>End room</button></div>
     </header>
     <div class="room-layout">
       <section>
@@ -52,7 +52,16 @@
             <button class="button button-quiet" id="stop-sharing" type="button" hidden>Stop sharing</button>
             <label class="button button-quiet file-picker" id="file-picker" hidden for="source-file">Choose local video</label>
           </div>
-          <p class="share-note">Sharing a third-party page requires you to open it yourself and select that browser tab in the share dialog. The portal does not extract or bypass protected streams. Audio is not available as a separate group call yet.</p>
+          <p class="share-note">Sharing a third-party page requires you to open it yourself and select that browser tab in the share dialog. The portal does not extract or bypass protected streams.</p>
+        </section>
+        <section class="call-panel" aria-label="Room voice and video call">
+          <header class="call-heading"><div><h2>Voice &amp; video</h2><p id="call-status">Your mic and camera start off. Turn on either when you are ready.</p></div></header>
+          <div class="call-controls">
+            <button class="button button-quiet" id="toggle-mic" type="button" aria-pressed="false">Turn mic on</button>
+            <button class="button button-quiet" id="toggle-camera" type="button" aria-pressed="false">Turn camera on</button>
+          </div>
+          <div class="call-grid" id="call-grid" aria-live="polite"></div>
+          <p class="call-note">Your browser will ask for microphone or camera permission. You can turn either off at any time.</p>
         </section>
       </section>
       <aside class="chat-panel">

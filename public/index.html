@@ -42,7 +42,7 @@
       <div class="nav-section-label">Menu</div>
       <nav class="nav-menu">
         <a class="nav-link active" data-view="home">
-          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#home"></use></svg> Home
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#home"></use></svg> Feed
         </a>
         <a class="nav-link" data-view="discover">
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#compass"></use></svg> Discover
@@ -51,7 +51,7 @@
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#radio"></use></svg> Browse
         </a>
         <a class="nav-link" href="/movies.html">
-          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg> Movies
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg> Watch party
         </a>
         <a class="nav-link" data-view="liked">
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#heart"></use></svg> Liked
@@ -61,10 +61,7 @@
           <span class="badge-new">new</span>
         </a>
         <a class="nav-link" data-view="add-friend">
-          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> Add friend
-        </a>
-        <a class="nav-link" data-view="feed" aria-label="Feed" title="Feed">
-          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#album"></use></svg> Feed
+          <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#user-plus"></use></svg> Friends
         </a>
         <a class="nav-link" data-view="reels" aria-label="Reels" title="Reels">
           <svg class="nav-icon ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg> Reels
@@ -123,12 +120,18 @@
               <p class="notification-empty">Checking for updates…</p>
             </div>
           </section>
+          <section class="live-call-alert" id="live-call-alert" aria-live="assertive" hidden>
+            <strong id="live-call-title">Incoming call</strong>
+            <p id="live-call-copy"></p>
+            <button type="button" id="live-call-open">Open call</button>
+          </section>
         </div>
       </div>
 
       <!-- Home View -->
-      <div class="view active" id="view-home">
-        <h1 class="section-big-title" id="featured-pack-page-title" aria-live="polite">Nymix Picks</h1>
+      <div class="view active home-view" id="view-home">
+        <div class="home-promo-sticky">
+        <h1 class="section-big-title" id="featured-pack-page-title" aria-live="polite"># Nymix Picks</h1>
 
         <!-- Featured music carousel -->
         <div class="hero-banner" id="hero-banner" role="region" aria-roledescription="carousel" aria-label="Featured music packs">
@@ -158,7 +161,8 @@
         </div>
 
         <!-- Playlist Table -->
-        <div class="playlist-section">
+        </div>
+        <div class="playlist-section" hidden>
           <div class="playlist-header">
             <div><h2 id="featured-heading">Latest from Naim Almas Official</h2><p class="featured-caption">Music videos from the official YouTube channel</p></div>
             <a class="show-all-btn" id="featured-channel-link" href="https://www.youtube.com/@naimalmasofficial" target="_blank" rel="noopener noreferrer">View channel</a>
@@ -178,6 +182,9 @@
               <!-- filled by JS -->
             </tbody>
           </table>
+        </div>
+        <div class="home-feed-area" id="home-feed-area">
+          <iframe id="social-portal" title="Nymix community feed" src="/social.html?embed=1&amp;panel=feed&amp;home=1" allow="autoplay; camera; microphone"></iframe>
         </div>
       </div>
 
@@ -208,7 +215,7 @@
       </div>
 
       <div class="view view-messages" id="view-messages">
-        <iframe id="social-portal" title="Nymix messages and friends" src="/social.html?embed=1&panel=chat" allow="autoplay"></iframe>
+        <div class="messages-portal-area" id="messages-portal-area"></div>
       </div>
 
       <!-- Bottom Player Bar -->

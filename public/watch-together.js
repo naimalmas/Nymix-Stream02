@@ -36,8 +36,9 @@
   function updateSelectionSummary() {
     $('#selection-count').textContent = selectedFriends.size
       ? `${selectedFriends.size} friend${selectedFriends.size === 1 ? '' : 's'} selected`
-      : 'Select friends to start a room.';
-    $('#create-room').disabled = selectedFriends.size === 0;
+      : 'No friends selected? Create a room and share its link.';
+    $('#create-room').textContent = selectedFriends.size ? 'Create room & invite friends' : 'Create room & get link';
+    $('#create-room').disabled = false;
   }
 
   function renderFriends(friends) {
@@ -47,7 +48,7 @@
       if (!availableIds.has(id)) selectedFriends.delete(id);
     }
     if (!friends.length) {
-      list.innerHTML = '<p class="muted">No friends yet. Accept a request here or <a href="/social.html">find friends in Messages</a>.</p>';
+      list.innerHTML = '<p class="muted friends-empty">No friends yet? You can still create a room and share its link with anyone.</p>';
       updateSelectionSummary();
       return;
     }
@@ -143,7 +144,8 @@
         method: 'POST',
         body: JSON.stringify({ friendIds: [...selectedFriends] }),
       });
-      window.location.assign(`/watch-room.html?code=${encodeURIComponent(room.code)}`);
+      const invite = new URLSearchParams({ code: room.code, invite: room.inviteToken });
+      window.location.assign(`/watch-room.html?${invite.toString()}`);
     } catch (error) {
       console.error('Could not create private watch room.', error);
       showMessage(error.message || 'Could not create a room.', true);

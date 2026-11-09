@@ -30,6 +30,8 @@ const S = {
   liked: [],
   notifications: [],
   notificationsBusy: false,
+  notificationsInitialized: false,
+  notificationAudio: null,
 };
 
 // ── Auth Guard ────────────────────────────────────────
@@ -90,6 +92,10 @@ window.onYouTubeIframeAPIReady = () => {
         setTimeout(() => next(), 2500);
       },
     },
+  });
+  $('live-call-open').addEventListener('click', () => {
+    $('live-call-alert').hidden = true;
+    showView('messages');
   });
 };
 
@@ -685,22 +691,31 @@ function showView(name, syncPortal = true) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const v = document.getElementById('view-' + viewName);
   if (v) v.classList.add('active');
-  document.querySelector('.app')?.classList.toggle('social-active', viewName === 'messages');
+  document.querySelector('.app')?.classList.toggle('social-active', viewName === 'messages' || viewName === 'home');
   document.querySelectorAll('.nav-link').forEach(a =>
     a.classList.toggle('active', a.dataset.view === name)
   );
   const titles = {
-    home: "What's hot", discover: 'Discover',
+    home: 'Feed', discover: 'Discover',
     browse: 'Browse', liked: 'Your Library', radio: 'Radio',
-    messages: 'Messages', feed: 'Feed', reels: 'Reels', profile: 'Profile', 'add-friend': 'Add friend',
+    messages: 'Messages', feed: 'Feed', reels: 'Reels', profile: 'Profile', 'add-friend': 'Friends',
   };
   $('view-title').textContent = titles[name] || '';
   if (name === 'home') startFeaturedPackRotation();
   else stopFeaturedPackRotation();
-  if (viewName === 'messages' && syncPortal) {
-    $('social-portal')?.contentWindow?.postMessage({
+  const portal = $('social-portal');
+  if (name === 'home') {
+    portal.style.height = '';
+    $('home-feed-area').appendChild(portal);
+  } else if (viewName === 'messages') {
+    portal.style.height = '100%';
+    $('messages-portal-area').appendChild(portal);
+  }
+  if ((viewName === 'messages' || name === 'home') && syncPortal) {
+    portal?.contentWindow?.postMessage({
       type: 'nymix-social-panel',
-      panel: name === 'add-friend' ? 'people' : ['feed', 'reels', 'profile'].includes(name) ? name : 'chat',
+      panel: name === 'home' ? 'feed' : name === 'add-friend' ? 'people' : ['feed', 'reels', 'profile'].includes(name) ? name : 'chat',
+      homeFeed: name === 'home',
     }, window.location.origin);
   }
 }
@@ -786,9 +801,44 @@ function timeAgo(ts) {
   return Math.floor(d / 86400) + ' days ago';
 }
 
+function notificationAudio() {
+  const AudioContext = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContext) return null;
+  if (!S.notificationAudio) S.notificationAudio = new AudioContext();
+  if (S.notificationAudio.state === 'suspended') {
+    S.notificationAudio.resume().catch(error => console.warn('Could not enable notification sound.', error));
+  }
+  return S.notificationAudio;
+}
+
+function playNotificationSound() {
+  const context = notificationAudio();
+  if (!context) return;
+  const start = context.currentTime;
+  [880, 1175].forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const at = start + index * 0.13;
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.13, at + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.2);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(at);
+    oscillator.stop(at + 0.21);
+  });
+}
+
 function renderNotifications(items) {
   const list = $('notification-list');
   const badge = $('notification-count');
+  if (S.notificationsInitialized) {
+    const previousIds = new Set(S.notifications.map(item => item.id));
+    if (items.some(item => item.type === 'message' && !previousIds.has(item.id))) playNotificationSound();
+  }
+  S.notificationsInitialized = true;
   S.notifications = items;
   badge.hidden = items.length === 0;
   badge.textContent = items.length > 99 ? '99+' : String(items.length);
@@ -864,6 +914,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   if (!requireAuth()) return;
 
   updateUserMenu();
+  document.addEventListener('pointerdown', notificationAudio, { once: true });
+  document.addEventListener('keydown', notificationAudio, { once: true });
   $('hero-slide-prev').addEventListener('click', () => {
     renderFeaturedPack(activeFeaturedPackIndex - 1);
     restartFeaturedPackRotation();
@@ -918,12 +970,24 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   window.addEventListener('message', event => {
     if (event.origin !== window.location.origin || event.source !== $('social-portal')?.contentWindow) return;
-    if (event.data?.type === 'nymix-profile-updated' && event.data.user?.id === user()?.id) {
+    if (event.data?.type === 'nymix-social-feed-resize' &&
+        Number.isFinite(event.data.height) &&
+        $('social-portal').parentElement === $('home-feed-area')) {
+      $('social-portal').style.height = `${Math.max(700, Math.min(event.data.height, 100000))}px`;
+    } else if (event.data?.type === 'nymix-call-alert') {
+      $('live-call-title').textContent = `${event.data.name || 'Your friend'} is calling`;
+      $('live-call-copy').textContent = `${event.data.kind === 'video' ? 'Video' : 'Audio'} call · open Messages to answer`;
+      $('live-call-alert').hidden = false;
+      playNotificationSound();
+      showView('messages');
+    } else if (event.data?.type === 'nymix-call-ended') {
+      $('live-call-alert').hidden = true;
+    } else if (event.data?.type === 'nymix-profile-updated' && event.data.user?.id === user()?.id) {
       localStorage.setItem('nx_user', JSON.stringify(event.data.user));
       updateUserMenu();
     } else if (event.data?.type === 'nymix-social-navigation' &&
         ['messages', 'people', 'feed', 'reels', 'profile'].includes(event.data.panel)) {
-      showView(event.data.panel === 'people' ? 'add-friend' : event.data.panel, false);
+      showView(event.data.panel === 'people' ? 'add-friend' : event.data.panel);
     }
   });
 
@@ -946,7 +1010,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('social-portal')?.addEventListener('load', () => {
     const activeView = document.querySelector('.nav-link.active')?.dataset.view;
-    if (activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'reels' || activeView === 'profile') showView(activeView);
+    if (activeView === 'home' || activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'reels' || activeView === 'profile') showView(activeView);
   });
 
   await loadLiked();

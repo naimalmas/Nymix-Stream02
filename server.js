@@ -499,6 +499,7 @@ app.get('/api/search', async (req, res) => {
       q: `${q} song`,
       type: 'video',
       videoCategoryId: '10',
+      videoEmbeddable: 'true',
       maxResults: '50',
       key,
     });
@@ -783,6 +784,7 @@ app.get('/api/social/reels', userAuth, async (req, res) => {
       type: 'video',
       videoDuration: 'short',
       videoEmbeddable: 'true',
+      videoEmbeddable: 'true',
       order: 'date',
       maxResults: '15',
       key,
@@ -894,10 +896,12 @@ app.get('/api/watch-rooms', userAuth, (req, res) => {
 });
 
 app.post('/api/watch-rooms', userAuth, (req, res) => {
-  const friendIds = Array.isArray(req.body?.friendIds) ? [...new Set(req.body.friendIds)] : [];
-  if (!friendIds.length || friendIds.length > 7 || friendIds.some(id => typeof id !== 'string' || !areFriends(req.user.id, id))) {
-    return res.status(400).json({ error: 'Invite 1–7 friends to create a private room' });
+  const requestedFriendIds = req.body?.friendIds ?? [];
+  if (!Array.isArray(requestedFriendIds) || requestedFriendIds.length > 7 ||
+      requestedFriendIds.some(id => typeof id !== 'string' || !areFriends(req.user.id, id))) {
+    return res.status(400).json({ error: 'Invite up to 7 friends or create a room to share its link' });
   }
+  const friendIds = [...new Set(requestedFriendIds)];
   const social = getSocialState();
   social.watchRooms = social.watchRooms.filter(room => room.createdAt > Date.now() - 24 * 60 * 60 * 1000);
   if (social.watchRooms.length >= 100) return res.status(429).json({ error: 'There are too many active watch rooms; try again later' });
@@ -906,6 +910,7 @@ app.post('/api/watch-rooms', userAuth, (req, res) => {
     code: randomCode(used),
     hostId: req.user.id,
     hostName: req.user.name,
+    inviteToken: crypto.randomBytes(32).toString('hex'),
     invitedUserIds: friendIds,
     members: [{ id: req.user.id, name: req.user.name }],
     source: null,
@@ -916,7 +921,20 @@ app.post('/api/watch-rooms', userAuth, (req, res) => {
   };
   social.watchRooms.push(room);
   wd('social.json', social);
-  res.status(201).json({ code: room.code, hostId: room.hostId, hostName: room.hostName, members: room.members });
+  res.status(201).json({ code: room.code, inviteToken: room.inviteToken, hostId: room.hostId, hostName: room.hostName, members: room.members });
+});
+
+app.post('/api/watch-rooms/:code/invite-link', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
+  if (!room || room.createdAt < Date.now() - 24 * 60 * 60 * 1000 || !watchRoomForMember(room, req.user.id)) {
+    return res.status(404).json({ error: 'Join an active watch room before sharing its link' });
+  }
+  if (!/^[a-f0-9]{64}$/i.test(room.inviteToken || '')) {
+    room.inviteToken = crypto.randomBytes(32).toString('hex');
+    wd('social.json', social);
+  }
+  res.json({ inviteToken: room.inviteToken });
 });
 
 app.post('/api/watch-rooms/:code/join', userAuth, (req, res) => {
@@ -924,22 +942,28 @@ app.post('/api/watch-rooms/:code/join', userAuth, (req, res) => {
   const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || room.createdAt < Date.now() - 24 * 60 * 60 * 1000) return res.status(404).json({ error: 'Watch room not found or expired' });
   if (!watchRoomForMember(room, req.user.id)) {
-    if (!room.invitedUserIds.includes(req.user.id) || !areFriends(room.hostId, req.user.id)) {
-      return res.status(403).json({ error: 'This private room is only for invited friends' });
+    const inviteToken = req.body?.inviteToken;
+    const linkIsValid = typeof inviteToken === 'string' &&
+      /^[a-f0-9]{64}$/i.test(inviteToken) &&
+      /^[a-f0-9]{64}$/i.test(room.inviteToken || '') &&
+      crypto.timingSafeEqual(Buffer.from(inviteToken, 'hex'), Buffer.from(room.inviteToken, 'hex'));
+    const isFriendInvite = room.invitedUserIds.includes(req.user.id) && areFriends(room.hostId, req.user.id);
+    if (!linkIsValid && !isFriendInvite) {
+      return res.status(403).json({ error: 'Ask the host for a valid room invite link' });
     }
     if (room.members.length >= 8) return res.status(409).json({ error: 'This watch room is full' });
     room.members.push({ id: req.user.id, name: req.user.name });
-    room.invitedUserIds = room.invitedUserIds.filter(id => id !== req.user.id);
+    if (isFriendInvite) room.invitedUserIds = room.invitedUserIds.filter(id => id !== req.user.id);
     wd('social.json', social);
   }
-  const { signals, messages, invitedUserIds, ...publicRoom } = room;
+  const { signals, messages, invitedUserIds, inviteToken, ...publicRoom } = room;
   res.json(publicRoom);
 });
 
 app.get('/api/watch-rooms/:code', userAuth, (req, res) => {
   const room = getSocialState().watchRooms.find(item => item.code === req.params.code.toUpperCase());
   if (!room || !watchRoomForMember(room, req.user.id)) return res.status(404).json({ error: 'Join this private watch room first' });
-  const { signals, invitedUserIds, ...publicRoom } = room;
+  const { signals, invitedUserIds, inviteToken, ...publicRoom } = room;
   res.json(publicRoom);
 });
 
@@ -950,7 +974,7 @@ app.put('/api/watch-rooms/:code/source', userAuth, (req, res) => {
   if (req.body?.source === null) {
     room.source = null;
     room.sourceUpdatedAt = Date.now();
-    room.signals = [];
+    room.signals = room.signals.filter(signal => signal.channel === 'call');
     wd('social.json', social);
     return res.json({ source: null, sourceUpdatedAt: room.sourceUpdatedAt });
   }
@@ -958,7 +982,7 @@ app.put('/api/watch-rooms/:code/source', userAuth, (req, res) => {
   const title = typeof req.body.source.title === 'string' ? req.body.source.title.trim().slice(0, 120) : '';
   room.source = { type: req.body.source.type, ...(req.body.source.url ? { url: req.body.source.url } : {}), title };
   room.sourceUpdatedAt = Date.now();
-  room.signals = [];
+  room.signals = room.signals.filter(signal => signal.channel === 'call');
   wd('social.json', social);
   res.json({ source: room.source, sourceUpdatedAt: room.sourceUpdatedAt });
 });
@@ -993,11 +1017,13 @@ app.post('/api/watch-rooms/:code/signals', userAuth, (req, res) => {
   const social = getSocialState();
   const room = social.watchRooms.find(item => item.code === req.params.code.toUpperCase());
   const { to, type, description, candidate } = req.body || {};
+  const channel = req.body?.channel || 'media';
   if (!room || !watchRoomForMember(room, req.user.id) || !watchRoomForMember(room, to) || to === req.user.id) {
     return res.status(404).json({ error: 'Watch room participant not found' });
   }
   if (!['offer', 'answer', 'ice'].includes(type)) return res.status(400).json({ error: 'Invalid connection signal' });
-  const signal = { id: crypto.randomUUID(), from: req.user.id, to, type, createdAt: Date.now() };
+  if (!['media', 'call'].includes(channel)) return res.status(400).json({ error: 'Invalid connection channel' });
+  const signal = { id: crypto.randomUUID(), from: req.user.id, to, type, channel, createdAt: Date.now() };
   if (type === 'offer' || type === 'answer') {
     if (!description || description.type !== type || typeof description.sdp !== 'string' || description.sdp.length > 20000) {
       return res.status(400).json({ error: 'Invalid connection description' });
@@ -1471,8 +1497,6 @@ app.get('/api/calls/signals', userAuth, (req, res) => {
 });
 
 app.get('/api/calls/config', userAuth, (req, res) => {
-  const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
-  const turnUrls = (process.env.TURN_URLS || process.env.TURN_URL || '').split(',').map(url => url.trim()).filter(Boolean);
   res.set('Cache-Control', 'no-store');
   const meteredApp = process.env.METERED_TURN_APP;
   const meteredApiKey = process.env.METERED_TURN_API_KEY;
@@ -1513,6 +1537,8 @@ app.get('/api/calls/config', userAuth, (req, res) => {
       .finally(() => clearTimeout(timeout));
     return;
   }
+  const iceServers = [{ urls: 'stun:stun.l.google.com:19302' }];
+  const turnUrls = (process.env.TURN_URLS || process.env.TURN_URL || '').split(',').map(url => url.trim()).filter(Boolean);
   if (turnUrls.length && process.env.TURN_SECRET) {
     const expiresAt = Math.floor(Date.now() / 1000) + 3600;
     const username = `${expiresAt}:${req.user.id}`;
@@ -1524,10 +1550,11 @@ app.get('/api/calls/config', userAuth, (req, res) => {
 
 app.post('/api/calls/:friendId/signal', userAuth, (req, res) => {
   if (!areFriends(req.user.id, req.params.friendId)) return res.status(403).json({ error: 'Calls are available to friends only' });
-  const { type, sessionId, description, candidate } = req.body;
+  const { type, sessionId, description, candidate, callType = 'audio' } = req.body;
   if (!['offer', 'answer', 'ice', 'reject', 'end'].includes(type)) {
     return res.status(400).json({ error: 'Invalid call signal' });
   }
+  if (!['audio', 'video'].includes(callType)) return res.status(400).json({ error: 'Invalid call type' });
   if (typeof sessionId !== 'string' || !/^[\w-]{8,80}$/.test(sessionId)) {
     return res.status(400).json({ error: 'Invalid call session' });
   }
@@ -1538,6 +1565,7 @@ app.post('/api/calls/:friendId/signal', userAuth, (req, res) => {
     type,
     sessionId,
     ts: Date.now(),
+    ...(type === 'offer' ? { callType } : {}),
   };
   if (type === 'offer' || type === 'answer') {
     if (!description || description.type !== type || typeof description.sdp !== 'string' || description.sdp.length > 20000) {
