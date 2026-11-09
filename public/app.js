@@ -687,7 +687,7 @@ function renderPlayed() {
 
 // ── Views ─────────────────────────────────────────────
 function showView(name, syncPortal = true) {
-  const viewName = name === 'add-friend' || name === 'feed' || name === 'reels' || name === 'profile' ? 'messages' : name;
+  const viewName = name === 'add-friend' || name === 'friend-requests' || name === 'feed' || name === 'reels' || name === 'profile' ? 'messages' : name;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const v = document.getElementById('view-' + viewName);
   if (v) v.classList.add('active');
@@ -698,7 +698,7 @@ function showView(name, syncPortal = true) {
   const titles = {
     home: 'Feed', discover: 'Discover',
     browse: 'Browse', liked: 'Your Library', radio: 'Radio',
-    messages: 'Messages', feed: 'Feed', reels: 'Reels', profile: 'Profile', 'add-friend': 'Friends',
+    messages: 'Messages', feed: 'Feed', reels: 'Reels', profile: 'Profile', 'add-friend': 'Friends', 'friend-requests': 'Friend requests',
   };
   $('view-title').textContent = titles[name] || '';
   if (name === 'home') startFeaturedPackRotation();
@@ -720,7 +720,8 @@ function showView(name, syncPortal = true) {
   if ((viewName === 'messages' || name === 'home') && syncPortal) {
     portal?.contentWindow?.postMessage({
       type: 'nymix-social-panel',
-      panel: name === 'home' ? 'feed' : name === 'add-friend' ? 'people' : ['feed', 'reels', 'profile'].includes(name) ? name : 'chat',
+      panel: name === 'home' ? 'feed' : ['add-friend', 'friend-requests'].includes(name) ? 'people' : ['feed', 'reels', 'profile'].includes(name) ? name : 'chat',
+      focusRequests: name === 'friend-requests',
       homeFeed: name === 'home',
     }, window.location.origin);
   }
@@ -1016,7 +1017,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   });
   $('social-portal')?.addEventListener('load', () => {
     const activeView = document.querySelector('.nav-link.active')?.dataset.view;
-    if (activeView === 'home' || activeView === 'messages' || activeView === 'add-friend' || activeView === 'feed' || activeView === 'reels' || activeView === 'profile') {
+    if (activeView === 'home' || activeView === 'messages' || activeView === 'add-friend' || activeView === 'friend-requests' || activeView === 'feed' || activeView === 'reels' || activeView === 'profile') {
       showView(activeView);
     }
   });

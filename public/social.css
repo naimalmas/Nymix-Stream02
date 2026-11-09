@@ -566,6 +566,7 @@ input:disabled { opacity: .55; }
 .friend-stack .person-name { display: block; min-width: 0; overflow: hidden; overflow-wrap: normal; text-overflow: ellipsis; white-space: nowrap; }
 .friend-stack .person-actions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); justify-content: stretch; gap: 6px; }
 .friend-stack .person-actions .button { min-width: 0; min-height: 32px; overflow: hidden; padding: 6px 8px; text-overflow: ellipsis; white-space: nowrap; }
+.side-card.focus-target { border-color: rgba(173,125,255,.55); box-shadow: 0 0 0 3px rgba(160,106,255,.12), 0 10px 35px rgba(0,0,0,.12); }
 @media (max-width: 1080px) {
   .discover-layout { grid-template-columns: minmax(0,1fr) minmax(290px,320px); gap: 15px; }
 }

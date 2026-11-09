@@ -2562,6 +2562,17 @@ window.addEventListener('message', event => {
   if (event.data?.type === 'nymix-social-panel' && ['people', 'chat', 'feed', 'reels'].includes(event.data.panel)) {
     if (typeof event.data.homeFeed === 'boolean') state.homeFeed = event.data.homeFeed;
     setPanel(event.data.panel, false);
+    if (event.data.panel === 'people' && event.data.focusRequests === true) {
+      requestAnimationFrame(() => {
+        const requestCard = $('friend-requests-card');
+        requestCard?.scrollIntoView({
+          behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+          block: 'center',
+        });
+        requestCard?.classList.add('focus-target');
+        window.setTimeout(() => requestCard?.classList.remove('focus-target'), 1800);
+      });
+    }
   } else if (event.data?.type === 'nymix-social-panel' && event.data.panel === 'profile') {
     openProfile(state.user.id, false);
   }
