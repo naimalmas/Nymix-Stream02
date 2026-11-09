@@ -39,9 +39,15 @@
             <div class="field-help"><strong>Bunny Stream details</strong><span>Open your video under Dashboard → Videos to copy its IDs.</span></div>
             <label>Library ID<input name="libraryId" required inputmode="numeric" placeholder="e.g. 123456" /></label>
             <label>Video ID<input name="videoId" required placeholder="Bunny Stream video ID" /></label>
-            <label>Thumbnail image URL<input name="thumbnailUrl" type="url" required maxlength="2048" placeholder="https://your-cdn.com/movie-poster.jpg" /></label>
-            <p class="field-note">Use a public HTTPS image URL. Bunny Stream thumbnails can be copied from your video library.</p>
+            <label class="upload-field">Movie thumbnail<input name="thumbnailFile" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
+            <p class="field-note">Choose a JPG, PNG, or WebP image from your device. It will be resized before saving.</p>
             <img class="thumbnail-preview" id="thumbnail-preview" alt="Thumbnail preview" hidden />
+            <div class="field-help"><strong>Homepage promo trailer</strong><span>Upload the trailer to Bunny Stream, then enter its video IDs below.</span></div>
+            <div class="form-row">
+              <label>Promo Library ID<input name="promoLibraryId" inputmode="numeric" placeholder="Optional" /></label>
+              <label>Promo Video ID<input name="promoVideoId" placeholder="Optional" /></label>
+            </div>
+            <label class="consent"><input name="featured" type="checkbox" /><span>Feature this movie and its trailer on the homepage.</span></label>
             <label class="consent"><input name="licensed" type="checkbox" required /><span>I own this video or have permission to publish it.</span></label>
             <p class="form-message" id="form-message" role="status" hidden></p>
             <button class="button button-primary submit-button" type="submit"><span aria-hidden="true">＋</span> Publish movie</button>

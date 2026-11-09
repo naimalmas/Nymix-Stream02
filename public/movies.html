@@ -26,18 +26,19 @@
     <section class="hero" id="home">
       <div class="hero-shade"></div>
       <div class="hero-copy">
-        <p class="eyebrow"><span class="live-dot"></span> NYMIX CINEMA</p>
-        <h1>Your next story<br /><span>starts here.</span></h1>
-        <p class="hero-description">Explore the collection and settle in for a great movie experience.</p>
+        <p class="eyebrow"><span class="live-dot"></span><span id="hero-label">NYMIX CINEMA</span></p>
+        <h1 id="hero-title">Your next story<br /><span>starts here.</span></h1>
+        <p class="hero-description" id="hero-description">Explore the collection and settle in for a great movie experience.</p>
         <div class="hero-actions">
+          <button class="button button-primary" type="button" id="hero-watch-promo" hidden><span aria-hidden="true">▶</span> Watch trailer</button>
           <a class="button button-primary" href="#catalog"><span aria-hidden="true">▶</span> Explore movies</a>
         </div>
-        <p class="hero-note">Choose a movie and start watching.</p>
+        <p class="hero-note" id="hero-note">Choose a movie and start watching.</p>
       </div>
-      <div class="hero-art" aria-hidden="true">
-        <div class="poster poster-back"></div>
-        <div class="poster poster-front"><span>YOUR<br />NEXT<br /><b>STORY</b></span></div>
-        <span class="art-spark spark-one">✦</span><span class="art-spark spark-two">✧</span>
+      <div class="hero-art" id="hero-art" aria-hidden="true">
+        <img class="hero-promo-image" id="hero-promo-image" alt="" />
+        <div class="hero-promo-empty"><span>NYMIX</span><strong>CINEMA</strong></div>
+        <div class="hero-promo-caption" id="hero-promo-caption" hidden></div>
       </div>
       <div class="hero-bottom"><span>NYMIX CINEMA</span><span>Stories worth watching</span></div>
     </section>
@@ -66,6 +67,10 @@
   <dialog class="movie-dialog" id="movie-dialog" aria-labelledby="dialog-title">
     <button class="dialog-close" type="button" id="dialog-close" aria-label="Close movie">×</button>
     <div id="movie-detail"></div>
+  </dialog>
+  <dialog class="promo-dialog" id="promo-dialog" aria-label="Movie promo trailer">
+    <button class="dialog-close" type="button" id="promo-close" aria-label="Close trailer">×</button>
+    <div id="promo-player"></div>
   </dialog>
 
   <div class="toast" id="toast" role="status" aria-live="polite"></div>

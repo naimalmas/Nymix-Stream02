@@ -223,13 +223,26 @@ app.get('/api/movies', (req, res) => {
   })) : []);
 });
 
+const isValidMovieThumbnail = value => {
+  if (typeof value !== 'string' || value.length > 700000) return false;
+  const match = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(value);
+  if (!match) return false;
+  const image = Buffer.from(match[2], 'base64');
+  if (!image.length || image.length > 512 * 1024 || image.toString('base64') !== match[2]) return false;
+  if (match[1] === 'jpeg') return image[0] === 0xff && image[1] === 0xd8 && image[2] === 0xff;
+  if (match[1] === 'png') return image.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]));
+  return image.toString('ascii', 0, 4) === 'RIFF' && image.toString('ascii', 8, 12) === 'WEBP';
+};
+
 app.post('/api/admin/movies', adminAuth, (req, res) => {
-  const { title, year, genre, description, libraryId, videoId } = req.body && typeof req.body === 'object' ? req.body : {};
+  const { title, year, genre, description, libraryId, videoId, promoLibraryId, promoVideoId, featured } = req.body && typeof req.body === 'object' ? req.body : {};
   const cleanTitle = typeof title === 'string' ? title.trim() : '';
   const cleanGenre = typeof genre === 'string' ? genre.trim() : '';
   const cleanDescription = typeof description === 'string' ? description.trim() : '';
   const cleanLibraryId = typeof libraryId === 'string' ? libraryId.trim() : '';
   const cleanVideoId = typeof videoId === 'string' ? videoId.trim() : '';
+  const cleanPromoLibraryId = typeof promoLibraryId === 'string' ? promoLibraryId.trim() : '';
+  const cleanPromoVideoId = typeof promoVideoId === 'string' ? promoVideoId.trim() : '';
   const allowedGenres = new Set(['Drama', 'Adventure', 'Comedy', 'Thriller', 'Documentary', 'Other']);
   if (!cleanTitle || cleanTitle.length > 80) return res.status(400).json({ error: 'Movie title is required and must be 80 characters or fewer' });
   if (!Number.isInteger(year) || year < 1888 || year > 2100) return res.status(400).json({ error: 'Enter a valid release year' });
@@ -238,16 +251,15 @@ app.post('/api/admin/movies', adminAuth, (req, res) => {
   if (!/^[A-Za-z0-9_-]+$/.test(cleanLibraryId) || !/^[A-Za-z0-9_-]+$/.test(cleanVideoId)) {
     return res.status(400).json({ error: 'Enter valid Bunny Stream Library and Video IDs' });
   }
-  if (typeof req.body.thumbnailUrl !== 'string' || req.body.thumbnailUrl.length > 2048) {
-    return res.status(400).json({ error: 'A thumbnail image URL is required and must be 2048 characters or fewer' });
+  if (!isValidMovieThumbnail(req.body.thumbnailData)) {
+    return res.status(400).json({ error: 'Upload a valid JPG, PNG, or WebP thumbnail no larger than 512 KB' });
   }
-  let thumbnailUrl;
-  try {
-    thumbnailUrl = new URL(req.body.thumbnailUrl.trim());
-    if (thumbnailUrl.protocol !== 'https:' || thumbnailUrl.username || thumbnailUrl.password) throw new Error('Unsupported thumbnail URL');
-  } catch {
-    return res.status(400).json({ error: 'Enter a valid HTTPS thumbnail image URL' });
+  if ((cleanPromoLibraryId && !cleanPromoVideoId) || (!cleanPromoLibraryId && cleanPromoVideoId) ||
+      (cleanPromoLibraryId && (!/^[A-Za-z0-9_-]+$/.test(cleanPromoLibraryId) || !/^[A-Za-z0-9_-]+$/.test(cleanPromoVideoId)))) {
+    return res.status(400).json({ error: 'Enter both valid Bunny Stream promo Library and Video IDs' });
   }
+  if (featured !== undefined && typeof featured !== 'boolean') return res.status(400).json({ error: 'Homepage feature selection is invalid' });
+  if (featured && !cleanPromoLibraryId) return res.status(400).json({ error: 'Add a promo trailer before featuring this movie' });
   const config = rd('config.json');
   const catalog = Array.isArray(config.movieCatalog) ? config.movieCatalog : [];
   if (catalog.length >= 500) return res.status(409).json({ error: 'Movie catalog is full' });
@@ -257,13 +269,32 @@ app.post('/api/admin/movies', adminAuth, (req, res) => {
     year,
     genre: cleanGenre,
     description: cleanDescription,
-    thumbnailUrl: thumbnailUrl.toString(),
+    thumbnailData: req.body.thumbnailData,
     embedUrl: `https://iframe.mediadelivery.net/embed/${encodeURIComponent(cleanLibraryId)}/${encodeURIComponent(cleanVideoId)}`,
+    ...(cleanPromoLibraryId ? {
+      promoEmbedUrl: `https://iframe.mediadelivery.net/embed/${encodeURIComponent(cleanPromoLibraryId)}/${encodeURIComponent(cleanPromoVideoId)}`,
+    } : {}),
+    featured: featured === true,
     demo: false,
   };
-  config.movieCatalog = [...catalog, movie];
+  config.movieCatalog = [...(movie.featured ? catalog.map(item => ({ ...item, featured: false })) : catalog), movie];
   wd('config.json', config);
   res.status(201).json(movie);
+});
+
+app.put('/api/admin/movies/:movieId/feature', adminAuth, (req, res) => {
+  if (!req.body || typeof req.body.featured !== 'boolean') return res.status(400).json({ error: 'Homepage feature selection is invalid' });
+  const config = rd('config.json');
+  const catalog = Array.isArray(config.movieCatalog) ? config.movieCatalog : [];
+  const movie = catalog.find(item => item.id === req.params.movieId);
+  if (!movie) return res.status(404).json({ error: 'Movie not found' });
+  if (req.body.featured && !movie.promoEmbedUrl) return res.status(409).json({ error: 'Add a promo trailer before featuring this movie' });
+  config.movieCatalog = catalog.map(item => ({
+    ...item,
+    featured: req.body.featured ? item.id === movie.id : item.id === movie.id ? false : item.featured === true,
+  }));
+  wd('config.json', config);
+  res.json({ id: movie.id, featured: req.body.featured });
 });
 
 app.delete('/api/admin/movies/:movieId', adminAuth, (req, res) => {

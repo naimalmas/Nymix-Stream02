@@ -6,6 +6,7 @@
   const filters = $('#genre-filters');
   const search = $('#movie-search');
   const movieDialog = $('#movie-dialog');
+  const promoDialog = $('#promo-dialog');
   let selectedGenre = 'All';
   let watchlistOnly = false;
   let toastTimer;
@@ -68,8 +69,9 @@
       ? 'No movies match your search.'
       : 'No movies are available yet. Check back soon.';
     grid.innerHTML = visible.map(movie => {
-      const poster = movie.thumbnailUrl
-        ? `<img class="movie-poster" src="${escapeHtml(movie.thumbnailUrl)}" alt="" loading="lazy" />`
+      const thumbnail = movie.thumbnailData || movie.thumbnailUrl;
+      const poster = thumbnail
+        ? `<img class="movie-poster" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" />`
         : '<span class="poster-placeholder" aria-hidden="true">N</span>';
       return `<article class="movie-card">
         <button class="movie-open" type="button" data-movie="${escapeHtml(movie.id)}" aria-label="Watch ${escapeHtml(movie.title)}">
@@ -93,6 +95,7 @@
       const catalog = await response.json();
       if (!Array.isArray(catalog)) throw new Error('Movie catalog response is invalid');
       movies = catalog.filter(movie => movie && typeof movie.id === 'string' && typeof movie.title === 'string' && typeof movie.embedUrl === 'string');
+      renderFeaturedMovie(movies.find(movie => movie.featured && movie.promoEmbedUrl));
       watchlist = watchlist.filter(id => movies.some(movie => movie.id === id));
       save(WATCHLIST_KEY, watchlist);
       renderFilters();
@@ -107,6 +110,7 @@
 
   function showMovie(movie) {
     const inList = watchlist.includes(movie.id);
+    const thumbnail = movie.thumbnailData || movie.thumbnailUrl;
     const video = movie.embedUrl
       ? `<section class="player-shell" id="player-shell" aria-label="Movie player">
           <div class="player-toolbar"><span class="player-brand"><i></i> NYMIX CINEMA</span><button class="fullscreen-button" id="fullscreen-player" type="button" aria-label="Enter fullscreen">⛶</button></div>
@@ -117,7 +121,7 @@
     $('#movie-detail').innerHTML = `<div class="detail-content">
       ${video}
       <div class="detail-heading"><div><p class="eyebrow">${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</p><h2 id="dialog-title">${escapeHtml(movie.title)}</h2><p>${escapeHtml(movie.description || '')}</p></div>
-        ${movie.thumbnailUrl ? `<img class="detail-poster" src="${escapeHtml(movie.thumbnailUrl)}" alt="${escapeHtml(movie.title)} poster" />` : ''}
+        ${thumbnail ? `<img class="detail-poster" src="${escapeHtml(thumbnail)}" alt="${escapeHtml(movie.title)} poster" />` : ''}
       </div>
       <div class="detail-actions">
         <button class="button button-quiet" id="toggle-watchlist" type="button">${inList ? '✓ Remove from My List' : '＋ Add to My List'}</button>
@@ -141,6 +145,30 @@
       showToast(inList ? 'Removed from My List.' : 'Added to My List.');
     });
     movieDialog.showModal();
+  }
+
+  function renderFeaturedMovie(movie) {
+    const hero = $('#hero-art');
+    const image = $('#hero-promo-image');
+    const watchButton = $('#hero-watch-promo');
+    if (!movie) {
+      hero.classList.remove('has-promo');
+      image.removeAttribute('src');
+      return;
+    }
+    $('#hero-label').textContent = 'NOW FEATURING';
+    $('#hero-title').textContent = movie.title;
+    $('#hero-description').textContent = movie.description || `${movie.genre} · ${movie.year}`;
+    $('#hero-note').textContent = `${movie.genre} · ${movie.year}`;
+    $('#hero-promo-caption').textContent = movie.title;
+    $('#hero-promo-caption').hidden = false;
+    image.src = movie.thumbnailData || movie.thumbnailUrl || '';
+    hero.classList.add('has-promo');
+    watchButton.hidden = false;
+    watchButton.onclick = () => {
+      $('#promo-player').innerHTML = `<iframe class="promo-video" src="${escapeHtml(movie.promoEmbedUrl)}" title="${escapeHtml(`${movie.title} trailer`)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe>`;
+      promoDialog.showModal();
+    };
   }
 
   filters.addEventListener('click', event => {
@@ -167,6 +195,8 @@
   });
   $('#dialog-close').addEventListener('click', () => movieDialog.close());
   movieDialog.addEventListener('close', () => { $('#movie-detail').replaceChildren(); });
+  $('#promo-close').addEventListener('click', () => promoDialog.close());
+  promoDialog.addEventListener('close', () => { $('#promo-player').replaceChildren(); });
   document.addEventListener('fullscreenchange', () => {
     const fullscreenButton = $('#fullscreen-player');
     if (fullscreenButton) fullscreenButton.setAttribute('aria-label', document.fullscreenElement ? 'Exit fullscreen' : 'Enter fullscreen');
