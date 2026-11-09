@@ -75,8 +75,9 @@ if (!isVercel) {
   }
 }
 
-const database = isVercel && process.env.DATABASE_URL
-  ? new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 3 })
+const databaseUrl = process.env.DATABASE_URL_POOLED || process.env.DATABASE_URL;
+const database = isVercel && databaseUrl
+  ? new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false }, max: 1 })
   : null;
 let databaseInitialization;
 

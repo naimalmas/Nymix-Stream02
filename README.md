@@ -35,7 +35,8 @@ Deploy the GitHub repository as an Express project. Vercel serves files from `pu
 
 Configure these environment variables for Production, Preview, and Development as needed:
 
-- `DATABASE_URL`: PostgreSQL connection string. The database role must be allowed to create a table and read/write rows.
+- `DATABASE_URL_POOLED` (recommended): pooled PostgreSQL connection string for serverless requests. If unset, the app falls back to `DATABASE_URL`, which must be allowed to create a table and read/write rows.
+- `DATABASE_URL`: PostgreSQL connection string. Used as a fallback when `DATABASE_URL_POOLED` is not configured.
 - `JWT_SECRET`: a private, persistent random secret (at least 32 random bytes recommended).
 - `SUPER_ADMIN_PASSWORD`: initial Super Admin password, at least 12 characters.
 - `YOUTUBE_API_KEY`: YouTube Data API key for full search. Search returns up to 50 songs per page with a “Load more songs” button. Without a key, only matching featured songs are available.
