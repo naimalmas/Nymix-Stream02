@@ -18,6 +18,8 @@ The home page also rotates between Nymix Picks and Prokash Hits featured music p
 
 Open `/movies.html` to start a private Watch Together room. Sign in, select 1–7 accepted friends, and create a room; only those invited friends can join. Room chat, membership, playback selection, and WebRTC signaling are stored in the existing local JSON state or PostgreSQL state on Vercel.
 
+The shared sign-in page supports Google sign-in when `GOOGLE_CLIENT_ID` is configured. Create a Google OAuth Web client, add each site's origin (for example `https://your-domain.vercel.app` and `http://localhost:3000`) to its authorized JavaScript origins, then set the client ID in the deployment environment. Existing email/password sign-in remains available. Incoming and outgoing friend requests also appear on `/movies.html`; accept or decline incoming requests there before inviting those friends to a room.
+
 The room host can share a browser tab/screen, paste a YouTube or Google Drive playback link, or play a local video from their device and relay it directly to room members. Screen/file sharing uses browser WebRTC peer connections rather than uploading the movie to the server; peer connectivity depends on the participants' networks, and restrictive networks may need a TURN service. Audio/video calling is not included in this watch-room version. Google Drive/YouTube embeds use each provider's official player and do not provide synchronized transport controls. Only use videos you own or have permission to share; protected third-party streams are not extracted or bypassed.
 
 ## Local development
@@ -39,6 +41,7 @@ Configure these environment variables for Production, Preview, and Development a
 - `JWT_SECRET`: a private, persistent random secret (at least 32 random bytes recommended).
 - `SUPER_ADMIN_PASSWORD`: initial Super Admin password, at least 12 characters.
 - `YOUTUBE_API_KEY`: YouTube Data API key for full search. Search returns up to 50 songs per page with a “Load more songs” button. Without a key, only matching featured songs are available.
+- `GOOGLE_CLIENT_ID` (optional): Google OAuth Web client ID for Google sign-in. Configure the matching authorized JavaScript origins in Google Cloud Console.
 - `TURN_URLS` (optional): comma-separated TURN server URLs for audio calls. Without a TURN server, calls rely on STUN and may not connect on restrictive networks.
 - `TURN_SECRET` (optional): shared secret for Coturn REST API credentials. Configure it with `TURN_URLS` to issue short-lived TURN credentials to signed-in users.
 

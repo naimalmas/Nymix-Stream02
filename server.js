@@ -374,6 +374,99 @@ app.post('/api/auth/login', async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+app.get('/api/auth/google/config', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ clientId: process.env.GOOGLE_CLIENT_ID || '' });
+});
+
+app.post('/api/auth/google', async (req, res) => {
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const credential = req.body?.credential;
+  if (!clientId) return res.status(503).json({ error: 'Google sign-in is not configured' });
+  if (typeof credential !== 'string' || credential.length > 8192) {
+    return res.status(400).json({ error: 'Invalid Google credential' });
+  }
+
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    let response;
+    try {
+      response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`, {
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (!response.ok) return res.status(401).json({ error: 'Google sign-in could not be verified' });
+    const identity = await response.json();
+    const email = typeof identity.email === 'string' ? identity.email.trim().toLowerCase() : '';
+    const verified = identity.email_verified === true || identity.email_verified === 'true';
+    const expiresAt = Number(identity.exp);
+    if (
+      identity.aud !== clientId ||
+      !['accounts.google.com', 'https://accounts.google.com'].includes(identity.iss) ||
+      typeof identity.sub !== 'string' ||
+      !email ||
+      !verified ||
+      !Number.isFinite(expiresAt) ||
+      expiresAt <= Math.floor(Date.now() / 1000)
+    ) {
+      return res.status(401).json({ error: 'Google account details could not be verified' });
+    }
+
+    const users = rd('users.json');
+    let user = users.find(account => account.googleId === identity.sub);
+    if (user && String(user.email || '').toLowerCase() !== email) {
+      return res.status(409).json({ error: 'The Google account email has changed. Contact support to update your account.' });
+    }
+    if (user?.banned) return res.status(403).json({ error: 'Account banned' });
+    if (!user) {
+      user = users.find(account => String(account.email || '').toLowerCase() === email);
+      if (user?.banned) return res.status(403).json({ error: 'Account banned' });
+      if (user && user.role !== 'user') {
+        return res.status(403).json({ error: 'Google sign-in is only available for user accounts' });
+      }
+      if (user?.googleId && user.googleId !== identity.sub) {
+        return res.status(409).json({ error: 'This account is linked to a different Google account' });
+      }
+      if (!user) {
+        user = {
+          id: `u_${crypto.randomUUID()}`,
+          name: typeof identity.name === 'string' && identity.name.trim()
+            ? identity.name.trim().slice(0, 80)
+            : email.split('@')[0],
+          email,
+          password: '',
+          role: 'user',
+          avatar: '',
+          createdAt: new Date().toISOString(),
+          banned: false,
+          totalPlays: 0,
+          bio: '',
+          googleId: identity.sub,
+        };
+        users.push(user);
+        const liked = rd('liked.json');
+        liked[user.id] = [];
+        wd('liked.json', liked);
+      } else {
+        user.googleId = identity.sub;
+      }
+      wd('users.json', users);
+    }
+
+    const token = jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role }, SECRET, { expiresIn: '7d' });
+    res.json({
+      token,
+      user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar || '' },
+    });
+  } catch (error) {
+    console.error('Google sign-in verification failed:', error.message);
+    res.status(502).json({ error: 'Could not verify Google sign-in right now' });
+  }
+});
+
 app.get('/api/auth/me', auth, (req, res) => {
   const users = rd('users.json');
   const user  = users.find(u => u.id === req.user.id);

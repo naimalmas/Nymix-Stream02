@@ -37,6 +37,8 @@ input::placeholder{color:#4b5563}
 .divider{text-align:center;color:#4b5563;font-size:12px;margin:16px 0;position:relative}
 .divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:rgba(255,255,255,0.1)}
 .divider::before{left:0}.divider::after{right:0}
+#google-button{display:flex;justify-content:center;min-height:40px}
+#google-msg[hidden]{display:none}
 </style>
 </head>
 <body>
@@ -53,6 +55,9 @@ input::placeholder{color:#4b5563}
       <div class="tab active" id="tab-login" onclick="switchTab('login')">Login</div>
       <div class="tab" id="tab-register" onclick="switchTab('register')">Register</div>
     </div>
+    <div id="google-button"></div>
+    <div class="msg" id="google-msg" role="status" hidden></div>
+    <div class="divider">or continue with email</div>
 
     <!-- Login Form -->
     <div id="form-login">
@@ -82,11 +87,17 @@ function switchTab(t){
 }
 function dashboardPath(role){
   if(new URLSearchParams(window.location.search).get('next')==='movies' && (role==='admin'||role==='super_admin')) return '/movie-admin.html';
+  if(new URLSearchParams(window.location.search).get('next')==='movies' && role==='user') return '/movies.html';
   if(role==='super_admin') return '/super-admin/';
   if(role==='admin') return '/admin/';
   return '/';
 }
 function showMsg(id,text,type){const el=document.getElementById(id);el.textContent=text;el.className='msg '+(type||'err');}
+function completeLogin(data){
+  localStorage.setItem('nx_token',data.token);
+  localStorage.setItem('nx_user',JSON.stringify(data.user));
+  window.location.href=dashboardPath(data.user.role);
+}
 async function doLogin(){
   const email=document.getElementById('l-email').value.trim();
   const pass=document.getElementById('l-pass').value;
@@ -95,10 +106,8 @@ async function doLogin(){
     const r=await fetch(API+'/auth/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email,password:pass})});
     const d=await r.json();
     if(!r.ok){showMsg('l-msg',d.error);return;}
-    localStorage.setItem('nx_token',d.token);
-    localStorage.setItem('nx_user',JSON.stringify(d.user));
     showMsg('l-msg','Login successful! Redirecting...','ok');
-    setTimeout(()=>{ window.location.href = dashboardPath(d.user.role); },800);
+    setTimeout(()=>completeLogin(d),800);
   }catch(e){showMsg('l-msg','Server connection failed. Is the server running?');}
 }
 async function doRegister(){
@@ -111,11 +120,42 @@ async function doRegister(){
     const r=await fetch(API+'/auth/register',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,email,password:pass})});
     const d=await r.json();
     if(!r.ok){showMsg('r-msg',d.error);return;}
-    localStorage.setItem('nx_token',d.token);
-    localStorage.setItem('nx_user',JSON.stringify(d.user));
     showMsg('r-msg','Account created! Redirecting...','ok');
-    setTimeout(()=>{ window.location.href=dashboardPath(d.user.role); },800);
+    setTimeout(()=>completeLogin(d),800);
   }catch(e){showMsg('r-msg','Server connection failed. Is the server running?');}
+}
+async function initGoogleSignIn(){
+  const button=document.getElementById('google-button');
+  try{
+    const configResponse=await fetch(API+'/auth/google/config');
+    const config=await configResponse.json();
+    if(!configResponse.ok) throw new Error(config.error||'Could not load Google sign-in settings');
+    if(!config.clientId){showMsg('google-msg','Google sign-in is not configured yet.');return;}
+    const script=document.createElement('script');
+    script.src='https://accounts.google.com/gsi/client';
+    script.async=true;
+    script.onload=()=>{
+      if(!window.google?.accounts?.id){showMsg('google-msg','Google sign-in could not be loaded.');return;}
+      window.google.accounts.id.initialize({
+        client_id:config.clientId,
+        callback:async response=>{
+          if(!response.credential){showMsg('google-msg','Google did not return a sign-in credential.');return;}
+          try{
+            const result=await fetch(API+'/auth/google',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({credential:response.credential})});
+            const data=await result.json();
+            if(!result.ok) throw new Error(data.error||'Google sign-in failed');
+            completeLogin(data);
+          }catch(error){showMsg('google-msg',error.message||'Google sign-in failed.');}
+        }
+      });
+      window.google.accounts.id.renderButton(button,{type:'standard',theme:'filled_black',size:'large',text:'continue_with',shape:'rectangular',width:Math.max(180,Math.min(320,document.querySelector('.card').clientWidth-80))});
+    };
+    script.onerror=()=>showMsg('google-msg','Google sign-in could not be loaded. Check your connection.');
+    document.head.appendChild(script);
+  }catch(error){
+    console.error('Could not initialize Google sign-in.',error);
+    showMsg('google-msg',error.message||'Could not load Google sign-in.');
+  }
 }
 // Enter key
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const f=document.getElementById('form-login').style.display!=='none'; f?doLogin():doRegister(); } });
@@ -123,6 +163,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Enter'){ const f=document.g
 const u=JSON.parse(localStorage.getItem('nx_user')||'null');
 const t=localStorage.getItem('nx_token');
 if(u && t){ window.location.href = dashboardPath(u.role); }
+initGoogleSignIn();
 </script>
 </body>
 </html>
