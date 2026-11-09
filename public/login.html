@@ -34,6 +34,9 @@ input::placeholder{color:#4b5563}
 .msg{font-size:13px;text-align:center;padding:10px;border-radius:10px;margin-top:12px;min-height:20px}
 .msg.err{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)}
 .msg.ok{background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}
+.privacy-link{position:fixed;right:0;bottom:16px;left:0;z-index:2;text-align:center;font-size:12px}
+.privacy-link a{color:#c4b5fd;text-decoration:none}
+.privacy-link a:hover{text-decoration:underline}
 .divider{text-align:center;color:#4b5563;font-size:12px;margin:16px 0;position:relative}
 .divider::before,.divider::after{content:'';position:absolute;top:50%;width:42%;height:1px;background:rgba(255,255,255,0.1)}
 .divider::before{left:0}.divider::after{right:0}
@@ -77,6 +80,7 @@ input::placeholder{color:#4b5563}
     </div>
   </div>
 </div>
+<footer class="privacy-link"><a href="/privacy.html">Privacy Policy</a></footer>
 <script>
 const API = '/api';
 function switchTab(t){
