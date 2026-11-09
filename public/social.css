@@ -33,7 +33,7 @@ html.embedded-portal .messages-main > .notice { margin:0; padding:3px 12px; }
 html.embedded-portal .inbox-layout { min-height:0; height:100%; border:0; border-radius:0; box-shadow:none; }
 html.embedded-home, html.embedded-home body { height:auto; min-height:0; overflow:visible; }
 html.embedded-home body.messages-page { display:block; }
-html.embedded-home .messages-main { display:block; height:auto; min-height:0; overflow:visible; padding:0; }
+html.embedded-home body.messages-page .messages-main { display:block; width:100%; height:auto; min-height:0; flex:none; overflow:visible; margin:0; padding:14px 8px 24px; }
 .messages-page .messages-main { display: flex; width: 100%; max-width: none; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; margin: 0; padding: 18px clamp(18px, 4vw, 56px) 24px; }
 .messages-main > .notice { flex: 0 0 auto; }
 .messages-main > #panel-chat.active { display: flex; min-height: 0; flex: 1; flex-direction: column; }
@@ -79,7 +79,7 @@ h3 { font-size: 14px; margin: 0 0 12px; }
 .notice.error { color: var(--red); }
 .panel { display: none; }
 .panel.active { display: block; }
-.feed-layout { display: grid; grid-template-columns: minmax(0, 620px) minmax(220px, 280px); justify-content: center; align-items: start; gap: 24px; }
+.feed-layout { display: grid; width: min(100%, 980px); grid-template-columns: minmax(0, 620px) minmax(220px, 280px); justify-content: center; align-items: start; gap: clamp(16px, 2vw, 24px); margin: 0 auto; }
 .feed-main, .feed-list { display: grid; min-width: 0; gap: 16px; }
 .feed-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 2px 2px; }
 .feed-heading h1 { margin-bottom: 5px; font-size: clamp(26px, 4vw, 36px); }
@@ -131,7 +131,7 @@ h3 { font-size: 14px; margin: 0 0 12px; }
 .reel-details span, .reel-details a { color: var(--muted); font-size: 10px; }
 .reel-details a { width: fit-content; color: var(--purple-light); text-decoration: none; }
 .reels-more { align-self: center; }
-.feed-sidebar { position: sticky; top: 16px; }
+.feed-sidebar { position: static; }
 .feed-sidebar h2 { margin-bottom: 8px; }
 .feed-sidebar .button { margin-top: 6px; }
 .feed-composer .button:disabled { opacity: .48; cursor: not-allowed; }
