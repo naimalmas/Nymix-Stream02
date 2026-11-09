@@ -4,6 +4,7 @@
   const form = $('#movie-form');
   const list = $('#movie-list');
   let movies = [];
+  let editingMovieId = null;
 
   function escapeHtml(value) {
     return String(value).replace(/[&<>"']/g, char => ({
@@ -64,8 +65,66 @@
       ${(movie.thumbnailData || movie.thumbnailUrl) ? `<img class="movie-art" src="${escapeHtml(movie.thumbnailData || movie.thumbnailUrl)}" alt="" loading="lazy" />` : '<div class="movie-art" aria-hidden="true">N</div>'}
       <div class="movie-details"><strong>${escapeHtml(movie.title)}${movie.featured ? ' <span class="featured-badge">FEATURED</span>' : ''}</strong><span>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</span></div>
       ${movie.promoEmbedUrl ? `<button class="feature-button" type="button" data-feature="${escapeHtml(movie.id)}" data-featured="${movie.featured ? 'true' : 'false'}">${movie.featured ? 'Remove promo' : 'Feature on home'}</button>` : ''}
+      <button class="edit-button" type="button" data-edit="${escapeHtml(movie.id)}">Edit</button>
       <button class="delete-button" type="button" data-delete="${escapeHtml(movie.id)}" aria-label="Remove ${escapeHtml(movie.title)}">Remove</button>
     </article>`).join('');
+  }
+
+  function getEmbedIds(embedUrl) {
+    try {
+      const url = new URL(embedUrl);
+      const parts = url.pathname.split('/').filter(Boolean);
+      if (url.hostname !== 'iframe.mediadelivery.net' || parts.length < 3 || parts[0] !== 'embed') return ['', ''];
+      return [decodeURIComponent(parts[1]), decodeURIComponent(parts[2])];
+    } catch (error) {
+      console.error('Could not read the saved Bunny Stream video IDs.', error);
+      return ['', ''];
+    }
+  }
+
+  function setEditingMovie(movie) {
+    editingMovieId = movie.id;
+    const [libraryId, videoId] = getEmbedIds(movie.embedUrl);
+    const [promoLibraryId, promoVideoId] = movie.promoEmbedUrl
+      ? getEmbedIds(movie.promoEmbedUrl)
+      : ['', ''];
+    form.elements.title.value = movie.title;
+    form.elements.year.value = movie.year;
+    form.elements.genre.value = movie.genre;
+    form.elements.description.value = movie.description || '';
+    form.elements.libraryId.value = libraryId;
+    form.elements.videoId.value = videoId;
+    form.elements.promoLibraryId.value = promoLibraryId;
+    form.elements.promoVideoId.value = promoVideoId;
+    form.elements.featured.checked = movie.featured === true;
+    form.elements.thumbnailFile.required = false;
+    form.elements.licensed.required = false;
+    $('#license-consent').hidden = true;
+    $('#thumbnail-preview').src = movie.thumbnailData || movie.thumbnailUrl || '';
+    $('#thumbnail-preview').hidden = !$('#thumbnail-preview').src;
+    $('#thumbnail-note').textContent = 'Choose a new JPG, PNG, or WebP image to replace the current thumbnail, or leave empty to keep it.';
+    $('#form-eyebrow').textContent = 'EDIT CONTENT';
+    $('#form-title').textContent = 'Edit movie';
+    form.querySelector('[type=submit]').innerHTML = 'Save changes';
+    $('#cancel-edit').hidden = false;
+    $('#form-message').hidden = true;
+    $('.form-panel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function resetMovieForm() {
+    editingMovieId = null;
+    form.reset();
+    form.elements.thumbnailFile.required = false;
+    form.elements.licensed.required = true;
+    $('#license-consent').hidden = false;
+    $('#thumbnail-preview').hidden = true;
+    $('#thumbnail-preview').removeAttribute('src');
+    $('#thumbnail-note').textContent = 'Choose a JPG, PNG, or WebP image from your device. It will be resized before saving.';
+    $('#form-eyebrow').textContent = 'NEW CONTENT';
+    $('#form-title').textContent = 'Add a movie';
+    form.querySelector('[type=submit]').innerHTML = '<span aria-hidden="true">＋</span> Publish movie';
+    $('#cancel-edit').hidden = true;
+    $('#form-message').hidden = true;
   }
 
   async function checkAdmin() {
@@ -104,11 +163,16 @@
       showFormMessage('Library ID and Video ID can only contain letters, numbers, underscores, and hyphens.');
       return;
     }
-    if (!(thumbnailFile instanceof File) || !thumbnailFile.size || !['image/jpeg', 'image/png', 'image/webp'].includes(thumbnailFile.type)) {
+    const hasThumbnailFile = thumbnailFile instanceof File && thumbnailFile.size > 0;
+    if (!hasThumbnailFile && !editingMovieId) {
       showFormMessage('Choose a JPG, PNG, or WebP thumbnail image.');
       return;
     }
-    if (thumbnailFile.size > 10 * 1024 * 1024) {
+    if (hasThumbnailFile && !['image/jpeg', 'image/png', 'image/webp'].includes(thumbnailFile.type)) {
+      showFormMessage('Choose a JPG, PNG, or WebP thumbnail image.');
+      return;
+    }
+    if (hasThumbnailFile && thumbnailFile.size > 10 * 1024 * 1024) {
       showFormMessage('The source thumbnail must be 10 MB or smaller.');
       return;
     }
@@ -124,41 +188,46 @@
     const submit = form.querySelector('[type=submit]');
     submit.disabled = true;
     $('#form-message').hidden = true;
-    try {
-      thumbnailData = await makeThumbnail(thumbnailFile);
-    } catch (error) {
-      console.error('Could not process the uploaded thumbnail.', error);
-      showFormMessage(error.message || 'Could not process the thumbnail image.');
-      submit.disabled = false;
-      return;
+    if (hasThumbnailFile) {
+      try {
+        thumbnailData = await makeThumbnail(thumbnailFile);
+      } catch (error) {
+        console.error('Could not process the uploaded thumbnail.', error);
+        showFormMessage(error.message || 'Could not process the thumbnail image.');
+        submit.disabled = false;
+        return;
+      }
     }
     try {
-      const response = await authorizedFetch('/api/admin/movies', {
-        method: 'POST',
-        body: JSON.stringify({
-          title: String(data.get('title')).trim(),
-          year: Number(data.get('year')),
-          genre: String(data.get('genre')),
-          description: String(data.get('description')).trim(),
-          libraryId,
-          videoId,
-          thumbnailData,
-          promoLibraryId,
-          promoVideoId,
-          featured,
-        }),
-      });
+      const payload = {
+        title: String(data.get('title')).trim(),
+        year: Number(data.get('year')),
+        genre: String(data.get('genre')),
+        description: String(data.get('description')).trim(),
+        libraryId,
+        videoId,
+        promoLibraryId,
+        promoVideoId,
+        featured,
+      };
+      if (thumbnailData) payload.thumbnailData = thumbnailData;
+      const isEditing = Boolean(editingMovieId);
+      const response = await authorizedFetch(
+        isEditing ? `/api/admin/movies/${encodeURIComponent(editingMovieId)}` : '/api/admin/movies',
+        { method: isEditing ? 'PUT' : 'POST', body: JSON.stringify(payload) },
+      );
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || 'Could not add the movie.');
-      movies = [...(result.featured ? movies.map(movie => ({ ...movie, featured: false })) : movies), result];
+      if (!response.ok) throw new Error(result.error || (isEditing ? 'Could not save movie changes.' : 'Could not add the movie.'));
+      if (result.featured) movies = movies.map(movie => ({ ...movie, featured: false }));
+      movies = isEditing
+        ? movies.map(movie => movie.id === result.id ? result : movie)
+        : [...movies, result];
       renderMovies();
-      form.reset();
-      $('#thumbnail-preview').hidden = true;
-      $('#thumbnail-preview').removeAttribute('src');
-      showFormMessage('Movie published to the public catalog.', true);
+      resetMovieForm();
+      showFormMessage(isEditing ? 'Movie changes saved.' : 'Movie published to the public catalog.', true);
     } catch (error) {
-      console.error('Could not add movie.', error);
-      showFormMessage(error.message || 'Could not publish the movie.');
+      console.error(editingMovieId ? 'Could not update movie.' : 'Could not add movie.', error);
+      showFormMessage(error.message || (editingMovieId ? 'Could not save movie changes.' : 'Could not publish the movie.'));
     } finally {
       submit.disabled = false;
     }
@@ -228,6 +297,12 @@
   });
 
   list.addEventListener('click', async event => {
+    const editButton = event.target.closest('[data-edit]');
+    if (editButton) {
+      const movie = movies.find(item => item.id === editButton.dataset.edit);
+      if (movie) setEditingMovie(movie);
+      return;
+    }
     const featureButton = event.target.closest('[data-feature]');
     if (featureButton) {
       const movie = movies.find(item => item.id === featureButton.dataset.feature);
@@ -267,6 +342,7 @@
     }
   });
 
+  $('#cancel-edit').addEventListener('click', resetMovieForm);
   $('#refresh').addEventListener('click', loadMovies);
   $('#logout').addEventListener('click', () => {
     localStorage.removeItem('nx_token');

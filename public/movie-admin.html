@@ -27,7 +27,7 @@
 
       <section class="dashboard-grid">
         <section class="panel form-panel">
-          <div class="panel-heading"><div><p class="eyebrow">NEW CONTENT</p><h2>Add a movie</h2></div><span class="step-badge">01</span></div>
+          <div class="panel-heading"><div><p class="eyebrow" id="form-eyebrow">NEW CONTENT</p><h2 id="form-title">Add a movie</h2></div><span class="step-badge">01</span></div>
           <p class="panel-intro">Upload your authorized video to Bunny Stream first, then enter its video details here.</p>
           <form id="movie-form">
             <label>Movie title<input name="title" required maxlength="80" placeholder="Enter movie title" /></label>
@@ -39,8 +39,8 @@
             <div class="field-help"><strong>Bunny Stream details</strong><span>Open your video under Dashboard → Videos to copy its IDs.</span></div>
             <label>Library ID<input name="libraryId" required inputmode="numeric" placeholder="e.g. 123456" /></label>
             <label>Video ID<input name="videoId" required placeholder="Bunny Stream video ID" /></label>
-            <label class="upload-field">Movie thumbnail<input name="thumbnailFile" type="file" accept="image/jpeg,image/png,image/webp" required /></label>
-            <p class="field-note">Choose a JPG, PNG, or WebP image from your device. It will be resized before saving.</p>
+            <label class="upload-field">Movie thumbnail<input name="thumbnailFile" type="file" accept="image/jpeg,image/png,image/webp" /></label>
+            <p class="field-note" id="thumbnail-note">Choose a JPG, PNG, or WebP image from your device. It will be resized before saving.</p>
             <img class="thumbnail-preview" id="thumbnail-preview" alt="Thumbnail preview" hidden />
             <div class="field-help"><strong>Homepage promo trailer</strong><span>Upload the trailer to Bunny Stream, then enter its video IDs below.</span></div>
             <div class="form-row">
@@ -48,9 +48,10 @@
               <label>Promo Video ID<input name="promoVideoId" placeholder="Optional" /></label>
             </div>
             <label class="consent"><input name="featured" type="checkbox" /><span>Feature this movie and its trailer on the homepage.</span></label>
-            <label class="consent"><input name="licensed" type="checkbox" required /><span>I own this video or have permission to publish it.</span></label>
+            <label class="consent" id="license-consent"><input name="licensed" type="checkbox" required /><span>I own this video or have permission to publish it.</span></label>
             <p class="form-message" id="form-message" role="status" hidden></p>
             <button class="button button-primary submit-button" type="submit"><span aria-hidden="true">＋</span> Publish movie</button>
+            <button class="button button-muted cancel-edit-button" id="cancel-edit" type="button" hidden>Cancel editing</button>
           </form>
         </section>
 
