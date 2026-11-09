@@ -584,3 +584,22 @@ main { max-width:1420px; padding:16px clamp(12px,2.4vw,27px) 28px; }
 @media(max-width:390px) {
   .friends-panel .friends-list { grid-template-columns:minmax(0,1fr); }
 }
+
+.desktop-portal-link { display:inline-flex; align-items:center; min-height:36px; padding:0 12px; border:1px solid #ffffff18; border-radius:9px; color:#d5c8e3; font-size:12px; font-weight:700; white-space:nowrap; }
+.desktop-portal-link:hover { border-color:#c45ed45c; background:#a92cb51a; color:#fff; }
+.mobile-portal-link { display:none; }
+.topbar nav[aria-label="Watch navigation"] a:first-child { color:#e7b6e6; }
+.topbar nav[aria-label="Watch navigation"] a:first-child:hover { color:#fff; }
+.topbar nav[aria-label="Watch navigation"] { gap:12px; font-size:12px; }
+@media(max-width:800px) {
+  .desktop-portal-link { display:none; }
+  .mobile-portal-link { display:inline; color:#e7b6e6; white-space:nowrap; }
+}
+@media(max-width:600px) {
+  .topbar nav[aria-label="Watch navigation"] { gap:8px; font-size:10px; }
+}
+@media(max-width:380px) {
+  .mobile-nav { gap:6px; }
+  .mobile-nav a { font-size:8px; }
+  .topbar nav[aria-label="Watch navigation"] { gap:6px; font-size:8px; }
+}
