@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b0c12" />
   <meta name="description" content="A private Nymix Watch Together room." />
   <title>Private room · Nymix Watch</title>
-  <link rel="stylesheet" href="/watch-together.css?v=20261109-1856" />
+  <link rel="stylesheet" href="/watch-together.css?v=20261109-1902" />
 </head>
 <body>
   <header class="topbar">
@@ -36,7 +36,7 @@
     <div class="room-layout">
       <section>
         <div class="watch-panel">
-          <div class="watch-stage" id="watch-stage">
+          <div class="watch-stage" id="watch-stage">`r`n            <div class="stage-overlay-btns" id="stage-overlay-btns">`r`n              <button class="stage-overlay-btn" id="pip-btn" title="Picture in Picture" hidden>⧉</button>`r`n              <button class="stage-overlay-btn" id="fullscreen-btn" title="Fullscreen (F)">⛶</button>`r`n            </div>
             <div class="watch-empty" id="watch-empty"><span>▶</span><strong>Settle in together</strong><p>The room host can share a screen, add an official video link, or play a local video.</p></div>
           </div>
           <div class="stage-status"><span class="live-pill">PRIVATE WATCH ROOM</span><span id="playback-status">Waiting for the host to start playback</span></div>
@@ -88,6 +88,6 @@
   </main>
   <div class="room-toast" id="room-toast" role="status" aria-live="polite"></div>
   <video id="local-video" playsinline muted hidden></video>
-  <script src="/watch-room.js?v=20261109-1856"></script>
+  <script src="/watch-room.js?v=20261109-1902"></script>
 </body>
 </html>

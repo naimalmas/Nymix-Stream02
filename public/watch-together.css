@@ -603,3 +603,87 @@ main { max-width:1420px; padding:16px clamp(12px,2.4vw,27px) 28px; }
   .mobile-nav a { font-size:8px; }
   .topbar nav[aria-label="Watch navigation"] { gap:6px; font-size:8px; }
 }
+
+.guest-join-shell { max-width:620px; padding-top:clamp(36px,10vh,100px); }
+.guest-join-card { padding:clamp(22px,5vw,40px); border:1px solid #ffffff18; border-radius:18px; background:radial-gradient(ellipse at 90% 0,#85336b2b,transparent 55%),linear-gradient(145deg,#1b1927,#14131d); box-shadow:0 24px 70px #0005; }
+.guest-join-card h1 { margin:0; font:800 clamp(26px,5vw,36px)/1.15 Manrope,sans-serif; letter-spacing:-1px; }
+.guest-join-card > p:not(.eyebrow) { color:#b5b1c0; font-size:14px; line-height:1.65; }
+.guest-join-form { display:grid; gap:9px; margin-top:22px; }
+.guest-join-form label { color:#ded9e7; font-size:12px; font-weight:700; }
+.guest-join-form input { width:100%; min-height:46px; padding:0 13px; border:1px solid #ffffff20; border-radius:10px; outline:0; background:#0f0d17; color:var(--text); }
+.guest-join-form input:focus { border-color:#d66ad2; box-shadow:0 0 0 3px #be44bb24; }
+.guest-join-form .button { justify-self:start; margin-top:5px; }
+.guest-join-error { min-height:0; margin:0; color:#ffb1ba; font-size:12px; }
+.guest-join-error:empty { display:none; }
+.guest-join-card .guest-join-note { margin:17px 0 0; padding-top:13px; border-top:1px solid #ffffff12; color:#858194; font-size:11px; }
+@media(max-width:600px) {
+  .guest-join-shell { padding-top:24px; }
+  .guest-join-card { padding:22px 18px; }
+}
+
+/* ── Video Player Enhancements ───────────────────── */
+.watch-stage { cursor:pointer; }
+.watch-stage:fullscreen, .watch-stage:-webkit-full-screen { 
+  min-height:100vh; aspect-ratio:unset; border-radius:0;
+}
+.watch-stage:fullscreen iframe,
+.watch-stage:fullscreen video,
+.watch-stage:-webkit-full-screen iframe,
+.watch-stage:-webkit-full-screen video {
+  min-height:100vh; height:100vh; aspect-ratio:unset;
+}
+.stage-overlay-btns {
+  position:absolute; z-index:5; right:10px; bottom:10px;
+  display:flex; gap:7px; opacity:0; transition:opacity .22s;
+}
+.watch-stage:hover .stage-overlay-btns,
+.watch-stage:focus-within .stage-overlay-btns { opacity:1; }
+.stage-overlay-btn {
+  width:36px; height:36px; display:grid; place-items:center;
+  border:1px solid #ffffff30; border-radius:8px;
+  background:#0b0c12cc; backdrop-filter:blur(6px);
+  color:#fff; font-size:16px; cursor:pointer; transition:.18s;
+}
+.stage-overlay-btn:hover { background:#ffffff25; transform:scale(1.08); }
+.video-controls-overlay {
+  position:absolute; z-index:4; inset:auto 0 0;
+  padding:38px 14px 10px;
+  background:linear-gradient(transparent,#000000cc);
+  opacity:0; transition:opacity .25s; pointer-events:none;
+}
+.video-controls-overlay.visible {
+  opacity:1; pointer-events:auto;
+}
+.video-controls-row {
+  display:flex; align-items:center; gap:10px;
+}
+.video-ctrl-btn {
+  min-width:34px; height:34px; display:grid; place-items:center;
+  border:0; border-radius:7px; background:transparent;
+  color:#fff; font-size:18px; cursor:pointer; transition:.15s; flex:0 0 auto;
+}
+.video-ctrl-btn:hover { background:#ffffff20; }
+.video-time { color:#ffffffcc; font-size:11px; white-space:nowrap; flex:0 0 auto; }
+.video-volume { flex:0 0 auto; display:flex; align-items:center; gap:6px; }
+.video-volume-slider {
+  width:70px; height:4px; cursor:pointer; accent-color:#f04e83;
+}
+.video-progress-wrap {
+  position:absolute; left:0; right:0; bottom:50px;
+  padding:0 14px; opacity:0; transition:opacity .25s; pointer-events:none;
+}
+.video-controls-overlay.visible + .video-progress-wrap,
+.video-controls-overlay.visible ~ .video-progress-wrap { opacity:1; pointer-events:auto; }
+.video-progress {
+  width:100%; height:4px; cursor:pointer; accent-color:#f04e83;
+  border-radius:2px;
+}
+.play-pause-center {
+  position:absolute; z-index:6; top:50%; left:50%; transform:translate(-50%,-50%);
+  width:60px; height:60px; display:grid; place-items:center;
+  border:2px solid #ffffff60; border-radius:50%;
+  background:#0b0c12aa; backdrop-filter:blur(8px);
+  color:#fff; font-size:26px; cursor:pointer;
+  opacity:0; transition:opacity .25s; pointer-events:none;
+}
+.watch-stage:hover .play-pause-center { opacity:1; pointer-events:auto; }
