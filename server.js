@@ -256,7 +256,7 @@ const validateMovieInput = (body, existingMovie = null) => {
   if (thumbnailData !== undefined && !isValidMovieThumbnail(thumbnailData)) {
     return { error: 'Upload a valid JPG, PNG, or WebP thumbnail no larger than 512 KB' };
   }
-  if (!thumbnailData && !existingMovie && !isValidMovieThumbnail(thumbnailData)) {
+  if (!thumbnailData && !existingMovie?.thumbnailData && !existingMovie?.thumbnailUrl) {
     return { error: 'Upload a valid JPG, PNG, or WebP thumbnail no larger than 512 KB' };
   }
   if ((cleanPromoLibraryId && !cleanPromoVideoId) || (!cleanPromoLibraryId && cleanPromoVideoId) ||

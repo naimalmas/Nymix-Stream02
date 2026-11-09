@@ -61,13 +61,16 @@
     $('#movie-count').textContent = String(movies.length);
     $('#list-message').hidden = movies.length > 0;
     $('#list-message').textContent = 'No movies have been added yet.';
-    list.innerHTML = movies.map(movie => `<article class="movie-row">
-      ${(movie.thumbnailData || movie.thumbnailUrl) ? `<img class="movie-art" src="${escapeHtml(movie.thumbnailData || movie.thumbnailUrl)}" alt="" loading="lazy" />` : '<div class="movie-art" aria-hidden="true">N</div>'}
-      <div class="movie-details"><strong>${escapeHtml(movie.title)}${movie.featured ? ' <span class="featured-badge">FEATURED</span>' : ''}</strong><span>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</span></div>
-      ${movie.promoEmbedUrl ? `<button class="feature-button" type="button" data-feature="${escapeHtml(movie.id)}" data-featured="${movie.featured ? 'true' : 'false'}">${movie.featured ? 'Remove promo' : 'Feature on home'}</button>` : ''}
-      <button class="edit-button" type="button" data-edit="${escapeHtml(movie.id)}">Edit</button>
-      <button class="delete-button" type="button" data-delete="${escapeHtml(movie.id)}" aria-label="Remove ${escapeHtml(movie.title)}">Remove</button>
-    </article>`).join('');
+    list.innerHTML = movies.map(movie => {
+      const thumbnail = movie.thumbnailData || movie.thumbnailUrl;
+      return `<article class="movie-row">
+        ${thumbnail ? `<img class="movie-art" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" />` : '<div class="movie-art" aria-hidden="true">N</div>'}
+        <div class="movie-details"><strong>${escapeHtml(movie.title)}${movie.featured ? ' <span class="featured-badge">FEATURED</span>' : ''}</strong><span>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</span>${thumbnail ? '' : '<small class="thumbnail-missing">Thumbnail needs upload</small>'}</div>
+        ${movie.promoEmbedUrl ? `<button class="feature-button" type="button" data-feature="${escapeHtml(movie.id)}" data-featured="${movie.featured ? 'true' : 'false'}">${movie.featured ? 'Remove promo' : 'Feature on home'}</button>` : ''}
+        <button class="edit-button" type="button" data-edit="${escapeHtml(movie.id)}">Edit</button>
+        <button class="delete-button" type="button" data-delete="${escapeHtml(movie.id)}" aria-label="Remove ${escapeHtml(movie.title)}">Remove</button>
+      </article>`;
+    }).join('');
   }
 
   function getEmbedIds(embedUrl) {
@@ -97,12 +100,16 @@
     form.elements.promoLibraryId.value = promoLibraryId;
     form.elements.promoVideoId.value = promoVideoId;
     form.elements.featured.checked = movie.featured === true;
-    form.elements.thumbnailFile.required = false;
+    const hasThumbnail = Boolean(movie.thumbnailData || movie.thumbnailUrl);
+    form.elements.thumbnailFile.required = !hasThumbnail;
     form.elements.licensed.required = false;
     $('#license-consent').hidden = true;
-    $('#thumbnail-preview').src = movie.thumbnailData || movie.thumbnailUrl || '';
-    $('#thumbnail-preview').hidden = !$('#thumbnail-preview').src;
-    $('#thumbnail-note').textContent = 'Choose a new JPG, PNG, or WebP image to replace the current thumbnail, or leave empty to keep it.';
+    const thumbnailPreview = $('#thumbnail-preview');
+    thumbnailPreview.src = hasThumbnail ? (movie.thumbnailData || movie.thumbnailUrl) : '';
+    thumbnailPreview.hidden = !hasThumbnail;
+    $('#thumbnail-note').textContent = hasThumbnail
+      ? 'Choose a new JPG, PNG, or WebP image to replace the current thumbnail, or leave empty to keep it.'
+      : 'This movie has no saved thumbnail. Choose an image before saving.';
     $('#form-eyebrow').textContent = 'EDIT CONTENT';
     $('#form-title').textContent = 'Edit movie';
     form.querySelector('[type=submit]').innerHTML = 'Save changes';
