@@ -9,56 +9,77 @@
   <link rel="stylesheet" href="/watch-together.css" />
 </head>
 <body>
-  <header class="topbar">
-    <a class="brand" href="/movies.html"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></a>
-    <nav><a href="#rooms">My rooms</a><a href="#invite">Friends</a></nav>
-    <div class="account"><span id="account-name"></span><button class="button button-quiet" id="sign-out" type="button">Sign out</button></div>
-  </header>
-  <main>
-    <section class="hero">
-      <div class="hero-glow"></div>
-      <div class="hero-copy">
-        <p class="eyebrow"><span class="live-dot"></span> PRIVATE ROOMS · BETTER TOGETHER</p>
-        <h1>Movie night,<br /><span>your people.</span></h1>
-        <p>Start a private room, invite friends, share a screen or play a link together. Chat while you watch.</p>
-        <a class="button button-primary" href="#invite">＋ Create a room</a>
-      </div>
-      <div class="hero-art" aria-hidden="true"><div class="screen-card"><span>▶</span><strong>YOUR ROOM</strong><small>friends · film · chat</small></div><i>✦</i></div>
-      <div class="hero-foot"><span>WATCH TOGETHER</span><span>PRIVATE BY DESIGN</span></div>
-    </section>
+  <aside class="sidebar" aria-label="Watch navigation">
+    <a class="brand" href="/movies.html" aria-label="Nymix Watch home"><span class="brand-mark">N</span><span class="sidebar-brand-name">Nymix</span></a>
+    <p class="sidebar-label">MENU</p>
+    <nav class="side-nav" aria-label="Main navigation">
+      <a class="side-link active" href="#home" aria-label="Home"><span aria-hidden="true">⌂</span><small>Home</small></a>
+      <a class="side-link" href="#rooms" aria-label="My rooms"><span aria-hidden="true">▣</span><small>Rooms</small></a>
+      <a class="side-link" href="#invite" aria-label="Friends"><span aria-hidden="true">♧</span><small>Friends</small></a>
+    </nav>
+    <div class="sidebar-bottom"><span class="sidebar-private" aria-hidden="true">✦</span><small>Private<br />by design</small></div>
+  </aside>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="mobile-brand brand" href="/movies.html"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></a>
+      <nav class="mobile-nav" aria-label="Main navigation"><a href="#rooms">Rooms</a><a href="#invite">Friends</a></nav>
+      <div class="topbar-title"><span class="topbar-kicker">YOUR PRIVATE WATCH SPACE</span><strong>Watch Together</strong></div>
+      <div class="account"><span class="account-avatar" aria-hidden="true">N</span><span id="account-name"></span><a class="button button-primary top-create" href="#invite">＋ Start a room</a><button class="button button-quiet" id="sign-out" type="button">Sign out</button></div>
+    </header>
+    <main id="home">
+      <section class="watch-layout" aria-label="Your watch parties">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-glow"></div>
+          <div class="hero-art">
+            <figure class="hangout-photo">
+              <img src="https://images.unsplash.com/photo-1528605248644-14dd04022da1?auto=format&amp;fit=crop&amp;w=1200&amp;q=85" alt="Friends spending time together around a table" fetchpriority="high" />
+              <figcaption class="photo-caption"><span>WATCH · CHAT · HANG OUT</span><strong>Good times are better together.</strong></figcaption>
+            </figure>
+          </div>
+          <div class="hero-copy">
+            <p class="eyebrow">WATCH TOGETHER</p>
+            <h1 id="hero-title">Watch, chat,<br /><span>hang out.</span></h1>
+            <p>From movie nights to long chats and casual adda, bring your people into one private room.</p>
+            <div class="hero-actions"><a class="button button-primary" href="#invite">＋ Create a room</a><a class="button button-quiet hero-secondary" href="#rooms">My rooms</a></div>
+          </div>
+          <div class="hero-foot"><span>PRIVATE ROOMS</span><span>MADE FOR FRIENDS</span></div>
+        </section>
 
-    <section class="content-grid">
-      <section class="panel friends-panel" id="invite">
-        <header class="section-heading"><div><p class="eyebrow">YOUR PEOPLE</p><h2>Invite friends</h2><p>Rooms are private. Only friends you invite can join.</p></div><span class="section-icon">✦</span></header>
-        <div class="friends-list" id="friends-list"><p class="muted">Loading your friends…</p></div>
-        <div class="panel-footer"><span id="selection-count">Select friends to start a room.</span><button class="button button-primary" id="create-room" type="button" disabled>Create private room</button></div>
-        <p class="form-message" id="page-message" role="status" hidden></p>
+        <section class="panel friends-panel" id="invite" aria-labelledby="invite-panel-title">
+          <header class="invite-heading"><div><p class="eyebrow">YOUR PEOPLE</p><h2 id="invite-panel-title">Invite friends</h2><p>Choose who to bring along.</p></div><span class="section-icon" aria-hidden="true">✦</span></header>
+          <div class="friends-list" id="friends-list"><p class="muted">Loading your friends…</p></div>
+          <div class="panel-footer"><span id="selection-count">Select friends to start a room.</span><button class="button button-primary" id="create-room" type="button" disabled>Create private room</button></div>
+          <p class="form-message" id="page-message" role="status" hidden></p>
+        </section>
       </section>
 
-      <section class="panel rooms-panel" id="rooms">
-        <header class="section-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2>My rooms</h2><p>Invites and rooms you have joined.</p></div><button class="button button-quiet" id="refresh-rooms" type="button">Refresh</button></header>
+      <section class="rooms-section" id="rooms" aria-labelledby="rooms-title">
+        <header class="options-heading rooms-heading"><div><p class="eyebrow">PICK UP WHERE YOU LEFT OFF</p><h2 id="rooms-title">My rooms</h2></div><button class="button button-quiet refresh-rooms" id="refresh-rooms" type="button">Refresh</button></header>
         <div class="room-list" id="room-list"><p class="muted">Loading rooms…</p></div>
       </section>
-    </section>
 
-    <section class="panel requests-panel" id="requests-panel" hidden>
-      <header class="section-heading">
-        <div><p class="eyebrow">STAY CONNECTED</p><h2>Friend requests</h2><p>Accept a request to invite that friend to a watch room.</p></div>
-        <button class="button button-quiet" id="refresh-friends" type="button">Refresh</button>
-      </header>
-      <div class="request-list" id="friend-requests" aria-live="polite"></div>
-      <p class="form-message" id="request-message" role="status" hidden></p>
-    </section>
+      <section class="panel requests-panel" id="requests-panel" aria-labelledby="requests-title" hidden>
+        <header class="section-heading">
+          <div><p class="eyebrow">STAY CONNECTED</p><h2 id="requests-title">Friend requests</h2><p>Accept a request to invite that friend to a watch room.</p></div>
+          <button class="button button-quiet" id="refresh-friends" type="button">Refresh</button>
+        </header>
+        <div class="request-list" id="friend-requests" aria-live="polite"></div>
+        <p class="form-message" id="request-message" role="status" hidden></p>
+      </section>
 
-    <section class="feature-row">
-      <article><span>▣</span><div><strong>Share a screen</strong><p>Broadcast a browser tab or screen. Everyone watches the host's shared view.</p></div></article>
-      <article><span>↗</span><div><strong>Bring a link</strong><p>Use official YouTube or Google Drive playback links.</p></div></article>
-      <article><span>▰</span><div><strong>Play a local video</strong><p>The host can play a video from their device and share it live with the room.</p></div></article>
-      <article><span>☰</span><div><strong>Chat as you watch</strong><p>Room chat is for you and the friends invited to that room.</p></div></article>
-    </section>
-    <p class="legal-note">Only share videos you own or are allowed to show. Third-party sites must be opened and played by you; this portal does not download or bypass their access controls. Screen sharing works best on desktop Chrome or Edge. Audio calling is not included yet.</p>
-  </main>
-  <footer><span class="brand brand-small"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></span><span>Good films. Good company.</span></footer>
-  <script src="/watch-together.js"></script>
+      <section class="watch-options" aria-labelledby="watch-options-title">
+        <header class="options-heading"><div><p class="eyebrow">MAKE IT YOURS</p><h2 id="watch-options-title">Make your room yours</h2></div><p>Watch, chat, or just hang out together.</p></header>
+        <div class="feature-row">
+          <article><span aria-hidden="true">▣</span><div><strong>Share a screen</strong><p>Broadcast a browser tab or screen. Everyone watches the host's shared view.</p></div></article>
+          <article><span aria-hidden="true">↗</span><div><strong>Bring a link</strong><p>Use official YouTube or Google Drive playback links.</p></div></article>
+          <article><span aria-hidden="true">▰</span><div><strong>Play a local video</strong><p>The host can play a video from their device and share it live with the room.</p></div></article>
+          <article><span aria-hidden="true">☰</span><div><strong>Chat as you watch</strong><p>Room chat is for you and the friends invited to that room.</p></div></article>
+        </div>
+      </section>
+      <p class="legal-note">Only share videos you own or are allowed to show. Third-party sites must be opened and played by you; this portal does not download or bypass their access controls. Screen sharing works best on desktop Chrome or Edge. Audio calling is not included yet.</p>
+    </main>
+    <footer><span class="brand brand-small"><span class="brand-mark">N</span><span>Nymix <b>Watch</b></span></span><span>Good times. Good company.</span></footer>
+    <script src="/watch-together.js"></script>
+  </div>
 </body>
 </html>
