@@ -1,28 +1,12 @@
 (() => {
   const WATCHLIST_KEY = 'nymix-cinema-watchlist-v1';
-  const colors = [
-    'radial-gradient(ellipse at 70% 27%,#e0ad7b 0 4%,transparent 5%),radial-gradient(ellipse at 70% 51%,#e36e68 0 13%,transparent 14%),linear-gradient(145deg,#58364a,#a95565 57%,#271c31)',
-    'radial-gradient(ellipse at 35% 36%,#f5c586 0 5%,transparent 6%),linear-gradient(160deg,#1d4860,#39898a 46%,#14232e)',
-    'radial-gradient(ellipse at 63% 34%,#f7d8a9 0 6%,transparent 7%),linear-gradient(150deg,#734b31,#d29153 48%,#362b39)',
-    'radial-gradient(ellipse at 48% 32%,#e99872 0 7%,transparent 8%),linear-gradient(150deg,#313e67,#6e5f91 48%,#241a35)',
-    'radial-gradient(ellipse at 67% 28%,#ddc796 0 6%,transparent 7%),linear-gradient(150deg,#1d4540,#427761 48%,#142821)',
-    'radial-gradient(ellipse at 38% 36%,#e8c38b 0 6%,transparent 7%),linear-gradient(150deg,#573b4e,#9b5b79 52%,#241b30)',
-  ];
-  const samples = [
-    { id: 'demo-1', title: 'শেষ বিকেলের গল্প', year: 2025, genre: 'ড্রামা', description: 'একটি ছোট শহর, পুরোনো বন্ধুত্ব আর নতুন করে শুরু করার গল্প।', demo: true },
-    { id: 'demo-2', title: 'নীল দিগন্ত', year: 2024, genre: 'অ্যাডভেঞ্চার', description: 'অজানা পথের শেষে কী অপেক্ষা করছে—সেই খোঁজে এক রোমাঞ্চকর যাত্রা।', demo: true },
-    { id: 'demo-3', title: 'চায়ের কাপে ঝড়', year: 2025, genre: 'কমেডি', description: 'এক কাপ চা আর একগুচ্ছ ভুল বোঝাবুঝি থেকে শুরু হওয়া মজার কাহিনি।', demo: true },
-    { id: 'demo-4', title: 'নীরব সংকেত', year: 2023, genre: 'থ্রিলার', description: 'শহরের অন্ধকারে পাওয়া একটি সংকেত বদলে দেয় সবার পরিচিত জীবন।', demo: true },
-    { id: 'demo-5', title: 'সবুজের দিনলিপি', year: 2024, genre: 'ডকুমেন্টারি', description: 'প্রকৃতি, মানুষ আর আমাদের আগামী দিনের জন্য একটি আশাবাদী গল্প।', demo: true },
-    { id: 'demo-6', title: 'আলোর ঠিকানা', year: 2022, genre: 'ড্রামা', description: 'পরিবার আর স্বপ্নকে ঘিরে তৈরি একটি আন্তরিক গল্প।', demo: true },
-  ];
 
   const $ = (selector) => document.querySelector(selector);
   const grid = $('#movie-grid');
   const filters = $('#genre-filters');
   const search = $('#movie-search');
   const movieDialog = $('#movie-dialog');
-  let selectedGenre = 'সব';
+  let selectedGenre = 'All';
   let watchlistOnly = false;
   let toastTimer;
 
@@ -36,7 +20,7 @@
     }
   }
 
-  let movies = samples;
+  let movies = [];
   let watchlist = readList(WATCHLIST_KEY, []);
 
   function save(key, value) {
@@ -45,7 +29,7 @@
       return true;
     } catch (error) {
       console.error(`Could not save ${key} to local storage.`, error);
-      showToast('ব্রাউজারে তথ্য সংরক্ষণ করা যায়নি।');
+      showToast('Could not save your list in this browser.');
       return false;
     }
   }
@@ -65,7 +49,7 @@
   }
 
   function renderFilters() {
-    const genres = ['সব', ...new Set(movies.map(movie => movie.genre))];
+    const genres = [...new Set(['All', ...movies.map(movie => movie.genre)])];
     filters.innerHTML = genres.map(genre => `<button class="filter-chip${genre === selectedGenre ? ' active' : ''}" type="button" data-genre="${escapeHtml(genre)}">${escapeHtml(genre)}</button>`).join('');
   }
 
@@ -73,62 +57,88 @@
     const query = search.value.trim().toLocaleLowerCase();
     const visible = movies.filter(movie => {
       const matchesQuery = `${movie.title} ${movie.genre} ${movie.year}`.toLocaleLowerCase().includes(query);
-      const matchesGenre = selectedGenre === 'সব' || movie.genre === selectedGenre;
+      const matchesGenre = selectedGenre === 'All' || movie.genre === selectedGenre;
       const matchesList = !watchlistOnly || watchlist.includes(movie.id);
       return matchesQuery && matchesGenre && matchesList;
     });
 
-    $('#catalog-title').textContent = watchlistOnly ? 'আমার তালিকা' : 'জনপ্রিয় সিনেমা';
+    $('#catalog-title').textContent = watchlistOnly ? 'My List' : 'Movies';
     $('#empty-state').hidden = visible.length > 0;
+    $('#empty-state').textContent = visible.length || movies.length
+      ? 'No movies match your search.'
+      : 'No movies are available yet. Check back soon.';
     grid.innerHTML = visible.map(movie => {
-      const index = Math.max(0, movies.indexOf(movie)) % colors.length;
+      const poster = movie.thumbnailUrl
+        ? `<img class="movie-poster" src="${escapeHtml(movie.thumbnailUrl)}" alt="" loading="lazy" />`
+        : '<span class="poster-placeholder" aria-hidden="true">N</span>';
       return `<article class="movie-card">
-        <button class="movie-open" type="button" data-movie="${escapeHtml(movie.id)}" style="--poster:${colors[index]}" aria-label="${escapeHtml(movie.title)} - বিস্তারিত দেখুন">
+        <button class="movie-open" type="button" data-movie="${escapeHtml(movie.id)}" aria-label="Watch ${escapeHtml(movie.title)}">
+          ${poster}<span class="poster-gradient" aria-hidden="true"></span>
           <span class="card-play" aria-hidden="true">▶</span>
           <span class="poster-copy"><small>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</small><strong>${escapeHtml(movie.title)}</strong></span>
         </button>
-        <div class="movie-meta"><div><h3>${escapeHtml(movie.title)}</h3><p>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</p></div><span class="rating">${movie.demo ? 'DEMO' : 'HD'}</span></div>
+        <div class="movie-meta"><div><h3>${escapeHtml(movie.title)}</h3><p>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</p></div></div>
       </article>`;
     }).join('');
     $('#watchlist-count').textContent = String(watchlist.length);
   }
 
   async function loadMovies() {
+    $('#empty-state').hidden = true;
+    grid.innerHTML = '';
+    filters.innerHTML = '';
     try {
       const response = await fetch('/api/movies');
       if (!response.ok) throw new Error(`Movie catalog request failed (${response.status})`);
       const catalog = await response.json();
       if (!Array.isArray(catalog)) throw new Error('Movie catalog response is invalid');
-      movies = [...samples, ...catalog];
+      movies = catalog.filter(movie => movie && typeof movie.id === 'string' && typeof movie.title === 'string' && typeof movie.embedUrl === 'string');
+      watchlist = watchlist.filter(id => movies.some(movie => movie.id === id));
+      save(WATCHLIST_KEY, watchlist);
       renderFilters();
       renderMovies();
     } catch (error) {
       console.error('Could not load the movie catalog.', error);
-      showToast('ক্যাটালগ লোড করা যায়নি।');
+      $('#empty-state').hidden = false;
+      $('#empty-state').textContent = 'Could not load movies right now. Please try again later.';
+      showToast('Could not load the movie catalog.');
     }
   }
 
   function showMovie(movie) {
     const inList = watchlist.includes(movie.id);
     const video = movie.embedUrl
-      ? `<iframe class="detail-video" src="${escapeHtml(movie.embedUrl)}" title="${escapeHtml(movie.title)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture;" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin"></iframe>`
-      : `<div class="video-placeholder"><div><span>▶</span><br />এটি একটি নমুনা শিরোনাম। দেখার জন্য আপনার অনুমোদিত Bunny Stream ভিডিও যোগ করুন।</div></div>`;
+      ? `<section class="player-shell" id="player-shell" aria-label="Movie player">
+          <div class="player-toolbar"><span class="player-brand"><i></i> NYMIX CINEMA</span><button class="fullscreen-button" id="fullscreen-player" type="button" aria-label="Enter fullscreen">⛶</button></div>
+          <iframe class="detail-video" src="${escapeHtml(movie.embedUrl)}" title="${escapeHtml(movie.title)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="eager" referrerpolicy="strict-origin-when-cross-origin"></iframe>
+          <div class="player-footer"><span>${escapeHtml(movie.title)}</span><span>Now playing</span></div>
+        </section>`
+      : `<div class="video-placeholder"><div><span>▶</span><br />This movie is not available to play yet.</div></div>`;
     $('#movie-detail').innerHTML = `<div class="detail-content">
-      <p class="eyebrow">${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}${movie.demo ? ' · DEMO' : ''}</p>
-      <h2 id="dialog-title">${escapeHtml(movie.title)}</h2>
-      <p>${escapeHtml(movie.description || 'আপনার নিজের ক্যাটালগের একটি সিনেমা।')}</p>
       ${video}
+      <div class="detail-heading"><div><p class="eyebrow">${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</p><h2 id="dialog-title">${escapeHtml(movie.title)}</h2><p>${escapeHtml(movie.description || '')}</p></div>
+        ${movie.thumbnailUrl ? `<img class="detail-poster" src="${escapeHtml(movie.thumbnailUrl)}" alt="${escapeHtml(movie.title)} poster" />` : ''}
+      </div>
       <div class="detail-actions">
-        <button class="button button-quiet" id="toggle-watchlist" type="button">${inList ? '✓ তালিকা থেকে সরান' : '＋ আমার তালিকায় রাখুন'}</button>
+        <button class="button button-quiet" id="toggle-watchlist" type="button">${inList ? '✓ Remove from My List' : '＋ Add to My List'}</button>
       </div>
     </div>`;
+    $('#fullscreen-player')?.addEventListener('click', async () => {
+      try {
+        if (document.fullscreenElement) await document.exitFullscreen();
+        else await $('#player-shell').requestFullscreen();
+      } catch (error) {
+        console.error('Could not enter fullscreen playback.', error);
+        showToast('Fullscreen is not available in this browser.');
+      }
+    });
     $('#toggle-watchlist').addEventListener('click', () => {
       const next = inList ? watchlist.filter(id => id !== movie.id) : [...watchlist, movie.id];
       if (!save(WATCHLIST_KEY, next)) return;
       watchlist = next;
       showMovie(movie);
       renderMovies();
-      showToast(inList ? 'আমার তালিকা থেকে সরানো হয়েছে।' : 'আমার তালিকায় যোগ হয়েছে।');
+      showToast(inList ? 'Removed from My List.' : 'Added to My List.');
     });
     movieDialog.showModal();
   }
@@ -150,13 +160,16 @@
   search.addEventListener('input', () => { watchlistOnly = false; renderMovies(); });
   $('#watchlist-nav').addEventListener('click', () => {
     watchlistOnly = !watchlistOnly;
-    selectedGenre = 'সব';
+    selectedGenre = 'All';
     renderFilters();
     renderMovies();
     $('#catalog').scrollIntoView({ behavior: 'smooth' });
   });
   $('#dialog-close').addEventListener('click', () => movieDialog.close());
-  renderFilters();
-  renderMovies();
+  movieDialog.addEventListener('close', () => { $('#movie-detail').replaceChildren(); });
+  document.addEventListener('fullscreenchange', () => {
+    const fullscreenButton = $('#fullscreen-player');
+    if (fullscreenButton) fullscreenButton.setAttribute('aria-label', document.fullscreenElement ? 'Exit fullscreen' : 'Enter fullscreen');
+  });
   loadMovies();
 })();

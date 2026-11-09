@@ -226,13 +226,23 @@ app.post('/api/admin/movies', adminAuth, (req, res) => {
   const cleanDescription = typeof description === 'string' ? description.trim() : '';
   const cleanLibraryId = typeof libraryId === 'string' ? libraryId.trim() : '';
   const cleanVideoId = typeof videoId === 'string' ? videoId.trim() : '';
-  const allowedGenres = new Set(['ড্রামা', 'অ্যাডভেঞ্চার', 'কমেডি', 'থ্রিলার', 'ডকুমেন্টারি', 'অন্যান্য']);
+  const allowedGenres = new Set(['Drama', 'Adventure', 'Comedy', 'Thriller', 'Documentary', 'Other']);
   if (!cleanTitle || cleanTitle.length > 80) return res.status(400).json({ error: 'Movie title is required and must be 80 characters or fewer' });
   if (!Number.isInteger(year) || year < 1888 || year > 2100) return res.status(400).json({ error: 'Enter a valid release year' });
   if (!allowedGenres.has(cleanGenre)) return res.status(400).json({ error: 'Choose a supported movie genre' });
   if (cleanDescription.length > 240) return res.status(400).json({ error: 'Description must be 240 characters or fewer' });
   if (!/^[A-Za-z0-9_-]+$/.test(cleanLibraryId) || !/^[A-Za-z0-9_-]+$/.test(cleanVideoId)) {
     return res.status(400).json({ error: 'Enter valid Bunny Stream Library and Video IDs' });
+  }
+  if (typeof req.body.thumbnailUrl !== 'string' || req.body.thumbnailUrl.length > 2048) {
+    return res.status(400).json({ error: 'A thumbnail image URL is required and must be 2048 characters or fewer' });
+  }
+  let thumbnailUrl;
+  try {
+    thumbnailUrl = new URL(req.body.thumbnailUrl.trim());
+    if (thumbnailUrl.protocol !== 'https:' || thumbnailUrl.username || thumbnailUrl.password) throw new Error('Unsupported thumbnail URL');
+  } catch {
+    return res.status(400).json({ error: 'Enter a valid HTTPS thumbnail image URL' });
   }
   const config = rd('config.json');
   const catalog = Array.isArray(config.movieCatalog) ? config.movieCatalog : [];
@@ -243,6 +253,7 @@ app.post('/api/admin/movies', adminAuth, (req, res) => {
     year,
     genre: cleanGenre,
     description: cleanDescription,
+    thumbnailUrl: thumbnailUrl.toString(),
     embedUrl: `https://iframe.mediadelivery.net/embed/${encodeURIComponent(cleanLibraryId)}/${encodeURIComponent(cleanVideoId)}`,
     demo: false,
   };

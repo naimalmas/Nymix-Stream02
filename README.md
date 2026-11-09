@@ -16,7 +16,7 @@ The home page also rotates between Nymix Picks and Prokash Hits featured music p
 
 ## Movie portal
 
-Open `/movies.html` to browse the public Nymix Cinema catalog. Movie management is separate at `/movie-admin.html`; it is not linked from the viewer portal and is limited to Admin and Super Admin accounts. Open the dashboard URL directly and sign in with an administrator account when prompted. The server rejects movie-management requests from regular users. Movies added or removed from the dashboard are saved in local `data/config.json`, shared with the public catalog, and persisted in PostgreSQL on Vercel.
+Open `/movies.html` to browse the public Nymix Cinema catalog. Movie management is separate at `/movie-admin.html`; it is not linked from the viewer portal and is limited to Admin and Super Admin accounts. Open the dashboard URL directly and sign in with an administrator account when prompted. The server rejects movie-management requests from regular users. Movies added or removed from the dashboard are saved in local `data/config.json`, shared with the public catalog, and persisted in PostgreSQL on Vercel. Add a public HTTPS thumbnail image URL for each movie; the dashboard previews it before publishing.
 
 Upload a movie that you own or are licensed to distribute to Bunny Stream first. In the movie dashboard, enter its Bunny Stream Library ID and Video ID along with the listing details. The dashboard registers the Bunny embed player in the catalog; it does not upload the video file itself. Do not add copyrighted movies without distribution permission.
 
