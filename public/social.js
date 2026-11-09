@@ -894,30 +894,28 @@ function formatThreadTime(timestamp) {
 }
 
 function renderRequests() {
-  $('request-count').textContent = String(state.requests.filter(request => request.direction === 'incoming').length);
-  renderList($('requests-list'), state.requests, 'No pending requests.', request => {
-    const actions = request.direction === 'incoming'
-      ? [
-          makeButton('Profile', () => openProfile(request.userId)),
-          makeButton('Accept', async () => {
-            try {
-              await put(`/friends/${encodeURIComponent(request.id)}`, { status: 'accepted' });
-              showNotice(`You and ${request.name} are now friends.`);
-              await refreshOverview();
-              await refreshSuggestions();
-              if ($('user-search').value.trim().length >= 2) await searchUsers($('user-search').value.trim());
-            } catch (error) { showNotice(error.message, true); }
-          }),
-          makeButton('Decline', async () => {
-            try {
-              await put(`/friends/${encodeURIComponent(request.id)}`, { status: 'rejected' });
-              await refreshOverview();
-            } catch (error) { showNotice(error.message, true); }
-          }, 'danger'),
-        ]
-      : [makeButton('Pending', () => {}, 'secondary')];
-    return makePerson(request, actions);
-  });
+  const incomingRequests = state.requests.filter(request => request.direction === 'incoming');
+  $('request-count').textContent = String(incomingRequests.length);
+  renderList($('requests-list'), incomingRequests, 'No one has sent you a friend request yet.', request =>
+    makePerson(request, [
+      makeButton('Profile', () => openProfile(request.userId)),
+      makeButton('Accept', async () => {
+        try {
+          await put(`/friends/${encodeURIComponent(request.id)}`, { status: 'accepted' });
+          showNotice(`You and ${request.name} are now friends.`);
+          await refreshOverview();
+          await refreshSuggestions();
+          if ($('user-search').value.trim().length >= 2) await searchUsers($('user-search').value.trim());
+        } catch (error) { showNotice(error.message, true); }
+      }),
+      makeButton('Decline', async () => {
+        try {
+          await put(`/friends/${encodeURIComponent(request.id)}`, { status: 'rejected' });
+          await refreshOverview();
+        } catch (error) { showNotice(error.message, true); }
+      }, 'danger'),
+    ]),
+  );
 }
 
 function renderUserCards(container, users, emptyText) {
