@@ -1582,8 +1582,10 @@ app.get('/api/calls/signals', userAuth, (req, res) => {
 
 app.get('/api/calls/config', watchRoomAuth, (req, res) => {
   res.set('Cache-Control', 'no-store');
-  const meteredApp = process.env.METERED_TURN_APP;
-  const meteredApiKey = process.env.METERED_TURN_API_KEY;
+  const hasEnvironmentTurnConfig = Boolean(process.env.METERED_TURN_APP || process.env.METERED_TURN_API_KEY);
+  const savedConfig = rd('config.json');
+  const meteredApp = hasEnvironmentTurnConfig ? process.env.METERED_TURN_APP : savedConfig.meteredTurnApp;
+  const meteredApiKey = hasEnvironmentTurnConfig ? process.env.METERED_TURN_API_KEY : savedConfig.meteredTurnApiKey;
   if (Boolean(meteredApp) !== Boolean(meteredApiKey)) {
     console.error('Metered TURN configuration is incomplete');
     return res.status(503).json({ error: 'TURN relay configuration is incomplete' });
@@ -2004,6 +2006,11 @@ app.get('/api/admin/config', superAdminAuth, (req, res) => {
   res.json({
     ytApiKeyConfigured: Boolean(process.env.YOUTUBE_API_KEY || config.ytApiKey),
     ytReelsQuery: config.ytReelsQuery || 'music #shorts',
+    meteredTurnConfigured: Boolean(
+      (process.env.METERED_TURN_APP && process.env.METERED_TURN_API_KEY) ||
+      (!process.env.METERED_TURN_APP && !process.env.METERED_TURN_API_KEY && config.meteredTurnApp && config.meteredTurnApiKey)
+    ),
+    meteredTurnEnvironmentConfigured: Boolean(process.env.METERED_TURN_APP || process.env.METERED_TURN_API_KEY),
     featuredSongs: config.featuredSongs,
   });
 });
@@ -2012,6 +2019,21 @@ app.put('/api/admin/config', superAdminAuth, (req, res) => {
   const cfg = rd('config.json');
   if (req.body.ytApiKey) cfg.ytApiKey = req.body.ytApiKey;
   if (req.body.featuredSongs) cfg.featuredSongs = req.body.featuredSongs;
+  if (req.body.clearMeteredTurn === true) {
+    delete cfg.meteredTurnApp;
+    delete cfg.meteredTurnApiKey;
+  } else if (req.body.meteredTurnApp !== undefined || req.body.meteredTurnApiKey !== undefined) {
+    const appName = typeof req.body.meteredTurnApp === 'string' ? req.body.meteredTurnApp.trim() : '';
+    const apiKey = typeof req.body.meteredTurnApiKey === 'string' ? req.body.meteredTurnApiKey.trim() : '';
+    if (!/^[a-z0-9][a-z0-9-]*$/i.test(appName) || appName.length > 100) {
+      return res.status(400).json({ error: 'Enter a valid Metered app name' });
+    }
+    if (!apiKey || apiKey.length > 512) {
+      return res.status(400).json({ error: 'Enter a valid Metered API key' });
+    }
+    cfg.meteredTurnApp = appName;
+    cfg.meteredTurnApiKey = apiKey;
+  }
   if (req.body.ytReelsQuery !== undefined) {
     if (typeof req.body.ytReelsQuery !== 'string' || !req.body.ytReelsQuery.trim() || req.body.ytReelsQuery.trim().length > 100) {
       return res.status(400).json({ error: 'Reels topic must be between 1 and 100 characters' });
