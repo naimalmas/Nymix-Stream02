@@ -198,6 +198,9 @@ const auth = (req, res, next) => {
     const claims = jwt.verify(h.split(' ')[1], SECRET);
     const account = rd('users.json').find(user => user.id === claims.id);
     if (!account || account.banned) return res.status(401).json({ error: 'Account unavailable' });
+    if ((claims.credentialVersion || 0) !== (account.credentialVersion || 0)) {
+      return res.status(401).json({ error: 'Session expired; sign in again' });
+    }
     req.user = { id: account.id, name: account.name, email: account.email, role: account.role };
     next();
   }
@@ -357,7 +360,7 @@ app.post('/api/auth/register', async (req, res) => {
     const liked = rd('liked.json');
     liked[user.id] = [];
     wd('liked.json', liked);
-    const token = jwt.sign({ id: user.id, name, email, role: 'user' }, SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, name, email, role: 'user', credentialVersion: user.credentialVersion || 0 }, SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user.id, name, email, role: 'user', avatar: '' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -370,7 +373,7 @@ app.post('/api/auth/login', async (req, res) => {
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     if (user.banned) return res.status(403).json({ error: 'Account banned' });
     if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ error: 'Invalid credentials' });
-    const token = jwt.sign({ id: user.id, name: user.name, email, role: user.role }, SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, name: user.name, email, role: user.role, credentialVersion: user.credentialVersion || 0 }, SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user.id, name: user.name, email, role: user.role, avatar: user.avatar } });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -457,7 +460,7 @@ app.post('/api/auth/google', async (req, res) => {
       wd('users.json', users);
     }
 
-    const token = jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role }, SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ id: user.id, name: user.name, email: user.email, role: user.role, credentialVersion: user.credentialVersion || 0 }, SECRET, { expiresIn: '7d' });
     res.json({
       token,
       user: { id: user.id, name: user.name, email: user.email, role: user.role, avatar: user.avatar || '' },
@@ -882,6 +885,9 @@ const watchRoomAuth = (req, res, next) => {
 
   const account = rd('users.json').find(user => user.id === claims.id);
   if (!account || account.banned) return res.status(401).json({ error: 'Account unavailable' });
+  if ((claims.credentialVersion || 0) !== (account.credentialVersion || 0)) {
+    return res.status(401).json({ error: 'Session expired; sign in again' });
+  }
   if (account.role !== 'user') return res.status(403).json({ error: 'Insufficient permissions' });
   req.user = { id: account.id, name: account.name, email: account.email, role: account.role };
   next();
@@ -995,6 +1001,9 @@ app.post('/api/watch-rooms/:code/join', (req, res) => {
   if (claims) {
     const account = rd('users.json').find(user => user.id === claims.id);
     if (!account || account.banned) return res.status(401).json({ error: 'Account unavailable' });
+    if ((claims.credentialVersion || 0) !== (account.credentialVersion || 0)) {
+      return res.status(401).json({ error: 'Session expired; sign in again' });
+    }
     if (account.role !== 'user') return res.status(403).json({ error: 'Insufficient permissions' });
     req.user = { id: account.id, name: account.name, email: account.email, role: account.role };
   }
@@ -1997,6 +2006,53 @@ app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
   delete liked[req.params.id];
   wd('liked.json', liked);
   res.json({ ok: true });
+});
+
+app.put('/api/super-admin/account', superAdminAuth, async (req, res) => {
+  const { currentPassword, email, newPassword } = req.body || {};
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+  if (typeof currentPassword !== 'string' || !currentPassword) {
+    return res.status(400).json({ error: 'Enter your current password' });
+  }
+  if (normalizedEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail)) {
+    return res.status(400).json({ error: 'Enter a valid email address' });
+  }
+  if (typeof newPassword !== 'string' || newPassword.length < 12 || newPassword.length > 128 ||
+      Buffer.byteLength(newPassword, 'utf8') > 72) {
+    return res.status(400).json({ error: 'New password must be at least 12 characters and no more than 72 bytes' });
+  }
+
+  const users = rd('users.json');
+  const account = users.find(user => user.id === req.user.id && user.role === 'super_admin');
+  if (!account || typeof account.password !== 'string' || !account.password) {
+    return res.status(401).json({ error: 'Super Admin account cannot verify a password' });
+  }
+  if (!await bcrypt.compare(currentPassword, account.password)) {
+    return res.status(401).json({ error: 'Current password is incorrect' });
+  }
+  if (users.some(user => user.id !== account.id && String(user.email).toLowerCase() === normalizedEmail)) {
+    return res.status(409).json({ error: 'That email address is already in use' });
+  }
+  if (await bcrypt.compare(newPassword, account.password)) {
+    return res.status(400).json({ error: 'Choose a new password different from your current password' });
+  }
+
+  account.email = normalizedEmail;
+  account.password = await bcrypt.hash(newPassword, 10);
+  account.credentialVersion = (account.credentialVersion || 0) + 1;
+  wd('users.json', users);
+
+  const token = jwt.sign({
+    id: account.id,
+    name: account.name,
+    email: account.email,
+    role: account.role,
+    credentialVersion: account.credentialVersion,
+  }, SECRET, { expiresIn: '7d' });
+  res.json({
+    token,
+    user: { id: account.id, name: account.name, email: account.email, role: account.role, avatar: account.avatar || '' },
+  });
 });
 
 app.get('/api/admin/config', superAdminAuth, (req, res) => {

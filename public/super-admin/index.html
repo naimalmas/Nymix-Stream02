@@ -73,6 +73,18 @@
         <div class="stat"><div class="stat-label">Plays</div><div class="stat-value" id="play-total">—</div></div>
         <div class="stat"><div class="stat-label">Banned users</div><div class="stat-value" id="banned-total">—</div></div>
       </section>
+      <section class="panel" style="margin-bottom:14px;max-width:700px">
+        <div class="panel-head"><h2>Change Super Admin login</h2></div>
+        <form id="account-form" class="form">
+          <label>New email<input id="account-email" type="email" maxlength="254" autocomplete="email" required /></label>
+          <label>Current password<input id="current-password" type="password" autocomplete="current-password" required /></label>
+          <label>New password<input id="new-password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required /></label>
+          <label>Confirm new password<input id="confirm-password" type="password" minlength="12" maxlength="128" autocomplete="new-password" required /></label>
+          <div class="sub">Changing your password signs out other sessions. Use a unique password with at least 12 characters.</div>
+          <button class="btn" type="submit">Update login</button>
+          <div class="message" id="account-status" role="status" aria-live="polite"></div>
+        </form>
+      </section>
       <section id="administrators" class="grid">
         <div class="panel">
           <div class="panel-head"><h2>Create administrator</h2></div>
@@ -123,6 +135,7 @@ const authorized=(()=>{
   if(!token()||!user){location.href='/login.html';return false;}
   if(user.role!=='super_admin'){location.href=routeByRole(user.role);return false;}
   document.getElementById('identity').textContent=user.name||user.email||'Super Admin';
+  document.getElementById('account-email').value=user.email||'';
   return true;
 })();
 function showMessage(element,message,error=false){element.textContent=message;element.classList.toggle('error',error);}
@@ -156,6 +169,29 @@ async function loadAll(){
   catch(error){console.error(error);document.getElementById('key-status').textContent='Some dashboard data could not be loaded';}
 }
 function escapeHtml(value){return String(value||'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));}
+document.getElementById('account-form').addEventListener('submit',async event=>{
+  event.preventDefault();
+  const status=document.getElementById('account-status');
+  const newPassword=document.getElementById('new-password').value;
+  if(newPassword!==document.getElementById('confirm-password').value){
+    showMessage(status,'New passwords do not match',true);
+    return;
+  }
+  try{
+    const result=await api('/super-admin/account',{method:'PUT',body:JSON.stringify({
+      email:document.getElementById('account-email').value,
+      currentPassword:document.getElementById('current-password').value,
+      newPassword
+    })});
+    localStorage.setItem('nx_token',result.token);
+    localStorage.setItem('nx_user',JSON.stringify(result.user));
+    document.getElementById('identity').textContent=result.user.name||result.user.email;
+    document.getElementById('current-password').value='';
+    document.getElementById('new-password').value='';
+    document.getElementById('confirm-password').value='';
+    showMessage(status,'Login updated. Other sessions have been signed out.');
+  }catch(error){showMessage(status,error.message,true);}
+});
 document.getElementById('admin-form').addEventListener('submit',async event=>{
   event.preventDefault();
   const form=event.currentTarget;
