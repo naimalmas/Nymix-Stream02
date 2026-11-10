@@ -103,17 +103,6 @@
           <div class="message" id="reels-status" role="status"></div>
         </form>
       </section>
-      <section class="panel" style="margin-top:14px;max-width:700px">
-        <div class="panel-head"><h2>Watch Together voice connectivity</h2></div>
-        <form id="turn-form" class="form">
-          <label>Metered app name<input id="turn-app" type="text" maxlength="100" autocomplete="off" placeholder="your-app-name" /></label>
-          <label>Metered API key<input id="turn-api-key" type="password" maxlength="512" autocomplete="new-password" placeholder="Enter a key to configure TURN" /></label>
-          <div class="sub">TURN relays help voice and video connect across different Wi-Fi networks. Create credentials with Metered Open Relay. The API key is stored in app settings, never shown back, and is only used by the server to request temporary connection credentials. Deployment environment variables take precedence.</div>
-          <button class="btn" type="submit">Save TURN settings</button>
-          <button class="btn btn-muted" id="clear-turn" type="button">Remove saved TURN settings</button>
-          <div class="message" id="turn-status" role="status"></div>
-        </form>
-      </section>
     </main>
   </div>
 <script>
@@ -161,10 +150,6 @@ async function loadKeyStatus(){
   const data=await api('/admin/config');
   document.getElementById('key-status').textContent=data.ytApiKeyConfigured?'A key is configured':'No key configured';
   document.getElementById('reels-query').value=data.ytReelsQuery||'music #shorts';
-  const turnStatus=document.getElementById('turn-status');
-  turnStatus.textContent=data.meteredTurnEnvironmentConfigured
-    ? data.meteredTurnConfigured?'TURN is configured in deployment environment variables':'TURN environment variables are incomplete; saved dashboard settings are not used'
-    : data.meteredTurnConfigured?'TURN is configured in dashboard settings':'No TURN relay is configured';
 }
 async function loadAll(){
   try{await Promise.all([loadOverview(),loadAdmins(),loadKeyStatus()]);}
@@ -194,30 +179,6 @@ document.getElementById('reels-form').addEventListener('submit',async event=>{
   try{
     await api('/admin/config',{method:'PUT',body:JSON.stringify({ytReelsQuery:topic})});
     showMessage(status,'Reels topic saved');
-  }catch(error){showMessage(status,error.message,true);}
-});
-document.getElementById('turn-form').addEventListener('submit',async event=>{
-  event.preventDefault();
-  const appName=document.getElementById('turn-app').value.trim();
-  const apiKey=document.getElementById('turn-api-key').value.trim();
-  const status=document.getElementById('turn-status');
-  if(!appName||!apiKey){showMessage(status,'Enter both the Metered app name and API key',true);return;}
-  try{
-    await api('/admin/config',{method:'PUT',body:JSON.stringify({meteredTurnApp:appName,meteredTurnApiKey:apiKey})});
-    document.getElementById('turn-api-key').value='';
-    showMessage(status,'TURN settings saved');
-    await loadKeyStatus();
-  }catch(error){showMessage(status,error.message,true);}
-});
-document.getElementById('clear-turn').addEventListener('click',async()=>{
-  const status=document.getElementById('turn-status');
-  if(!confirm('Remove the saved Metered TURN credentials?'))return;
-  try{
-    await api('/admin/config',{method:'PUT',body:JSON.stringify({clearMeteredTurn:true})});
-    document.getElementById('turn-app').value='';
-    document.getElementById('turn-api-key').value='';
-    showMessage(status,'Saved TURN settings removed');
-    await loadKeyStatus();
   }catch(error){showMessage(status,error.message,true);}
 });
 async function setAdminStatus(id,banned){
