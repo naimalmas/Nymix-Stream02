@@ -2008,6 +2008,78 @@ app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
   res.json({ ok: true });
 });
 
+app.get('/api/super-admin/overview', superAdminAuth, (req, res) => {
+  const users = rd('users.json');
+  const plays = rd('plays.json');
+  res.json({
+    users: users.filter(user => user.role === 'user').length,
+    admins: users.filter(user => user.role === 'admin' || user.role === 'super_admin').length,
+    plays: plays.length,
+    bannedUsers: users.filter(user => user.banned && user.role === 'user').length,
+  });
+});
+
+app.get('/api/super-admin/admins', superAdminAuth, (req, res) => {
+  res.json(rd('users.json')
+    .filter(user => user.role === 'admin')
+    .map(user => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      banned: Boolean(user.banned),
+    })));
+});
+
+app.post('/api/super-admin/admins', superAdminAuth, async (req, res) => {
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!name || name.length > 80) return res.status(400).json({ error: 'Name is required and must be 80 characters or fewer' });
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    return res.status(400).json({ error: 'Enter a valid email address' });
+  }
+  if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) {
+    return res.status(400).json({ error: 'Password must be at least 8 characters and no more than 72 bytes' });
+  }
+  const users = rd('users.json');
+  if (users.some(user => String(user.email || '').toLowerCase() === email)) {
+    return res.status(409).json({ error: 'That email address is already in use' });
+  }
+  const admin = {
+    id: `a_${Date.now()}_${crypto.randomBytes(4).toString('hex')}`,
+    name,
+    email,
+    password: await bcrypt.hash(password, 10),
+    role: 'admin',
+    avatar: '',
+    createdAt: new Date().toISOString(),
+    banned: false,
+    totalPlays: 0,
+  };
+  users.push(admin);
+  wd('users.json', users);
+  res.status(201).json({ id: admin.id, name: admin.name, email: admin.email, banned: false });
+});
+
+app.put('/api/super-admin/admins/:id', superAdminAuth, (req, res) => {
+  const users = rd('users.json');
+  const admin = users.find(user => user.id === req.params.id && user.role === 'admin');
+  if (!admin) return res.status(404).json({ error: 'Administrator not found' });
+  if (typeof req.body?.banned !== 'boolean') return res.status(400).json({ error: 'Status must be enabled or disabled' });
+  admin.banned = req.body.banned;
+  admin.credentialVersion = (admin.credentialVersion || 0) + 1;
+  wd('users.json', users);
+  res.json({ ok: true });
+});
+
+app.delete('/api/super-admin/admins/:id', superAdminAuth, (req, res) => {
+  const users = rd('users.json');
+  const admin = users.find(user => user.id === req.params.id && user.role === 'admin');
+  if (!admin) return res.status(404).json({ error: 'Administrator not found' });
+  wd('users.json', users.filter(user => user.id !== admin.id));
+  res.json({ ok: true });
+});
+
 app.put('/api/super-admin/account', superAdminAuth, async (req, res) => {
   const { currentPassword, email, newPassword } = req.body || {};
   const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
