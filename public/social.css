@@ -80,7 +80,7 @@ h3 { font-size: 14px; margin: 0 0 12px; }
 .panel { display: none; }
 .panel.active { display: block; }
 .feed-layout { display: grid; width: min(100%, 980px); grid-template-columns: minmax(0, 620px) minmax(220px, 280px); justify-content: center; align-items: start; gap: clamp(16px, 2vw, 24px); margin: 0 auto; }
-html.embedded-home .feed-layout { width: 100%; max-width: none; grid-template-columns: minmax(0, 1fr) minmax(220px, 260px); justify-content: stretch; margin: 0; }
+html.embedded-home .feed-layout { width: 100%; max-width: none; grid-template-columns: minmax(0, 700px) minmax(220px, 260px); justify-content: start; margin: 0; }
 .feed-main, .feed-list { display: grid; min-width: 0; gap: 16px; }
 .feed-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 8px 2px 2px; }
 .feed-heading h1 { margin-bottom: 5px; font-size: clamp(26px, 4vw, 36px); }
@@ -598,6 +598,11 @@ input:disabled { opacity: .55; }
   .conversation-messages { padding: 15px 14px; }
   .call-panel { padding: 8px 12px; }
   .chat-card > .message-form { padding: 10px 12px max(12px, env(safe-area-inset-bottom)); }
+  html.embedded-home body.messages-page .messages-main { padding: 12px 12px 20px; }
+  html.embedded-home .feed-layout { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  html.embedded-home .feed-sidebar { display: none; }
+  html.embedded-home .feed-heading { align-items: flex-start; flex-wrap: wrap; }
+  html.embedded-home .feed-heading .button { margin-left: auto; }
 }
 @media (max-width: 540px) {
   .messages-page .messages-main { padding: 8px; }
@@ -609,6 +614,9 @@ input:disabled { opacity: .55; }
   .feed-upload-icon { width: 36px; height: 36px; }
   .feed-upload small { font-size: 9px; }
   .feed-upload > .button { padding: 6px 8px; font-size: 9px; }
+  html.embedded-home body.messages-page .messages-main { padding: 10px 12px 20px; }
+  html.embedded-home .feed-heading { gap: 8px; }
+  html.embedded-home .feed-heading h1 { font-size: clamp(30px, 10vw, 38px); }
   .feed-post-header { padding: 10px 12px; }
   .feed-post-image { aspect-ratio: 1 / 1; }
   .feed-post-caption { padding: 10px 12px 12px; }
