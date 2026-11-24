@@ -75,7 +75,11 @@ if (!isVercel) {
   }
 }
 
-const databaseUrl = process.env.DATABASE_URL_POOLED || process.env.DATABASE_URL;
+// Prefer the active Neon resource connected by Vercel. The old Prisma
+// connection is kept as a fallback for existing deployments, but it may be
+// suspended when the provider plan limit is reached.
+const databaseUrl = process.env.NYMIXDB_DATABASE_URL ||
+  process.env.DATABASE_URL_POOLED || process.env.DATABASE_URL;
 const database = isVercel && databaseUrl
   ? new Pool({ connectionString: databaseUrl, ssl: { rejectUnauthorized: false }, max: 1 })
   : null;
