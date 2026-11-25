@@ -47,6 +47,40 @@ function requireAuth() {
   return true;
 }
 
+const urlBase64ToUint8Array = value => {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  return Uint8Array.from([...raw].map(char => char.charCodeAt(0)));
+};
+
+async function registerBackgroundCallNotifications() {
+  if (!token() || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+  try {
+    const config = await apiFetch('/push/config');
+    if (!config.enabled || !config.publicKey) return;
+    const registration = await navigator.serviceWorker.register('/sw.js');
+    let subscription = await registration.pushManager.getSubscription();
+    if (!subscription) {
+      if (Notification.permission === 'denied') return;
+      const permission = Notification.permission === 'granted'
+        ? 'granted'
+        : await Notification.requestPermission();
+      if (permission !== 'granted') return;
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(config.publicKey),
+      });
+    }
+    await apiFetch('/push/subscribe', {
+      method: 'POST',
+      body: JSON.stringify({ subscription: subscription.toJSON() }),
+    });
+  } catch (error) {
+    console.warn('Background call notifications unavailable:', error.message);
+  }
+}
+
 // ── YouTube IFrame API ────────────────────────────────
 window.onYouTubeIframeAPIReady = () => {
   S.ytPlayer = new YT.Player('yt-player', {
@@ -932,6 +966,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   updateUserMenu();
   document.addEventListener('pointerdown', notificationAudio, { once: true });
   document.addEventListener('keydown', notificationAudio, { once: true });
+  let pushSetupStarted = false;
+  const enableBackgroundCalls = () => {
+    if (pushSetupStarted) return;
+    pushSetupStarted = true;
+    registerBackgroundCallNotifications();
+  };
+  document.addEventListener('pointerdown', enableBackgroundCalls, { once: true });
+  document.addEventListener('keydown', enableBackgroundCalls, { once: true });
   $('hero-slide-prev').addEventListener('click', () => {
     renderFeaturedPack(activeFeaturedPackIndex - 1);
     restartFeaturedPackRotation();
