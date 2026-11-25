@@ -434,7 +434,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   if (!email || email.length > 254) return res.json(genericResponse);
   try {
     const users = rd('users.json');
-    const user = users.find(account => String(account.email || '').toLowerCase() === email && account.role === 'user');
+    const user = users.find(account => String(account.email || '').toLowerCase() === email && account.banned !== true);
     if (!user) return res.json(genericResponse);
     if (!process.env.RESEND_API_KEY || !process.env.MAIL_FROM) {
       return res.status(503).json({ error: 'Password reset email is not configured yet. Please contact support.' });
@@ -459,7 +459,7 @@ app.post('/api/auth/reset-password', async (req, res) => {
   try {
     const users = rd('users.json');
     const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const user = users.find(account => account.role === 'user' && account.resetTokenHash === tokenHash);
+    const user = users.find(account => account.resetTokenHash === tokenHash);
     if (!user || !user.resetTokenExpiresAt || Date.parse(user.resetTokenExpiresAt) <= Date.now()) return res.status(400).json({ error: 'This reset link is invalid or expired.' });
     user.password = await bcrypt.hash(password, 10);
     user.credentialVersion = (user.credentialVersion || 0) + 1;
