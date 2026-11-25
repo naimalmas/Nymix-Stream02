@@ -737,7 +737,7 @@ function showView(name, syncPortal = true) {
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   const v = document.getElementById('view-' + viewName);
   if (v) v.classList.add('active');
-  document.querySelector('.app')?.classList.toggle('social-active', viewName === 'messages' || viewName === 'home' || name === 'social-map' || name === 'social-quests');
+  document.querySelector('.app')?.classList.toggle('social-active', viewName === 'messages' || viewName === 'home' || name === 'social-map' || name === 'social-quests' || name === 'social-universe');
   document.querySelector('.app')?.classList.toggle('reels-active', name === 'reels');
   document.querySelectorAll('.nav-link').forEach(a =>
     a.classList.toggle('active', a.dataset.view === name)
@@ -746,7 +746,7 @@ function showView(name, syncPortal = true) {
     home: 'Feed', discover: 'Discover',
     browse: 'Browse', liked: 'Your Library', radio: 'Radio',
     messages: 'Messages', feed: 'Feed', reels: 'Reels', profile: 'Profile', 'add-friend': 'Friends', 'friend-requests': 'Friend requests',
-    'social-map': 'Hangout map', 'social-quests': 'Daily quests',
+    'social-map': 'Hangout map', 'social-quests': 'Daily quests', 'social-universe': 'Social universe',
   };
   $('view-title').textContent = titles[name] || '';
   if (name === 'home') startFeaturedPackRotation();

@@ -2,5 +2,10 @@
   "listenRooms": [],
   "games": [],
   "roomMessages": {},
-  "callSignals": []
+  "callSignals": [],
+  "aiCharacters": {},
+  "virtualConcerts": [],
+  "sharedPets": {},
+  "secretRooms": [],
+  "universeSettings": {}
 }

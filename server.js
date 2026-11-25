@@ -1027,8 +1027,144 @@ const getSocialState = () => {
   state.watchRooms ||= [];
   state.hangoutLocations ||= {};
   state.questProgress ||= {};
+  state.aiCharacters ||= {};
+  state.virtualConcerts ||= [];
+  state.sharedPets ||= {};
+  state.secretRooms ||= [];
+  state.universeSettings ||= {};
   return state;
 };
+
+const cleanFeatureText = (value, max, fallback = '') => typeof value === 'string' ? value.trim().slice(0, max) : fallback;
+const featureCode = used => randomCode(used).slice(0, 6);
+
+app.get('/api/social/character', userAuth, (req, res) => {
+  const social = getSocialState();
+  res.json(social.aiCharacters[req.user.id] || {
+    name: `${req.user.name || 'Nymix'}'s companion`,
+    personality: 'warm, curious and encouraging',
+    appearance: 'violet star traveler',
+    voice: 'default',
+    messages: [],
+  });
+});
+
+app.put('/api/social/character', userAuth, (req, res) => {
+  const social = getSocialState();
+  const previous = social.aiCharacters[req.user.id] || {};
+  const character = {
+    name: cleanFeatureText(req.body?.name, 40, previous.name || `${req.user.name || 'Nymix'}'s companion`),
+    personality: cleanFeatureText(req.body?.personality, 180, previous.personality || 'warm, curious and encouraging'),
+    appearance: cleanFeatureText(req.body?.appearance, 120, previous.appearance || 'violet star traveler'),
+    voice: ['default', 'soft', 'bright'].includes(req.body?.voice) ? req.body.voice : (previous.voice || 'default'),
+    messages: Array.isArray(previous.messages) ? previous.messages.slice(-20) : [],
+    updatedAt: Date.now(),
+  };
+  social.aiCharacters[req.user.id] = character;
+  wd('social.json', social);
+  res.json(character);
+});
+
+app.post('/api/social/character/chat', userAuth, (req, res) => {
+  const social = getSocialState();
+  const character = social.aiCharacters[req.user.id] || { name: 'Nymix companion', personality: 'warm, curious and encouraging', appearance: 'violet star traveler', voice: 'default', messages: [] };
+  const message = cleanFeatureText(req.body?.message, 240);
+  if (!message) return res.status(400).json({ error: 'Write a message first' });
+  const lower = message.toLowerCase();
+  const reply = lower.includes('sad') || lower.includes('মন খারাপ')
+    ? 'I am here with you. Tell me one small thing that would make this moment easier.'
+    : lower.includes('idea') || lower.includes('কী করি')
+      ? 'Let us turn that into a tiny experiment and invite one friend to try it with you.'
+      : `I heard you. As your ${character.personality || 'curious'} companion, I think the next small step is worth trying.`;
+  character.messages = [...(character.messages || []), { from: 'user', text: message, ts: Date.now() }, { from: 'character', text: reply, ts: Date.now() }].slice(-20);
+  social.aiCharacters[req.user.id] = character;
+  wd('social.json', social);
+  res.json({ reply, character });
+});
+
+app.get('/api/social/concerts', userAuth, (req, res) => {
+  const social = getSocialState();
+  const concerts = social.virtualConcerts.filter(item => item.status !== 'ended' && item.createdAt > Date.now() - 7 * 86400000).slice(-30).reverse();
+  res.json({ concerts });
+});
+
+app.post('/api/social/concerts', userAuth, (req, res) => {
+  const social = getSocialState();
+  const title = cleanFeatureText(req.body?.title, 80);
+  if (!title) return res.status(400).json({ error: 'Concert title is required' });
+  const used = new Set(social.virtualConcerts.map(item => item.code));
+  const concert = { code: featureCode(used), title, theme: cleanFeatureText(req.body?.theme, 80, 'Nymix lights'), hostId: req.user.id, hostName: req.user.name, members: [req.user.id], reactions: {}, status: 'live', createdAt: Date.now() };
+  social.virtualConcerts = [...social.virtualConcerts, concert].slice(-100);
+  wd('social.json', social);
+  res.status(201).json({ concert });
+});
+
+app.post('/api/social/concerts/:code/join', userAuth, (req, res) => {
+  const social = getSocialState();
+  const concert = social.virtualConcerts.find(item => item.code === String(req.params.code).toUpperCase() && item.status !== 'ended');
+  if (!concert) return res.status(404).json({ error: 'Concert not found' });
+  if (!concert.members.includes(req.user.id)) concert.members = [...concert.members, req.user.id].slice(-100);
+  wd('social.json', social);
+  res.json({ concert });
+});
+
+app.get('/api/social/pet', userAuth, (req, res) => {
+  const social = getSocialState();
+  const pet = social.sharedPets[req.user.id] || { name: 'Mochi', species: 'starlight fox', mood: 'sleepy', energy: 70, care: 0, members: [req.user.id], updatedAt: Date.now() };
+  res.json({ pet });
+});
+
+app.put('/api/social/pet', userAuth, (req, res) => {
+  const social = getSocialState();
+  const previous = social.sharedPets[req.user.id] || { name: 'Mochi', species: 'starlight fox', mood: 'sleepy', energy: 70, care: 0, members: [req.user.id] };
+  const action = ['feed', 'play', 'decorate'].includes(req.body?.action) ? req.body.action : '';
+  const delta = action === 'feed' ? 12 : action === 'play' ? 18 : action === 'decorate' ? 5 : 0;
+  const pet = { ...previous, name: cleanFeatureText(req.body?.name, 30, previous.name), species: cleanFeatureText(req.body?.species, 50, previous.species), energy: Math.min(100, Math.max(0, Number(previous.energy || 60) + (action === 'play' ? -4 : action ? 3 : 0))), care: Math.min(100, Number(previous.care || 0) + delta), mood: delta >= 15 ? 'excited' : delta ? 'happy' : previous.mood, updatedAt: Date.now() };
+  social.sharedPets[req.user.id] = pet;
+  wd('social.json', social);
+  res.json({ pet });
+});
+
+app.get('/api/social/secret-rooms', userAuth, (req, res) => {
+  const social = getSocialState();
+  const rooms = social.secretRooms.filter(room => room.hostId === req.user.id || room.unlockedBy?.includes(req.user.id)).map(({ code, title, clue, hostName, members, createdAt }) => ({ code, title, clue, hostName, members, createdAt }));
+  res.json({ rooms });
+});
+
+app.post('/api/social/secret-rooms', userAuth, (req, res) => {
+  const social = getSocialState();
+  const title = cleanFeatureText(req.body?.title, 70);
+  const clue = cleanFeatureText(req.body?.clue, 180);
+  if (!title || !clue) return res.status(400).json({ error: 'Title and clue are required' });
+  const used = new Set(social.secretRooms.map(item => item.code));
+  const room = { code: featureCode(used), title, clue, hostId: req.user.id, hostName: req.user.name, members: [req.user.id], unlockedBy: [req.user.id], createdAt: Date.now() };
+  social.secretRooms = [...social.secretRooms, room].slice(-100);
+  wd('social.json', social);
+  res.status(201).json({ room });
+});
+
+app.post('/api/social/secret-rooms/:code/unlock', userAuth, (req, res) => {
+  const social = getSocialState();
+  const room = social.secretRooms.find(item => item.code === String(req.params.code).toUpperCase());
+  if (!room) return res.status(404).json({ error: 'Secret room not found' });
+  const clueAnswer = cleanFeatureText(req.body?.answer, 180).toLowerCase();
+  if (!clueAnswer || clueAnswer !== room.clue.toLowerCase()) return res.status(403).json({ error: 'That clue answer did not unlock this room' });
+  room.unlockedBy ||= [];
+  if (!room.unlockedBy.includes(req.user.id)) room.unlockedBy.push(req.user.id);
+  if (!room.members.includes(req.user.id)) room.members.push(req.user.id);
+  wd('social.json', social);
+  res.json({ room });
+});
+
+app.get('/api/social/universe', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const relations = rd('friends.json');
+  const friendIds = relations.filter(item => item.status === 'accepted' && (item.user1 === req.user.id || item.user2 === req.user.id)).map(item => item.user1 === req.user.id ? item.user2 : item.user1);
+  const friends = friendIds.map(id => users.find(user => user.id === id && !user.banned)).filter(Boolean).map(user => ({ id: user.id, name: user.name, avatar: user.avatar || '' }));
+  const account = users.find(user => user.id === req.user.id);
+  const photos = Array.isArray(account?.photos) ? account.photos.slice(-12).map(photo => ({ id: photo.id, caption: photo.caption || '', createdAt: photo.createdAt })) : [];
+  res.json({ owner: { id: req.user.id, name: req.user.name }, stars: friends, planets: photos, constellations: photos.slice(-5).map((photo, index) => ({ id: photo.id, label: photo.caption || `Memory ${index + 1}` })) });
+});
 const notifyUserPush = async (userId, payload, social) => {
   if (!pushEnabled) return;
   const targets = social.pushSubscriptions.filter(item => item.userId === userId);

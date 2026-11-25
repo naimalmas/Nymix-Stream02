@@ -554,6 +554,33 @@ async function completeQuest(id) {
   try { await post(`/social/quests/${encodeURIComponent(id)}/complete`); await loadQuests(); }
   catch (error) { showNotice(error.message, true); }
 }
+function renderCharacter(character) {
+  $('character-name').value = character.name || '';
+  $('character-personality').value = character.personality || '';
+  $('character-appearance').value = character.appearance || '';
+  $('character-voice').value = character.voice || 'default';
+  const list = $('character-messages'); list.replaceChildren();
+  (character.messages || []).forEach(item => { const bubble = document.createElement('div'); bubble.className = `character-bubble${item.from === 'user' ? ' me' : ''}`; bubble.textContent = item.text; list.appendChild(bubble); });
+  list.scrollTop = list.scrollHeight;
+}
+async function loadCharacter() { try { renderCharacter(await api('/social/character')); } catch (error) { showNotice(error.message, true); } }
+function renderConcerts(data) {
+  $('concert-count').textContent = String(data.concerts?.length || 0);
+  const list = $('concert-list'); list.replaceChildren();
+  if (!data.concerts?.length) { list.innerHTML = '<p class="feed-empty">No live concerts yet. Start the first stage.</p>'; return; }
+  data.concerts.forEach(concert => { const item = document.createElement('div'); item.className = 'feature-list-item'; const copy = document.createElement('div'); const title = document.createElement('strong'); title.textContent = concert.title; const meta = document.createElement('span'); meta.textContent = `${concert.theme} · ${concert.members.length} audience · code ${concert.code}`; copy.append(title, meta); const button = makeButton(concert.members.includes(state.user.id) ? 'Joined' : 'Join', async () => { try { await post(`/social/concerts/${encodeURIComponent(concert.code)}/join`); await loadConcerts(); } catch (error) { showNotice(error.message, true); } }, 'secondary'); button.disabled = concert.members.includes(state.user.id); item.append(copy, button); list.appendChild(item); });
+}
+async function loadConcerts() { try { renderConcerts(await api('/social/concerts')); } catch (error) { showNotice(error.message, true); } }
+function renderPet(data) { const pet = data.pet || {}; $('pet-name').textContent = pet.name || 'Mochi'; $('pet-mood').textContent = pet.mood || 'sleepy'; $('pet-copy').textContent = `${pet.species || 'starlight fox'} · care ${pet.care || 0}% · energy ${pet.energy || 0}%`; }
+async function loadPet() { try { renderPet(await api('/social/pet')); } catch (error) { showNotice(error.message, true); } }
+function renderSecretRooms(data) { const list = $('secret-room-list'); list.replaceChildren(); if (!data.rooms?.length) { list.innerHTML = '<p class="feed-empty">No unlocked rooms yet.</p>'; return; } data.rooms.forEach(room => { const item = document.createElement('div'); item.className = 'feature-list-item'; const copy = document.createElement('div'); const title = document.createElement('strong'); title.textContent = room.title; const meta = document.createElement('span'); meta.textContent = `Code ${room.code} · ${room.members.length} members`; copy.append(title, meta); item.append(copy); list.appendChild(item); }); }
+async function loadSecretRooms() { try { renderSecretRooms(await api('/social/secret-rooms')); } catch (error) { showNotice(error.message, true); } }
+function renderUniverse(data) {
+  $('universe-title').textContent = `${data.owner?.name || 'Your'}'s universe`;
+  const orbit = $('universe-orbit'); orbit.replaceChildren();
+  (data.stars || []).slice(0, 9).forEach((star, index) => { const node = document.createElement('span'); node.className = 'universe-star'; node.textContent = String(star.name || '?').slice(0, 1).toUpperCase(); node.title = star.name; node.style.left = `${18 + ((index * 37) % 76)}%`; node.style.top = `${16 + ((index * 53) % 64)}%`; orbit.appendChild(node); });
+}
+async function loadUniverse() { try { renderUniverse(await api('/social/universe')); await Promise.all([loadCharacter(), loadConcerts(), loadPet(), loadSecretRooms()]); } catch (error) { showNotice(error.message, true); } }
 function clearHangoutMarkers() { state.hangoutMarkers.forEach(marker => marker.remove()); state.hangoutMarkers = []; }
 function renderHangoutLocations(data) {
   if (!window.L) { $('map-status').textContent = 'Map is still loading. Please try again.'; return; }
@@ -599,6 +626,7 @@ function setPanel(panelName, syncParent = true) {
   if (panelName === 'reels') loadReels().catch(error => showNotice(error.message, true));
   if (panelName === 'map') loadHangoutMap();
   if (panelName === 'quests') loadQuests().catch(error => showNotice(error.message, true));
+  if (panelName === 'universe') loadUniverse();
 }
 
 function renderFeed(posts) {
@@ -2238,6 +2266,35 @@ if (tab.dataset.panel === 'profile') openProfile(state.user.id);
 else setPanel(tab.dataset.panel);
 }));
 
+$('character-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  try { renderCharacter(await put('/social/character', { name: $('character-name').value, personality: $('character-personality').value, appearance: $('character-appearance').value, voice: $('character-voice').value })); showNotice('Character saved.'); }
+  catch (error) { showNotice(error.message, true); }
+});
+$('character-chat-form').addEventListener('submit', async event => {
+  event.preventDefault(); const input = $('character-message'); if (!input.value.trim()) return;
+  try { const data = await post('/social/character/chat', { message: input.value }); input.value = ''; renderCharacter(data.character); }
+  catch (error) { showNotice(error.message, true); }
+});
+$('concert-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  try { await post('/social/concerts', { title: $('concert-title').value, theme: $('concert-theme').value }); $('concert-form').reset(); await loadConcerts(); showNotice('Your virtual stage is live.'); }
+  catch (error) { showNotice(error.message, true); }
+});
+document.querySelectorAll('.pet-action').forEach(button => button.addEventListener('click', async () => {
+  try { await put('/social/pet', { action: button.dataset.action }); await loadPet(); }
+  catch (error) { showNotice(error.message, true); }
+}));
+$('secret-room-form').addEventListener('submit', async event => {
+  event.preventDefault();
+  try { const data = await post('/social/secret-rooms', { title: $('secret-title').value, clue: $('secret-clue').value }); $('secret-room-form').reset(); $('secret-code').value = data.room.code; await loadSecretRooms(); showNotice(`Secret room created. Code: ${data.room.code}`); }
+  catch (error) { showNotice(error.message, true); }
+});
+$('secret-unlock-button').addEventListener('click', async () => {
+  try { await post(`/social/secret-rooms/${encodeURIComponent($('secret-code').value.trim())}/unlock`, { answer: $('secret-answer').value }); await loadSecretRooms(); showNotice('Secret room unlocked.'); }
+  catch (error) { showNotice(error.message, true); }
+});
+
 $('discover-from-inbox').addEventListener('click', () => setPanel('people'));
 $('discover-from-empty').addEventListener('click', () => setPanel('people'));
 
@@ -2741,7 +2798,7 @@ if (chatListenCard) {
 }
 
 const initialPanel = new URLSearchParams(window.location.search).get('panel');
-if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed' || initialPanel === 'reels' || initialPanel === 'map' || initialPanel === 'quests') setPanel(initialPanel, false);
+if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed' || initialPanel === 'reels' || initialPanel === 'map' || initialPanel === 'quests' || initialPanel === 'universe') setPanel(initialPanel, false);
 else if (initialPanel === 'profile') setPanel('profile', false);
 syncEmbeddedHomeHeight();
 if (typeof ResizeObserver !== 'undefined') {

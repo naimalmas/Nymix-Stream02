@@ -30,6 +30,7 @@
       <button class="tab" data-panel="reels"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg> Reels</button>
       <button class="tab" data-panel="map"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#location"></use></svg> Hangout map</button>
       <button class="tab" data-panel="quests"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Quests</button>
+      <button class="tab" data-panel="universe"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Universe</button>
       <button class="tab" data-panel="profile"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg> Profile</button>
     </nav>
     <div class="account">
@@ -193,6 +194,42 @@
       <div class="feature-layout quests-layout">
         <article class="card feature-main"><header class="feature-heading"><div><p class="eyebrow">PLAY YOUR WAY</p><h1>Daily quests</h1><p>Small challenges to make your Nymix circle more active.</p></div><div class="quest-score"><strong id="quest-points">0</strong><span>points today</span></div></header><div id="quests-list" class="quests-list"><p class="feed-empty">Loading quests…</p></div></article>
         <aside class="card feature-side"><p class="eyebrow">DAILY STREAK</p><h2 id="quest-summary">Your quests reset every day.</h2><p>Complete challenges to earn points and discover more of Nymix.</p></aside>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-universe">
+      <div class="universe-hero card">
+        <div><p class="eyebrow">YOUR SOCIAL UNIVERSE</p><h1 id="universe-title">Your universe</h1><p>Friends become stars, memories become constellations, and every interaction changes your sky.</p></div>
+        <div class="universe-orbit" id="universe-orbit" aria-label="Your social universe"></div>
+      </div>
+      <div class="universe-grid">
+        <article class="card universe-card">
+          <header class="feature-heading"><div><p class="eyebrow">MEET YOUR OTHER SELF</p><h2>AI Character Studio</h2></div><span class="feature-badge">BETA</span></header>
+          <form id="character-form" class="feature-form">
+            <label>Name<input id="character-name" maxlength="40" placeholder="Nova"></label>
+            <label>Personality<textarea id="character-personality" maxlength="180" rows="2" placeholder="Funny, kind and curious"></textarea></label>
+            <label>Appearance<input id="character-appearance" maxlength="120" placeholder="A violet space traveler"></label>
+            <label>Voice preview<select id="character-voice"><option value="default">Default</option><option value="soft">Soft</option><option value="bright">Bright</option></select></label>
+            <button class="button" type="submit">Save character</button>
+          </form>
+          <div class="character-chat"><div class="character-messages" id="character-messages"></div><form id="character-chat-form"><input id="character-message" maxlength="240" placeholder="Talk to your character…"><button class="button secondary" type="submit">Send</button></form></div>
+        </article>
+        <article class="card universe-card">
+          <header class="feature-heading"><div><p class="eyebrow">MAKE A SCENE</p><h2>Virtual Concert Universe</h2></div><span id="concert-count" class="count">0</span></header>
+          <form id="concert-form" class="feature-form inline-form"><input id="concert-title" maxlength="80" placeholder="Tonight's rooftop show" required><input id="concert-theme" maxlength="80" placeholder="Neon rooftop theme"><button class="button" type="submit">Create</button></form>
+          <div id="concert-list" class="feature-list"></div>
+        </article>
+        <article class="card universe-card">
+          <header class="feature-heading"><div><p class="eyebrow">RAISE IT TOGETHER</p><h2>Shared Digital Pet</h2></div><span id="pet-mood" class="feature-badge">sleepy</span></header>
+          <div class="pet-stage"><div id="pet-avatar" class="pet-avatar">✦</div><div><strong id="pet-name">Mochi</strong><p id="pet-copy">Your friends can help care for this little creature.</p></div></div>
+          <div class="feature-actions"><button class="button secondary pet-action" data-action="feed">Feed</button><button class="button secondary pet-action" data-action="play">Play</button><button class="button secondary pet-action" data-action="decorate">Decorate</button></div>
+        </article>
+        <article class="card universe-card">
+          <header class="feature-heading"><div><p class="eyebrow">NOT FOR EVERYONE</p><h2>Secret Rooms</h2></div><span class="feature-badge">CLUE ONLY</span></header>
+          <form id="secret-room-form" class="feature-form"><input id="secret-title" maxlength="70" placeholder="Name your hidden room" required><input id="secret-clue" maxlength="180" placeholder="The exact answer friends must solve" required><button class="button" type="submit">Create secret room</button></form>
+          <div class="secret-unlock"><input id="secret-code" maxlength="6" placeholder="Room code"><input id="secret-answer" maxlength="180" placeholder="Solve the clue"><button class="button secondary" id="secret-unlock-button" type="button">Unlock</button></div>
+          <div id="secret-room-list" class="feature-list"></div>
+        </article>
       </div>
     </section>
 
@@ -428,6 +465,6 @@
       <button type="button" class="button secondary story-delete" id="story-delete" hidden>Delete your story</button>
     </section>
   </dialog>
-  <script src="/social.js?v=20261125-3"></script>
+  <script src="/social.js?v=20261125-4"></script>
 </body>
 </html>
