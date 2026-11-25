@@ -253,7 +253,7 @@ const me=()=>JSON.parse(localStorage.getItem('nx_user')||'null');
 })();
 function logout(){localStorage.clear();window.location.href='/login.html';}
 const hdr={'Content-Type':'application/json','Authorization':'Bearer '+tk()};
-const api=(url,opts={})=>fetch(API+url,{headers:hdr,...opts}).then(r=>r.json());
+const api=async(url,opts={})=>{const response=await fetch(API+url,{headers:hdr,...opts});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Request failed');return data;};
 function toast(msg,type='ok'){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show '+type;setTimeout(()=>el.classList.remove('show'),3000);}
 // Nav
 let usersData=[];

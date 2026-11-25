@@ -2106,10 +2106,10 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
   const users  = rd('users.json');
   const plays  = rd('plays.json');
   const liked  = rd('liked.json');
-  const totalUsers  = users.filter(u => u.role !== 'admin').length;
+  const totalUsers  = users.filter(u => u.role === 'user').length;
   const totalPlays  = plays.length;
   const totalLikes  = Object.values(liked).reduce((a, b) => a + b.length, 0);
-  const bannedUsers = users.filter(u => u.banned).length;
+  const bannedUsers = users.filter(u => u.role === 'user' && u.banned).length;
   const songCount = {};
   plays.forEach(p => {
     if (!songCount[p.songId]) songCount[p.songId] = { count: 0, title: p.songTitle, artist: p.songArtist, thumb: p.thumb };
@@ -2123,17 +2123,23 @@ app.get('/api/admin/stats', adminAuth, (req, res) => {
   }).reverse();
   const playsPerDay = days.map(label => ({ label, count: plays.filter(p => new Date(p.timestamp).toLocaleDateString('en-US',{month:'short',day:'numeric'}) === label).length }));
   const recent = plays.slice(-10).reverse().map(p => ({ user: users.find(u=>u.id===p.userId)?.name||'Unknown', song: p.songTitle, artist: p.songArtist, time: new Date(p.timestamp).toLocaleTimeString() }));
-  res.json({ totalUsers, totalPlays, totalLikes, bannedUsers, topSongs, playsPerDay, recent });
+  const storyCount = users.reduce((total, user) => total + (user.role === 'user' && Array.isArray(user.stories)
+    ? user.stories.filter(story => story.expiresAt > Date.now()).length : 0), 0);
+  res.json({ totalUsers, totalPlays, totalLikes, bannedUsers, storyCount, topSongs, playsPerDay, recent, recentActivity: recent });
 });
 
 app.get('/api/admin/users', adminAuth, (req, res) => {
-  res.json(rd('users.json').map(u => ({ id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt, banned: u.banned, totalPlays: u.totalPlays||0 })));
+  res.json(rd('users.json').filter(u => u.role === 'user').map(u => ({
+    id: u.id, name: u.name, email: u.email, role: u.role, createdAt: u.createdAt,
+    banned: u.banned, totalPlays: u.totalPlays || 0,
+  })));
 });
 
 app.put('/api/admin/users/:id', adminAuth, (req, res) => {
   const users = rd('users.json');
   const u = users.find(u => u.id === req.params.id);
   if (!u) return res.status(404).json({ error: 'Not found' });
+  if (u.role !== 'user') return res.status(403).json({ error: 'Administrator accounts are managed by Super Admin' });
   if (req.body.banned !== undefined) u.banned = req.body.banned;
   if (req.body.role) u.role = req.body.role;
   wd('users.json', users);
@@ -2141,12 +2147,54 @@ app.put('/api/admin/users/:id', adminAuth, (req, res) => {
 });
 
 app.delete('/api/admin/users/:id', adminAuth, (req, res) => {
-  let users = rd('users.json');
+  const originalUsers = rd('users.json');
+  const target = originalUsers.find(user => user.id === req.params.id);
+  if (!target) return res.status(404).json({ error: 'Not found' });
+  if (target.role !== 'user') return res.status(403).json({ error: 'Administrator accounts are managed by Super Admin' });
+  let users = originalUsers;
   users = users.filter(u => u.id !== req.params.id);
   wd('users.json', users);
   const liked = rd('liked.json');
   delete liked[req.params.id];
   wd('liked.json', liked);
+  res.json({ ok: true });
+});
+
+const youtubeVideoId = value => {
+  const input = String(value || '').trim();
+  if (/^[A-Za-z0-9_-]{11}$/.test(input)) return input;
+  const match = input.match(/(?:v=|youtu\.be\/|embed\/|shorts\/)([A-Za-z0-9_-]{11})/i);
+  return match?.[1] || '';
+};
+
+app.get('/api/admin/songs', adminAuth, (req, res) => {
+  res.json(Array.isArray(rd('config.json').featuredSongs) ? rd('config.json').featuredSongs : []);
+});
+
+app.post('/api/admin/songs', adminAuth, (req, res) => {
+  const id = youtubeVideoId(req.body?.youtubeUrl || req.body?.id);
+  const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
+  const artist = typeof req.body?.artist === 'string' ? req.body.artist.trim() : '';
+  if (!id) return res.status(400).json({ error: 'Enter a valid YouTube URL or video ID' });
+  if (!title || title.length > 160) return res.status(400).json({ error: 'Song title is required and must be 160 characters or fewer' });
+  if (!artist || artist.length > 120) return res.status(400).json({ error: 'Artist is required and must be 120 characters or fewer' });
+  const config = rd('config.json');
+  const songs = Array.isArray(config.featuredSongs) ? config.featuredSongs : [];
+  if (songs.some(song => song.id === id)) return res.status(409).json({ error: 'That song is already featured' });
+  if (songs.length >= 100) return res.status(409).json({ error: 'Featured playlist is full' });
+  const song = { id, title, artist, dur: '', album: 'Nymix Picks' };
+  config.featuredSongs = [...songs, song];
+  wd('config.json', config);
+  res.status(201).json(song);
+});
+
+app.delete('/api/admin/songs/:songId', adminAuth, (req, res) => {
+  const config = rd('config.json');
+  const songs = Array.isArray(config.featuredSongs) ? config.featuredSongs : [];
+  const updated = songs.filter(song => song.id !== req.params.songId);
+  if (updated.length === songs.length) return res.status(404).json({ error: 'Song not found' });
+  config.featuredSongs = updated;
+  wd('config.json', config);
   res.json({ ok: true });
 });
 
