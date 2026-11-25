@@ -1025,6 +1025,8 @@ const getSocialState = () => {
   state.callSignals ||= [];
   state.pushSubscriptions ||= [];
   state.watchRooms ||= [];
+  state.hangoutLocations ||= {};
+  state.questProgress ||= {};
   return state;
 };
 const notifyUserPush = async (userId, payload, social) => {
@@ -1343,6 +1345,75 @@ app.delete('/api/watch-rooms/:code', watchRoomAuth, (req, res) => {
   }
   wd('social.json', social);
   res.json({ ok: true });
+});
+
+const dailyQuestCatalog = [
+  { id: 'visit-map', title: 'Check the live map', description: 'See what is happening around your circle.', points: 10 },
+  { id: 'send-message', title: 'Say hello', description: 'Send a message to a friend.', points: 15 },
+  { id: 'share-photo', title: 'Share a moment', description: 'Post one photo to the community feed.', points: 20 },
+  { id: 'discover-person', title: 'Discover someone', description: 'Search for a new Nymix connection.', points: 10 },
+];
+const questDate = () => new Date().toISOString().slice(0, 10);
+
+app.get('/api/social/quests', userAuth, (req, res) => {
+  const social = getSocialState();
+  const today = questDate();
+  const progress = social.questProgress[req.user.id];
+  const completed = progress?.date === today ? progress.completed : [];
+  res.json({ date: today, points: completed.reduce((total, id) => total + (dailyQuestCatalog.find(quest => quest.id === id)?.points || 0), 0), quests: dailyQuestCatalog.map(quest => ({ ...quest, completed: completed.includes(quest.id) })) });
+});
+
+app.post('/api/social/quests/:questId/complete', userAuth, (req, res) => {
+  const quest = dailyQuestCatalog.find(item => item.id === req.params.questId);
+  if (!quest) return res.status(404).json({ error: 'Quest not found' });
+  const social = getSocialState();
+  const today = questDate();
+  const current = social.questProgress[req.user.id]?.date === today
+    ? social.questProgress[req.user.id]
+    : { date: today, completed: [] };
+  if (!current.completed.includes(quest.id)) current.completed.push(quest.id);
+  social.questProgress[req.user.id] = current;
+  wd('social.json', social);
+  res.json({ ok: true, quest: { ...quest, completed: true }, completed: current.completed, points: current.completed.reduce((total, id) => total + (dailyQuestCatalog.find(item => item.id === id)?.points || 0), 0) });
+});
+
+app.get('/api/social/hangout/locations', userAuth, (req, res) => {
+  const social = getSocialState();
+  const users = rd('users.json');
+  const friendIds = new Set(rd('friends.json').filter(relation => relation.status === 'accepted' && (relation.user1 === req.user.id || relation.user2 === req.user.id)).map(relation => relation.user1 === req.user.id ? relation.user2 : relation.user1));
+  const locations = Object.values(social.hangoutLocations).filter(location =>
+    location.sharing && location.userId !== req.user.id && friendIds.has(location.userId) && Date.now() - location.updatedAt < 30 * 60 * 1000,
+  ).map(location => {
+    const user = users.find(account => account.id === location.userId && !account.banned);
+    return user ? { ...safeProfile(user), latitude: location.latitude, longitude: location.longitude, updatedAt: location.updatedAt } : null;
+  }).filter(Boolean);
+  const own = social.hangoutLocations[req.user.id];
+  res.json({ sharing: Boolean(own?.sharing), locations });
+});
+
+app.put('/api/social/hangout/location', userAuth, (req, res) => {
+  const sharing = req.body?.sharing === true;
+  const social = getSocialState();
+  if (!sharing) {
+    delete social.hangoutLocations[req.user.id];
+    wd('social.json', social);
+    return res.json({ sharing: false });
+  }
+  const latitude = Number(req.body?.latitude);
+  const longitude = Number(req.body?.longitude);
+  if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+    return res.status(400).json({ error: 'A valid location is required' });
+  }
+  social.hangoutLocations[req.user.id] = {
+    userId: req.user.id,
+    // Round to roughly 100m so the app never exposes an exact home location.
+    latitude: Math.round(latitude * 1000) / 1000,
+    longitude: Math.round(longitude * 1000) / 1000,
+    sharing: true,
+    updatedAt: Date.now(),
+  };
+  wd('social.json', social);
+  res.json({ sharing: true });
 });
 
 app.get('/api/social/overview', userAuth, (req, res) => {

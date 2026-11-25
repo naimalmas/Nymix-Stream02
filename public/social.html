@@ -16,7 +16,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="/social.css?v=20261125-4" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <script src="https://www.youtube.com/iframe_api"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 </head>
 <body class="messages-page">
   <header class="topbar">
@@ -26,9 +28,12 @@
       <button class="tab" data-panel="people"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Discover</button>
       <button class="tab" data-panel="feed"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#album"></use></svg> Feed</button>
       <button class="tab" data-panel="reels"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#play"></use></svg> Reels</button>
+      <button class="tab" data-panel="map"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#location"></use></svg> Hangout map</button>
+      <button class="tab" data-panel="quests"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#sparkles"></use></svg> Quests</button>
       <button class="tab" data-panel="profile"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg> Profile</button>
     </nav>
     <div class="account">
+      <span class="offline-status" id="offline-status" hidden>Offline · drafts saved</span>
       <button type="button" class="account-profile-button" id="account-profile-button" aria-label="View your profile">
         <span class="account-avatar" id="account-avatar" aria-hidden="true"></span>
         <span id="account-name"></span>
@@ -170,6 +175,24 @@
             <div id="game-invites-list" class="stack"></div>
           </article>
         </aside>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-map">
+      <div class="feature-layout">
+        <article class="card feature-main">
+          <header class="feature-heading"><div><p class="eyebrow">YOUR CIRCLE</p><h1>Live map hangout</h1><p>See friends who choose to share an approximate location.</p></div><button class="button" id="map-refresh">Refresh</button></header>
+          <div id="hangout-map" class="hangout-map" aria-label="Live hangout map"></div>
+          <p class="feature-note" id="map-status">Location sharing is off.</p>
+        </article>
+        <aside class="card feature-side"><p class="eyebrow">PRIVACY FIRST</p><h2>Share your spot</h2><p>Your location is rounded to about 100 metres, visible only to accepted friends, and expires after 30 minutes.</p><label class="switch-row"><input type="checkbox" id="map-sharing"><span>Show me on the map</span></label><button class="button secondary" id="map-locate">Use my current location</button></aside>
+      </div>
+    </section>
+
+    <section class="panel" id="panel-quests">
+      <div class="feature-layout quests-layout">
+        <article class="card feature-main"><header class="feature-heading"><div><p class="eyebrow">PLAY YOUR WAY</p><h1>Daily quests</h1><p>Small challenges to make your Nymix circle more active.</p></div><div class="quest-score"><strong id="quest-points">0</strong><span>points today</span></div></header><div id="quests-list" class="quests-list"><p class="feed-empty">Loading quests…</p></div></article>
+        <aside class="card feature-side"><p class="eyebrow">DAILY STREAK</p><h2 id="quest-summary">Your quests reset every day.</h2><p>Complete challenges to earn points and discover more of Nymix.</p></aside>
       </div>
     </section>
 

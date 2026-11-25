@@ -73,6 +73,10 @@ const state = {
   noticeTimer: null,
   homeFeed: new URLSearchParams(window.location.search).get('home') === '1',
   homeFeedResizeObserver: null,
+  hangoutMap: null,
+  hangoutMarkers: [],
+  quests: [],
+  offlineQueue: JSON.parse(localStorage.getItem('nx_offline_chat_queue') || '[]'),
 };
 
 const $ = id => document.getElementById(id);
@@ -112,6 +116,33 @@ async function api(path, options = {}) {
 const post = (path, body = {}) => api(path, { method: 'POST', body: JSON.stringify(body) });
 const put = (path, body = {}) => api(path, { method: 'PUT', body: JSON.stringify(body) });
 const deleteRequest = path => api(path, { method: 'DELETE' });
+
+function saveOfflineQueue() { localStorage.setItem('nx_offline_chat_queue', JSON.stringify(state.offlineQueue.slice(-50))); }
+function saveDraft(friendId, text) {
+  const drafts = JSON.parse(localStorage.getItem('nx_chat_drafts') || '{}');
+  if (text) drafts[friendId] = text; else delete drafts[friendId];
+  localStorage.setItem('nx_chat_drafts', JSON.stringify(drafts));
+}
+function loadDraft(friendId) { return JSON.parse(localStorage.getItem('nx_chat_drafts') || '{}')[friendId] || ''; }
+function updateOfflineStatus() { $('offline-status').hidden = navigator.onLine; }
+async function flushOfflineQueue() {
+  if (!navigator.onLine || !state.offlineQueue.length) return;
+  const pending = [...state.offlineQueue];
+  for (const queued of pending) {
+    try {
+      const message = await post(`/chat/${encodeURIComponent(queued.friendId)}`, { text: queued.text });
+      state.offlineQueue = state.offlineQueue.filter(item => item.id !== queued.id);
+      if (state.activeFriend?.id === queued.friendId) {
+        state.chatMessages = state.chatMessages.filter(item => item.id !== queued.id);
+        state.chatMessages.push(message);
+        state.chatMessages.sort((a, b) => a.ts - b.ts);
+        renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+      }
+    } catch { break; }
+  }
+  saveOfflineQueue();
+  if (pending.length !== state.offlineQueue.length) showNotice('Queued messages sent.');
+}
 
 function makeButton(label, action, style = 'secondary') {
   const button = document.createElement('button');
@@ -499,17 +530,75 @@ function syncEmbeddedHomeHeight() {
   });
 }
 
+function renderQuests(data) {
+  state.quests = data.quests || [];
+  $('quest-points').textContent = data.points || 0;
+  $('quest-summary').textContent = `${state.quests.filter(quest => quest.completed).length}/${state.quests.length} completed today.`;
+  const list = $('quests-list');
+  list.replaceChildren();
+  state.quests.forEach(quest => {
+    const card = document.createElement('article');
+    card.className = `quest-card${quest.completed ? ' done' : ''}`;
+    const icon = document.createElement('span'); icon.className = 'quest-icon'; icon.textContent = quest.completed ? '✓' : '✦';
+    const copy = document.createElement('div'); copy.className = 'quest-copy';
+    const title = document.createElement('strong'); title.textContent = quest.title;
+    const description = document.createElement('span'); description.textContent = `${quest.description} · +${quest.points} points`;
+    copy.append(title, description);
+    const button = makeButton(quest.completed ? 'Completed' : 'Complete', () => completeQuest(quest.id), 'secondary');
+    button.disabled = quest.completed;
+    card.append(icon, copy, button); list.appendChild(card);
+  });
+}
+async function loadQuests() { renderQuests(await api('/social/quests')); }
+async function completeQuest(id) {
+  try { await post(`/social/quests/${encodeURIComponent(id)}/complete`); await loadQuests(); }
+  catch (error) { showNotice(error.message, true); }
+}
+function clearHangoutMarkers() { state.hangoutMarkers.forEach(marker => marker.remove()); state.hangoutMarkers = []; }
+function renderHangoutLocations(data) {
+  if (!window.L) { $('map-status').textContent = 'Map is still loading. Please try again.'; return; }
+  if (!state.hangoutMap) {
+    state.hangoutMap = L.map('hangout-map', { zoomControl: true }).setView([23.8103, 90.4125], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19, attribution: '© OpenStreetMap contributors' }).addTo(state.hangoutMap);
+  }
+  clearHangoutMarkers();
+  (data.locations || []).forEach(location => {
+    const marker = L.marker([location.latitude, location.longitude]).addTo(state.hangoutMap);
+    marker.bindPopup(`<strong>${String(location.name).replace(/[<>&"']/g, '')}</strong><br><small>Active on Nymix</small>`);
+    state.hangoutMarkers.push(marker);
+  });
+  $('map-sharing').checked = Boolean(data.sharing);
+  $('map-status').textContent = data.locations?.length ? `${data.locations.length} friend${data.locations.length === 1 ? '' : 's'} nearby.` : 'No friends are sharing their location right now.';
+  requestAnimationFrame(() => state.hangoutMap.invalidateSize());
+}
+async function loadHangoutMap() {
+  try { renderHangoutLocations(await api('/social/hangout/locations')); }
+  catch (error) { $('map-status').textContent = error.message; }
+}
+function requestHangoutLocation() {
+  if (!navigator.geolocation) return showNotice('Location is not supported by this browser.', true);
+  navigator.geolocation.getCurrentPosition(async position => {
+    try {
+      await put('/social/hangout/location', { sharing: true, latitude: position.coords.latitude, longitude: position.coords.longitude });
+      await loadHangoutMap();
+      await completeQuest('visit-map');
+    } catch (error) { $('map-status').textContent = error.message; }
+  }, error => { $('map-status').textContent = error.code === 1 ? 'Location permission was denied.' : 'Could not read your location.'; }, { enableHighAccuracy: false, maximumAge: 120000, timeout: 10000 });
+}
+
 function setPanel(panelName, syncParent = true) {
   document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === `panel-${panelName}`));
   document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab.dataset.panel === panelName));
   document.body.classList.toggle('reels-active', panelName === 'reels');
   if (panelName !== 'reels') pauseActiveReel();
   syncEmbeddedHomeHeight();
-  if (syncParent && ['chat', 'people', 'feed', 'profile'].includes(panelName) && window.parent !== window) {
+  if (syncParent && ['chat', 'people', 'feed', 'profile', 'map', 'quests'].includes(panelName) && window.parent !== window) {
     window.parent.postMessage({ type: 'nymix-social-navigation', panel: panelName, homeFeed: state.homeFeed }, window.location.origin);
   }
   if (panelName === 'feed') loadFeed().catch(error => showNotice(error.message, true));
   if (panelName === 'reels') loadReels().catch(error => showNotice(error.message, true));
+  if (panelName === 'map') loadHangoutMap();
+  if (panelName === 'quests') loadQuests().catch(error => showNotice(error.message, true));
 }
 
 function renderFeed(posts) {
@@ -1716,6 +1805,8 @@ async function selectFriend(friend) {
   setAvatar($('chat-avatar'), friend);
   $('inbox-layout').classList.add('conversation-open');
   $('chat-input').disabled = false;
+  $('chat-input').value = loadDraft(friend.id);
+  $('chat-input').style.height = '';
   $('chat-send').disabled = false;
   $('record-voice').disabled = false;
   $('chat-game-button').disabled = false;
@@ -1794,7 +1885,10 @@ async function searchUsers(query) {
   }
   try {
     const users = await api(`/users/search?q=${encodeURIComponent(query)}`);
-    if (sequence === state.searchSequence && $('user-search').value.trim() === query) renderSearchResults(users);
+    if (sequence === state.searchSequence && $('user-search').value.trim() === query) {
+      renderSearchResults(users);
+      if (users.length) completeQuest('discover-person').catch(() => {});
+    }
   } catch (error) {
     if (sequence === state.searchSequence) showNotice(error.message, true);
   }
@@ -2240,6 +2334,12 @@ $('account-profile-button').addEventListener('click', () => openProfile(state.us
 $('feed-refresh').addEventListener('click', () => loadFeed().catch(error => showNotice(error.message, true)));
 $('reels-refresh').addEventListener('click', () => loadReels(true));
 $('reels-more').addEventListener('click', () => loadReels(false, true));
+$('map-refresh').addEventListener('click', () => loadHangoutMap());
+$('map-locate').addEventListener('click', requestHangoutLocation);
+$('map-sharing').addEventListener('change', event => {
+  if (event.currentTarget.checked) requestHangoutLocation();
+  else put('/social/hangout/location', { sharing: false }).then(loadHangoutMap).catch(error => showNotice(error.message, true));
+});
 $('feed-profile-button').addEventListener('click', () => openProfile(state.user.id));
 $('profile-page-edit').addEventListener('click', () => {
   if (!state.profileTarget || state.profileTarget.id !== state.user.id) return;
@@ -2281,6 +2381,7 @@ $('feed-form').addEventListener('submit', async event => {
     $('feed-preview').removeAttribute('src');
     $('feed-preview').hidden = true;
     status.textContent = 'Photo shared to your profile and feed.';
+    completeQuest('share-photo').catch(() => {});
     await loadFeed();
   } catch (error) {
     status.textContent = error.message;
@@ -2475,13 +2576,23 @@ $('chat-form').addEventListener('submit', async event => {
     $('chat-input').style.height = '';
     renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
     renderFriends();
-  } catch (error) { showNotice(error.message, true); }
+    saveDraft(state.activeFriend.id, '');
+    completeQuest('send-message').catch(() => {});
+  } catch (error) {
+    const queued = { id: `offline_${Date.now()}_${Math.random().toString(36).slice(2)}`, friendId: state.activeFriend.id, text, ts: Date.now() };
+    state.offlineQueue.push(queued); saveOfflineQueue();
+    state.chatMessages.push({ id: queued.id, from: state.user.id, text, ts: queued.ts, type: 'text', pending: true });
+    $('chat-input').value = ''; $('chat-input').style.height = ''; saveDraft(state.activeFriend.id, '');
+    renderMessages($('chat-messages'), state.chatMessages, 'Say hello to your friend.');
+    showNotice('Offline: message queued and will send automatically.', true);
+  }
 });
 
 $('chat-input').addEventListener('input', event => {
   const input = event.currentTarget;
   input.style.height = 'auto';
   input.style.height = `${Math.min(input.scrollHeight, 120)}px`;
+  if (state.activeFriend) saveDraft(state.activeFriend.id, input.value);
 });
 
 $('chat-input').addEventListener('keydown', event => {
@@ -2630,7 +2741,7 @@ if (chatListenCard) {
 }
 
 const initialPanel = new URLSearchParams(window.location.search).get('panel');
-if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed' || initialPanel === 'reels') setPanel(initialPanel, false);
+if (initialPanel === 'people' || initialPanel === 'chat' || initialPanel === 'feed' || initialPanel === 'reels' || initialPanel === 'map' || initialPanel === 'quests') setPanel(initialPanel, false);
 else if (initialPanel === 'profile') setPanel('profile', false);
 syncEmbeddedHomeHeight();
 if (typeof ResizeObserver !== 'undefined') {
@@ -2687,6 +2798,9 @@ window.addEventListener('beforeunload', () => {
   state.voiceStream?.getTracks().forEach(track => track.stop());
 });
 updateCallPanel();
+updateOfflineStatus();
+window.addEventListener('online', () => { updateOfflineStatus(); flushOfflineQueue(); });
+window.addEventListener('offline', updateOfflineStatus);
 
 if (!token() || !state.user || state.user.role !== 'user') {
   if (window.parent !== window) window.top.location.href = '/login.html';
@@ -2696,6 +2810,7 @@ if (!token() || !state.user || state.user.role !== 'user') {
     setAvatar($('account-avatar'), state.user);
   if (initialPanel === 'profile') openProfile(state.user.id, false);
   refreshSocial();
+  flushOfflineQueue();
   refreshSuggestions().catch(error => showNotice(error.message, true));
   pollCallSignals().catch(error => showNotice(error.message, true));
   setInterval(refreshSocial, 4500);
