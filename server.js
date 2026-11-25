@@ -476,10 +476,10 @@ app.post('/api/auth/login', async (req, res) => {
   try {
     const { email, password } = req.body;
     const users = rd('users.json');
-    const user  = users.find(u => u.email === email);
+    const candidates = users.filter(u => String(u.email || '').toLowerCase() === String(email || '').trim().toLowerCase());
+    const user = candidates.find(u => u.password && bcrypt.compareSync(password, u.password));
     if (!user) return res.status(401).json({ error: 'Invalid credentials' });
     if (user.banned) return res.status(403).json({ error: 'Account banned' });
-    if (!await bcrypt.compare(password, user.password)) return res.status(401).json({ error: 'Invalid credentials' });
     const token = jwt.sign({ id: user.id, name: user.name, email, role: user.role, credentialVersion: user.credentialVersion || 0 }, SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user.id, name: user.name, email, role: user.role, avatar: user.avatar } });
   } catch (e) { res.status(500).json({ error: e.message }); }
