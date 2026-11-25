@@ -47,11 +47,11 @@ html.embedded-portal .inbox-layout { min-height:0; height:100%; border:0; border
 html.embedded-home, html.embedded-home body { height:auto; min-height:0; overflow:visible; }
 html.embedded-home body.messages-page { display:block; }
 html.embedded-home body.messages-page .messages-main { display:block; width:100%; height:auto; min-height:0; flex:none; overflow:visible; margin:0; padding:14px 0 24px; }
-html.embedded-home #panel-feed.active { display:grid; grid-template-columns:minmax(0,1fr) 232px; gap:18px 20px; width:min(100%,980px); margin:0 auto; }
+html.embedded-home #panel-feed.active { display:grid; grid-template-columns:minmax(0,min(700px,calc(100% - 280px))) 260px; gap:18px 20px; width:100%; margin:0; justify-content:start; }
 html.embedded-home #panel-feed > .stories-section { grid-column:1; width:100%; margin:0; }
 html.embedded-home #panel-feed > .feed-layout { display:contents; }
 html.embedded-home #panel-feed .feed-main { grid-column:1; }
-html.embedded-home #panel-feed .feed-sidebar { grid-column:2; grid-row:1 / span 2; margin:0; }
+html.embedded-home #panel-feed .feed-sidebar { grid-column:2; grid-row:1; margin:0; align-self:start; }
 html.embedded-home #panel-feed .feed-heading { padding-top:0; }
 html.embedded-home #panel-feed .feed-composer { padding:14px; }
 html.embedded-home #panel-feed .feed-composer textarea { order:1; min-height:62px; border-radius:12px; }
