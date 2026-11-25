@@ -32,6 +32,7 @@ const S = {
   notificationsBusy: false,
   notificationsInitialized: false,
   notificationAudio: null,
+  ringtoneTimer: null,
 };
 
 // ── Auth Guard ────────────────────────────────────────
@@ -132,11 +133,13 @@ window.onYouTubeIframeAPIReady = () => {
     if (frame?.contentWindow) frame.contentWindow.postMessage({ type: `nymix-call-${action}` }, window.location.origin);
   };
   $('live-call-accept').addEventListener('click', () => {
+    stopIncomingRingtone();
     $('live-call-alert').hidden = true;
     showView('messages');
     sendCallAction('accept');
   });
   $('live-call-decline').addEventListener('click', () => {
+    stopIncomingRingtone();
     $('live-call-alert').hidden = true;
     sendCallAction('decline');
   });
@@ -881,6 +884,37 @@ function playNotificationSound() {
   });
 }
 
+function playRingtoneBurst() {
+  const context = notificationAudio();
+  if (!context || context.state === 'suspended') return;
+  const start = context.currentTime;
+  [659, 880, 659].forEach((frequency, index) => {
+    const oscillator = context.createOscillator();
+    const gain = context.createGain();
+    const at = start + index * 0.22;
+    oscillator.type = 'sine';
+    oscillator.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.0001, at);
+    gain.gain.exponentialRampToValueAtTime(0.16, at + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.17);
+    oscillator.connect(gain);
+    gain.connect(context.destination);
+    oscillator.start(at);
+    oscillator.stop(at + 0.19);
+  });
+}
+
+function startIncomingRingtone() {
+  stopIncomingRingtone();
+  playRingtoneBurst();
+  S.ringtoneTimer = window.setInterval(playRingtoneBurst, 1200);
+}
+
+function stopIncomingRingtone() {
+  if (S.ringtoneTimer) window.clearInterval(S.ringtoneTimer);
+  S.ringtoneTimer = null;
+}
+
 function renderNotifications(items) {
   const list = $('notification-list');
   const badge = $('notification-count');
@@ -1037,9 +1071,10 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('live-call-avatar').textContent = String(event.data.name || 'N').trim().slice(0, 1).toUpperCase();
       $('live-call-copy').textContent = `${event.data.kind === 'video' ? 'Video' : 'Audio'} call · open Messages to answer`;
       $('live-call-alert').hidden = false;
-      playNotificationSound();
+      startIncomingRingtone();
       // Keep the caller on the current screen until they choose Accept.
     } else if (event.data?.type === 'nymix-call-ended') {
+      stopIncomingRingtone();
       $('live-call-alert').hidden = true;
     } else if (event.data?.type === 'nymix-profile-updated' && event.data.user?.id === user()?.id) {
       localStorage.setItem('nx_user', JSON.stringify(event.data.user));
