@@ -888,26 +888,26 @@ function playRingtoneBurst() {
   const context = notificationAudio();
   if (!context || context.state === 'suspended') return;
   const start = context.currentTime;
-  [784, 988, 784, 659, 784].forEach((frequency, index) => {
+  [520, 660, 520].forEach((frequency, index) => {
     const oscillator = context.createOscillator();
     const gain = context.createGain();
-    const at = start + index * 0.16;
-    oscillator.type = 'triangle';
+    const at = start + index * 0.38;
+    oscillator.type = 'sine';
     oscillator.frequency.value = frequency;
     gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(0.42, at + 0.02);
-    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.13);
+    gain.gain.exponentialRampToValueAtTime(0.46, at + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.28);
     oscillator.connect(gain);
     gain.connect(context.destination);
     oscillator.start(at);
-    oscillator.stop(at + 0.15);
+    oscillator.stop(at + 0.31);
   });
 }
 
 function startIncomingRingtone() {
   stopIncomingRingtone();
   playRingtoneBurst();
-  S.ringtoneTimer = window.setInterval(playRingtoneBurst, 1400);
+  S.ringtoneTimer = window.setInterval(playRingtoneBurst, 1800);
 }
 
 function stopIncomingRingtone() {
