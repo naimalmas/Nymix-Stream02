@@ -160,6 +160,9 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .nav-arrow .ui-icon { width:17px; height:17px; }
 .nav-arrow:hover { background:rgba(255,255,255,0.2); }
 .view-title { font-size:12px; color:var(--text3); margin-left:4px; }
+.home-search-box { display:flex; align-items:center; gap:8px; width:min(340px,38vw); min-height:32px; margin-left:auto; padding:0 12px; border:1px solid rgba(255,255,255,.08); border-radius:999px; background:rgba(255,255,255,.06); color:var(--text3); }
+.home-search-box:focus-within { border-color:rgba(168,85,247,.75); background:rgba(255,255,255,.09); box-shadow:0 0 0 3px rgba(124,58,237,.14); }
+.home-search-box .ui-icon { width:15px; height:15px; }.home-search-box input { width:100%; border:0; outline:0; background:transparent; color:var(--text); font-size:11px; }.home-search-box input::placeholder { color:#9d93ae; }
 .notification-wrap { position:relative; z-index:12; margin-left:auto; }
 .notification-toggle { position:relative; display:grid; width:36px; height:36px; place-items:center; border:1px solid rgba(255,255,255,.09); border-radius:11px; background:rgba(255,255,255,.06); color:var(--text); cursor:pointer; }
 .notification-toggle:hover, .notification-toggle[aria-expanded="true"] { border-color:rgba(160,106,255,.45); background:rgba(160,106,255,.15); }
@@ -195,6 +198,7 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .home-view.active { padding-top:0; }
 .home-promo { margin:0 -24px 20px; padding:0 24px; }
 .home-view .section-big-title { margin:0; padding:10px 0 10px; font-size:24px; }
+.home-view .section-big-title { font-size:16px; letter-spacing:-.02em; }
 .home-view .hero-banner { height:190px; margin-bottom:0; }
 .home-view .playlist-section[hidden] { display:none; }
 .home-feed-area { min-width:0; }

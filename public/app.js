@@ -1119,6 +1119,12 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // ── Search ──
   const inp = $('search-input');
+  const homeSearch = $('home-search-input');
+  homeSearch?.addEventListener('keydown', event => {
+    if (event.key !== 'Enter') return;
+    const sidebarSearch = $('search-input');
+    if (sidebarSearch) { sidebarSearch.value = homeSearch.value; sidebarSearch.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); }
+  });
   if (inp) {
     inp.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
