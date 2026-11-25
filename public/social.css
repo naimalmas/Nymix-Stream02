@@ -47,18 +47,23 @@ html.embedded-portal .inbox-layout { min-height:0; height:100%; border:0; border
 html.embedded-home, html.embedded-home body { height:auto; min-height:0; overflow:visible; }
 html.embedded-home body.messages-page { display:block; }
 html.embedded-home body.messages-page .messages-main { display:block; width:100%; height:auto; min-height:0; flex:none; overflow:visible; margin:0; padding:14px 0 24px; }
-html.embedded-home #panel-feed.active { display:grid; grid-template-columns:minmax(0,min(700px,calc(100% - 280px))) 260px; gap:18px 20px; width:100%; margin:0; justify-content:start; }
-html.embedded-home #panel-feed > .stories-section { grid-column:1; width:100%; margin:0; }
+html.embedded-home #panel-feed.active { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,400px); gap:24px 32px; width:100%; margin:0; justify-content:stretch; align-items:start; }
+html.embedded-home #panel-feed > .stories-section { grid-column:1; width:100%; margin:0; padding:20px 24px; border-radius:20px; background:rgba(25,19,37,.88); }
 html.embedded-home #panel-feed > .feed-layout { display:contents; }
 html.embedded-home #panel-feed .feed-main { grid-column:1; }
 html.embedded-home #panel-feed .feed-sidebar { grid-column:2; grid-row:1; margin:0; align-self:start; }
-html.embedded-home #panel-feed .feed-heading { padding-top:0; }
-html.embedded-home #panel-feed .feed-composer { padding:14px; }
-html.embedded-home #panel-feed .feed-composer textarea { order:1; min-height:62px; border-radius:12px; }
-html.embedded-home #panel-feed .feed-upload { order:2; border-top:1px solid var(--border); border-bottom:0; padding:12px 0 2px; }
+html.embedded-home #panel-feed .feed-heading { padding:0 0 4px; }
+html.embedded-home #panel-feed .feed-heading h1 { margin-bottom:4px; font-size:30px; }
+html.embedded-home #panel-feed .feed-heading .eyebrow { margin-bottom:4px; }
+html.embedded-home #panel-feed .stories-heading { margin-bottom:16px; }
+html.embedded-home #panel-feed .stories-heading h2 { font-size:20px; }
+html.embedded-home #panel-feed .feed-composer { padding:20px; border-radius:20px; }
+html.embedded-home #panel-feed .feed-composer textarea { order:1; min-height:92px; border:1px solid var(--border); border-radius:16px; background:rgba(255,255,255,.055); }
+html.embedded-home #panel-feed .feed-upload { order:2; border-top:0; border-bottom:0; padding:18px 0 2px; }
+html.embedded-home #panel-feed .feed-upload-icon { display:none; }
 html.embedded-home #panel-feed .feed-preview { order:2; }
 html.embedded-home #panel-feed .feed-composer-footer { order:3; }
-html.embedded-home #panel-feed .feed-sidebar { padding:18px; border-color:rgba(194,154,255,.16); background:linear-gradient(160deg,rgba(96,52,164,.3),rgba(255,255,255,.035)); }
+html.embedded-home #panel-feed .feed-sidebar { padding:24px; border-radius:20px; border-color:rgba(194,154,255,.16); background:linear-gradient(160deg,rgba(96,52,164,.3),rgba(255,255,255,.035)); }
 .messages-page .messages-main { display: flex; width: 100%; max-width: none; min-height: 0; flex: 1; flex-direction: column; overflow-y: auto; margin: 0; padding: 18px clamp(18px, 4vw, 56px) 24px; }
 .messages-main > .notice { flex: 0 0 auto; }
 .messages-main > #panel-chat.active { display: flex; min-height: 0; flex: 1; flex-direction: column; }
