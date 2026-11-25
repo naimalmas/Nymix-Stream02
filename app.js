@@ -330,7 +330,7 @@ function showView(name) {
   const v=document.getElementById('view-'+name);
   if(v) v.classList.add('active');
   document.querySelectorAll('.nav-link').forEach(a=>a.classList.toggle('active',a.dataset.view===name));
-  const titles={home:'What\'s hot',discover:'Discover',browse:'Browse',liked:'Your Library',radio:'Radio',albums:'Albums',songs:'Songs',artists:'Artists','social-messages':'Messages','social-map':'Hangout map','social-quests':'Daily quests'};
+  const titles={home:'What\'s hot',discover:'Discover',browse:'Browse',liked:'Your Library',radio:'Radio',albums:'Albums',songs:'Songs',artists:'Artists'};
   $('view-title').textContent=titles[name]||'';
 }
 
