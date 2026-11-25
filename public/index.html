@@ -7,7 +7,7 @@
   <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=20261125-1" />
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%237c3aed'/%3E%3Cpath fill='white' d='M37 14v24.5a8 8 0 1 0 5 7.5V24h10v-7H37zM32 46a4 4 0 1 1-4-4 4 4 0 0 1 4 4z'/%3E%3C/svg%3E" />
   <link rel="shortcut icon" href="/favicon.svg?v=20261125-1" />
-  <link rel="stylesheet" href="style.css?v=20261125-4" />
+  <link rel="stylesheet" href="style.css?v=20261125-5" />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <script src="https://www.youtube.com/iframe_api"></script>
 </head>
@@ -89,26 +89,11 @@
         </a>
       </nav>
 
-      <div class="nav-section-label" style="margin-top:20px">Library: 3</div>
-      <nav class="nav-menu">
-        <a class="nav-link" data-view="albums">
-          <svg class="nav-icon lib-icon ui-icon" style="background:#7c3aed" aria-hidden="true"><use href="/icons.svg#album"></use></svg> Albums
-          <span class="dot-blue"></span>
-        </a>
-        <a class="nav-link" data-view="songs">
-          <svg class="nav-icon lib-icon ui-icon" style="background:#059669" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Songs
-        </a>
-        <a class="nav-link" data-view="artists">
-          <svg class="nav-icon lib-icon ui-icon" style="background:#dc2626" aria-hidden="true"><use href="/icons.svg#user"></use></svg> Artists
-        </a>
-      </nav>
-
       <div class="sidebar-bottom">
         <div class="user-profile">
           <div class="user-avatar">N</div>
           <div class="user-info">
             <div class="user-name">Naim Almas</div>
-            <div class="user-plan">Premium member</div>
           </div>
           <button class="user-menu-button" id="profile-view-btn" title="Profile & dashboard" aria-label="Profile and dashboard"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#user"></use></svg></button>
         </div>
@@ -294,7 +279,6 @@
       <div class="tags-section">
         <div class="right-section-header">
           <h3>Tags</h3>
-          <button class="more-btn">···</button>
         </div>
         <div class="tags-grid">
           <button class="tag-pill" onclick="searchTag('Acoustic')"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#music"></use></svg> Acoustic</button>
@@ -318,7 +302,6 @@
           <div class="np-card-title" id="np-card-title">Select a song</div>
           <div class="np-card-artist" id="np-card-artist">—</div>
         </div>
-        <button class="np-add-btn">+</button>
       </div>
 
       <!-- Recently Played -->

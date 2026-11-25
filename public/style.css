@@ -116,11 +116,6 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   margin-left:auto; background:var(--red); color:white;
   font-size:9px; font-weight:700; padding:2px 6px; border-radius:20px;
 }
-.dot-blue {
-  margin-left:auto; width:7px; height:7px;
-  background:#3b82f6; border-radius:50%;
-}
-
 .sidebar-bottom { margin-top:auto; }
 .user-profile {
   display:flex; align-items:center; gap:10px;
@@ -135,7 +130,6 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 }
 .user-avatar-image { position:absolute; inset:0; width:100%; height:100%; border-radius:inherit; object-fit:cover; }
 .user-name { font-size:12px; font-weight:600; }
-.user-plan { font-size:10px; color:var(--text3); }
 
 /* ══════════════════════════════════════════
    CENTER
@@ -509,11 +503,11 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
   display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
 }
 .right-section-header h3 { font-size:16px; font-weight:700; }
-.more-btn, .see-all-btn {
+.see-all-btn {
   background:none; border:none; color:var(--text3);
   font-size:12px; cursor:pointer; transition:color 0.15s;
 }
-.more-btn:hover, .see-all-btn:hover { color:var(--text); }
+.see-all-btn:hover { color:var(--text); }
 .see-all-btn { color:var(--purple-light); font-weight:500; }
 
 .tags-grid { display:flex; flex-wrap:wrap; gap:8px; }
@@ -544,15 +538,6 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
 .np-card-info { padding:12px; }
 .np-card-title { font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .np-card-artist { font-size:12px; color:var(--text3); margin-top:3px; }
-.np-add-btn {
-  position:absolute; top:10px; right:10px;
-  width:28px; height:28px; background:rgba(0,0,0,0.5);
-  border:1px solid rgba(255,255,255,0.2); border-radius:50%;
-  color:white; font-size:16px; cursor:pointer;
-  backdrop-filter:blur(10px); transition:all 0.15s;
-}
-.np-add-btn:hover { background:var(--purple); border-color:var(--purple); }
-
 /* Recently Played */
 .played-list { display:flex; flex-direction:column; gap:4px; }
 .played-item {
@@ -615,11 +600,10 @@ html, body { height:100%; font-family:'Inter',sans-serif; background:var(--bg); 
     padding:9px 10px; font-size:13px;
   }
   .sidebar .nav-link .nav-icon, .app.social-active .sidebar .nav-link .nav-icon { width:20px; height:20px; }
-  .sidebar .nav-link .badge-new, .sidebar .nav-link .dot-blue { display:block; }
+  .sidebar .nav-link .badge-new { display:block; }
   .sidebar-bottom, .app.social-active .sidebar-bottom { display:block; flex:0 0 auto; margin-top:auto; padding-top:16px; }
   .sidebar-bottom .user-profile, .app.social-active .sidebar-bottom .user-profile { gap:10px; padding:10px 12px; }
   .sidebar-bottom .user-info, .app.social-active .sidebar-bottom .user-info { display:block; }
-  .sidebar-bottom .user-plan, .app.social-active .user-plan { display:block; }
   .sidebar-bottom .user-avatar, .app.social-active .sidebar-bottom .user-avatar { width:34px; height:34px; }
   .sidebar-bottom .user-menu-button, .app.social-active .sidebar-bottom .user-menu-button { width:32px; height:32px; }
   .mobile-menu-toggle {
