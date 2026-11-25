@@ -127,9 +127,9 @@
             </div>
           </section>
           <section class="live-call-alert" id="live-call-alert" aria-live="assertive" hidden>
-            <strong id="live-call-title">Incoming call</strong>
-            <p id="live-call-copy"></p>
-            <button type="button" id="live-call-open">Open call</button>
+            <div class="live-call-avatar" id="live-call-avatar" aria-hidden="true">N</div>
+            <div class="live-call-body"><strong id="live-call-title">Incoming call</strong><p id="live-call-copy"></p></div>
+            <div class="live-call-actions"><button type="button" class="live-call-decline" id="live-call-decline">Decline</button><button type="button" class="live-call-accept" id="live-call-accept">Accept</button></div>
           </section>
         </div>
       </div>
@@ -303,6 +303,6 @@
     </aside>
   </div>
 
-  <script src="app.js?v=20261109-1816"></script>
+  <script src="app.js?v=20261125-1"></script>
 </body>
 </html>

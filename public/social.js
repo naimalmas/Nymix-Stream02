@@ -2543,6 +2543,14 @@ if (typeof ResizeObserver !== 'undefined') {
 }
 window.addEventListener('message', event => {
   if (event.origin !== window.location.origin || event.source !== window.parent) return;
+  if (event.data?.type === 'nymix-call-accept') {
+    if (state.call.status === 'incoming') acceptAudioCall().catch(error => showNotice(error.message, true));
+    return;
+  }
+  if (event.data?.type === 'nymix-call-decline') {
+    if (state.call.status === 'incoming') finishCall(true).catch(error => showNotice(error.message, true));
+    return;
+  }
   if (event.data?.type === 'nymix-social-open-profile') {
     openProfile(state.user.id, false);
     return;

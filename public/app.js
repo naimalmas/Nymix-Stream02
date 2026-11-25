@@ -93,9 +93,18 @@ window.onYouTubeIframeAPIReady = () => {
       },
     },
   });
-  $('live-call-open').addEventListener('click', () => {
+  const sendCallAction = action => {
+    const frame = $('social-portal');
+    if (frame?.contentWindow) frame.contentWindow.postMessage({ type: `nymix-call-${action}` }, window.location.origin);
+  };
+  $('live-call-accept').addEventListener('click', () => {
     $('live-call-alert').hidden = true;
     showView('messages');
+    sendCallAction('accept');
+  });
+  $('live-call-decline').addEventListener('click', () => {
+    $('live-call-alert').hidden = true;
+    sendCallAction('decline');
   });
 };
 
@@ -983,10 +992,11 @@ document.addEventListener('DOMContentLoaded', async () => {
       $('social-portal').style.height = `${Math.max(700, Math.min(event.data.height, 100000))}px`;
     } else if (event.data?.type === 'nymix-call-alert') {
       $('live-call-title').textContent = `${event.data.name || 'Your friend'} is calling`;
+      $('live-call-avatar').textContent = String(event.data.name || 'N').trim().slice(0, 1).toUpperCase();
       $('live-call-copy').textContent = `${event.data.kind === 'video' ? 'Video' : 'Audio'} call · open Messages to answer`;
       $('live-call-alert').hidden = false;
       playNotificationSound();
-      showView('messages');
+      // Keep the caller on the current screen until they choose Accept.
     } else if (event.data?.type === 'nymix-call-ended') {
       $('live-call-alert').hidden = true;
     } else if (event.data?.type === 'nymix-profile-updated' && event.data.user?.id === user()?.id) {
