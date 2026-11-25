@@ -54,13 +54,28 @@ const dataDir = path.join(__dirname, 'data');
 if (!isVercel) fs.mkdirSync(dataDir, { recursive: true });
 const dp = file => path.join(dataDir, file);
 const requestState = new AsyncLocalStorage();
+const dirtyRequestStates = new WeakMap();
+const stateColumnByFile = {
+  'config.json': 'config',
+  'users.json': 'users',
+  'liked.json': 'liked',
+  'plays.json': 'plays',
+  'friends.json': 'friends',
+  'messages.json': 'messages',
+  'social.json': 'social',
+};
 const rd = file => {
   const state = requestState.getStore();
   return state ? state[file] : JSON.parse(fs.readFileSync(dp(file), 'utf8'));
 };
 const wd = (file, value) => {
   const state = requestState.getStore();
-  if (state) state[file] = value;
+  if (state) {
+    state[file] = value;
+    const dirtyFiles = dirtyRequestStates.get(state) || new Set();
+    dirtyFiles.add(file);
+    dirtyRequestStates.set(state, dirtyFiles);
+  }
   else fs.writeFileSync(dp(file), JSON.stringify(value, null, 2));
 };
 
@@ -166,6 +181,15 @@ async function persistentState(req, res, next) {
   let client;
   try {
     await initializeDatabase();
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      const isCallSignalPoll = req.originalUrl.split('?')[0] === '/api/calls/signals';
+      const columns = isCallSignalPoll ? ['users', 'social'] : Object.values(stateColumnByFile);
+      const result = await database.query(`SELECT ${columns.join(', ')} FROM nymix_state WHERE id = 1`);
+      if (!result.rowCount) throw new Error('Application database state is not initialized');
+      const state = Object.fromEntries(columns.map(column => [`${Object.keys(stateColumnByFile).find(file => stateColumnByFile[file] === column)}.json`, result.rows[0][column]]));
+      requestState.run(state, next);
+      return;
+    }
     client = await database.connect();
     await client.query('BEGIN');
     const result = await client.query('SELECT config, users, liked, plays, friends, messages, social FROM nymix_state WHERE id = 1 FOR UPDATE');
@@ -186,18 +210,14 @@ async function persistentState(req, res, next) {
       finished = true;
       (async () => {
         try {
-          await client.query(
-            'UPDATE nymix_state SET config = $1::jsonb, users = $2::jsonb, liked = $3::jsonb, plays = $4::jsonb, friends = $5::jsonb, messages = $6::jsonb, social = $7::jsonb WHERE id = 1',
-            [
-              JSON.stringify(state['config.json']),
-              JSON.stringify(state['users.json']),
-              JSON.stringify(state['liked.json']),
-              JSON.stringify(state['plays.json']),
-              JSON.stringify(state['friends.json']),
-              JSON.stringify(state['messages.json']),
-              JSON.stringify(state['social.json']),
-            ],
-          );
+          const dirtyFiles = [...(dirtyRequestStates.get(state) || [])];
+          if (dirtyFiles.length) {
+            const columns = dirtyFiles.map(file => stateColumnByFile[file]);
+            if (columns.some(column => !column)) throw new Error('Unknown persistent state column');
+            const assignments = columns.map((column, index) => `${column} = $${index + 1}::jsonb`).join(', ');
+            const values = dirtyFiles.map(file => JSON.stringify(state[file]));
+            await client.query(`UPDATE nymix_state SET ${assignments} WHERE id = 1`, values);
+          }
           await client.query('COMMIT');
           sendJson(body);
         } catch (error) {
@@ -879,23 +899,8 @@ app.get('/api/social/feed', userAuth, (req, res) => {
 
 const STORY_TTL = 24 * 60 * 60 * 1000;
 const MAX_STORIES = 10;
-const pruneStories = users => {
-  const now = Date.now();
-  let changed = false;
-  users.forEach(account => {
-    if (!Array.isArray(account.stories)) return;
-    const active = account.stories.filter(story => story && story.expiresAt > now);
-    if (active.length !== account.stories.length) {
-      account.stories = active;
-      changed = true;
-    }
-  });
-  return changed;
-};
-
 app.get('/api/social/stories', userAuth, (req, res) => {
   const users = rd('users.json');
-  if (pruneStories(users)) wd('users.json', users);
   const stories = users
     .filter(account => account.role === 'user' && !account.banned)
     .map(account => ({
