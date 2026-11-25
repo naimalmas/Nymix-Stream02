@@ -895,7 +895,7 @@ function playRingtoneBurst() {
     oscillator.type = 'sine';
     oscillator.frequency.value = frequency;
     gain.gain.setValueAtTime(0.0001, at);
-    gain.gain.exponentialRampToValueAtTime(0.16, at + 0.025);
+    gain.gain.exponentialRampToValueAtTime(0.34, at + 0.025);
     gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.17);
     oscillator.connect(gain);
     gain.connect(context.destination);
