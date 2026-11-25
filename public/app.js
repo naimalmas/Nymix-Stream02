@@ -738,6 +738,7 @@ function showView(name, syncPortal = true) {
   const v = document.getElementById('view-' + viewName);
   if (v) v.classList.add('active');
   document.querySelector('.app')?.classList.toggle('social-active', viewName === 'messages' || viewName === 'home');
+  document.querySelector('.app')?.classList.toggle('reels-active', name === 'reels');
   document.querySelectorAll('.nav-link').forEach(a =>
     a.classList.toggle('active', a.dataset.view === name)
   );
