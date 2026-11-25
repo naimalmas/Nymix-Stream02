@@ -15,7 +15,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="/social.css?v=20261125-9" />
+  <link rel="stylesheet" href="/social.css?v=20261125-10" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <script src="https://www.youtube.com/iframe_api"></script>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
@@ -145,6 +145,13 @@
             </div>
             <div id="search-results" class="discovery-grid" aria-live="polite"></div>
           </article>
+          <article class="card discovery-card request-card" id="friend-requests-card">
+            <div class="card-heading">
+              <div><p class="eyebrow">SAY HELLO</p><h2>Friend requests</h2><p class="section-caption">People who want to connect with you.</p></div>
+              <span class="count" id="request-count">0</span>
+            </div>
+            <div id="requests-list" class="discovery-grid request-grid" aria-live="polite"></div>
+          </article>
           <article class="card discovery-card" id="suggestions-card">
             <div class="card-heading suggestion-heading">
               <div><p class="eyebrow">PEOPLE YOU MAY KNOW</p><h2>Find your next friend</h2><p class="section-caption">Suggestions are ranked by mutual friends and recent activity.</p></div>
@@ -163,13 +170,6 @@
               <span class="count" id="discover-friend-count">0</span>
             </div>
             <div id="friends-list" class="stack friend-stack"></div>
-          </article>
-          <article class="card side-card" id="friend-requests-card">
-            <div class="card-heading">
-              <div><p class="eyebrow">SAY HELLO</p><h2>Friend requests</h2></div>
-              <span class="count" id="request-count">0</span>
-            </div>
-            <div id="requests-list" class="stack"></div>
           </article>
           <article class="card side-card" id="game-invites-card" hidden>
             <div class="card-heading"><div><p class="eyebrow">YOUR TURN?</p><h2>Game invites</h2></div></div>
@@ -465,6 +465,6 @@
       <button type="button" class="button secondary story-delete" id="story-delete" hidden>Delete your story</button>
     </section>
   </dialog>
-  <script src="/social.js?v=20261125-4"></script>
+  <script src="/social.js?v=20261125-5"></script>
 </body>
 </html>

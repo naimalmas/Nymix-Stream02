@@ -1073,7 +1073,6 @@ function renderRequests() {
   $('request-count').textContent = String(incomingRequests.length);
   renderList($('requests-list'), incomingRequests, 'No one has sent you a friend request yet.', request =>
     makePerson(request, [
-      makeButton('Profile', () => openProfile(request.userId)),
       makeButton('Accept', async () => {
         try {
           await put(`/friends/${encodeURIComponent(request.id)}`, { status: 'accepted' });

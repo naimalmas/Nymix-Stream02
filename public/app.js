@@ -414,7 +414,7 @@ function updateSearchMoreButton() {
   container.appendChild(wrap);
 }
 
-function searchTag(tag) { $('search-input').value = tag; search(tag); }
+function searchTag(tag) { $('home-search-input').value = tag; search(tag); }
 
 function renderGrid(songs, q, limited = false) {
   $('search-status').textContent = `${songs.length} results for "${q}"`;
@@ -688,7 +688,7 @@ function buildGenres() {
     c.className = 'genre-card';
     c.style.background = g.color;
     c.innerHTML = `<div class="genre-icon">${iconSvg(g.icon)}</div><div>${g.name}</div>`;
-    c.addEventListener('click', () => { $('search-input').value = g.name; search(g.name); });
+    c.addEventListener('click', () => { $('home-search-input').value = g.name; search(g.name); });
     grid.appendChild(c);
   });
 }
@@ -701,7 +701,7 @@ function buildRadio() {
     const c = document.createElement('div');
     c.className = 'radio-card';
     c.innerHTML = `<div class="radio-icon">${iconSvg(r.icon)}</div><div class="radio-title">${r.name}</div><div class="radio-desc">${r.desc}</div>`;
-    c.addEventListener('click', () => { $('search-input').value = r.query; search(r.query); });
+    c.addEventListener('click', () => { $('home-search-input').value = r.query; search(r.query); });
     grid.appendChild(c);
   });
 }
@@ -1118,13 +1118,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderPlayed();
 
   // ── Search ──
-  const inp = $('search-input');
-  const homeSearch = $('home-search-input');
-  homeSearch?.addEventListener('keydown', event => {
-    if (event.key !== 'Enter') return;
-    const sidebarSearch = $('search-input');
-    if (sidebarSearch) { sidebarSearch.value = homeSearch.value; sidebarSearch.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' })); }
-  });
+  const inp = $('home-search-input');
   if (inp) {
     inp.addEventListener('keydown', e => {
       if (e.key === 'Enter') {
