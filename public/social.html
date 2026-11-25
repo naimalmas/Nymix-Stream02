@@ -70,6 +70,11 @@
     </section>
 
     <section class="panel" id="panel-feed">
+      <section class="stories-section" aria-labelledby="stories-title">
+        <div class="stories-heading"><div><p class="eyebrow">24-HOUR MOMENTS</p><h2 id="stories-title">Stories</h2></div><span class="stories-hint">Disappear after 24 hours</span></div>
+        <div class="stories-list" id="stories-list" aria-live="polite"></div>
+        <input class="sr-only" id="story-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" />
+      </section>
       <div class="feed-layout">
         <section class="feed-main" aria-labelledby="feed-title">
           <header class="feed-heading">
@@ -392,6 +397,14 @@
       <p class="photo-share-notice" id="photo-share-notice" role="status" aria-live="polite"></p>
     </section>
   </dialog>
-  <script src="/social.js?v=20261125-1"></script>
+  <dialog class="story-viewer-dialog" id="story-viewer-dialog" aria-labelledby="story-viewer-title">
+    <section class="story-viewer">
+      <header class="story-viewer-header"><strong id="story-viewer-title">Story</strong><button type="button" class="icon-button" id="story-viewer-close" aria-label="Close story"><svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#close"></use></svg></button></header>
+      <div class="story-viewer-media"><button type="button" class="story-nav story-prev" id="story-prev" aria-label="Previous story">‹</button><img id="story-viewer-image" alt="Story" /><button type="button" class="story-nav story-next" id="story-next" aria-label="Next story">›</button></div>
+      <p class="story-viewer-caption" id="story-viewer-caption"></p>
+      <button type="button" class="button secondary story-delete" id="story-delete" hidden>Delete your story</button>
+    </section>
+  </dialog>
+  <script src="/social.js?v=20261125-2"></script>
 </body>
 </html>

@@ -815,6 +815,79 @@ app.get('/api/social/feed', userAuth, (req, res) => {
   res.json(posts);
 });
 
+const STORY_TTL = 24 * 60 * 60 * 1000;
+const MAX_STORIES = 10;
+const pruneStories = users => {
+  const now = Date.now();
+  let changed = false;
+  users.forEach(account => {
+    if (!Array.isArray(account.stories)) return;
+    const active = account.stories.filter(story => story && story.expiresAt > now);
+    if (active.length !== account.stories.length) {
+      account.stories = active;
+      changed = true;
+    }
+  });
+  return changed;
+};
+
+app.get('/api/social/stories', userAuth, (req, res) => {
+  const users = rd('users.json');
+  if (pruneStories(users)) wd('users.json', users);
+  const stories = users
+    .filter(account => account.role === 'user' && !account.banned)
+    .map(account => ({
+      author: safeProfile(account),
+      stories: (account.stories || []).filter(story => story.expiresAt > Date.now()).map(story => ({
+        id: story.id,
+        image: story.image,
+        caption: story.caption || '',
+        createdAt: story.createdAt,
+        expiresAt: story.expiresAt,
+      })),
+    }))
+    .filter(group => group.stories.length)
+    .sort((a, b) => String(b.stories[b.stories.length - 1].createdAt).localeCompare(String(a.stories[a.stories.length - 1].createdAt)));
+  res.json(stories);
+});
+
+app.post('/api/social/stories', userAuth, (req, res) => {
+  const { image, caption = '' } = req.body;
+  if (!validProfileImage(image, 256 * 1024)) {
+    return res.status(400).json({ error: 'Story must be a JPEG, PNG or WebP image under 256 KB' });
+  }
+  if (typeof caption !== 'string' || caption.trim().length > 100) {
+    return res.status(400).json({ error: 'Story captions must be 100 characters or fewer' });
+  }
+  const users = rd('users.json');
+  const account = users.find(user => user.id === req.user.id);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+  account.stories = (account.stories || []).filter(story => story.expiresAt > Date.now());
+  if (account.stories.length >= MAX_STORIES) return res.status(409).json({ error: 'You can have up to 10 active stories' });
+  const story = {
+    id: crypto.randomBytes(12).toString('hex'),
+    image,
+    caption: caption.trim(),
+    createdAt: new Date().toISOString(),
+    expiresAt: Date.now() + STORY_TTL,
+  };
+  account.stories.push(story);
+  wd('users.json', users);
+  res.status(201).json({ ...story, author: safeProfile(account) });
+});
+
+app.delete('/api/social/stories/:storyId', userAuth, (req, res) => {
+  const users = rd('users.json');
+  const account = users.find(user => user.id === req.user.id);
+  if (!account) return res.status(404).json({ error: 'Account not found' });
+  account.stories ||= [];
+  const index = account.stories.findIndex(story => story.id === req.params.storyId);
+  if (index < 0) return res.status(404).json({ error: 'Story not found' });
+  account.stories.splice(index, 1);
+  wd('users.json', users);
+  res.json({ ok: true });
+});
+
 const reelsCache = new Map();
 app.get('/api/social/reels', userAuth, async (req, res) => {
   const pageToken = typeof req.query.pageToken === 'string' ? req.query.pageToken : '';

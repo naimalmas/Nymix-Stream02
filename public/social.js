@@ -47,6 +47,9 @@ const state = {
   profilePhoto: '',
   feedPreviewUrl: '',
   feedLoading: false,
+  stories: [],
+  storyQueue: [],
+  storyIndex: 0,
   reelsLoading: false,
   reelsNextPageToken: null,
   reelsLoaded: false,
@@ -817,9 +820,64 @@ async function loadFeed() {
     const posts = await api('/social/feed');
     if (!Array.isArray(posts)) throw new Error('Invalid photo feed response');
     renderFeed(posts);
+    await loadStories();
   } finally {
     state.feedLoading = false;
   }
+}
+
+async function loadStories() {
+  const groups = await api('/social/stories');
+  if (!Array.isArray(groups)) throw new Error('Invalid stories response');
+  state.stories = groups;
+  renderStories(groups);
+}
+
+function renderStories(groups) {
+  const list = $('stories-list');
+  list.replaceChildren();
+  const add = document.createElement('label');
+  add.className = 'story-card add';
+  add.htmlFor = 'story-photo';
+  add.innerHTML = '<span class="story-card-avatar">+</span><strong>Add story</strong>';
+  list.appendChild(add);
+  groups.forEach(group => {
+    const latest = group.stories[group.stories.length - 1];
+    const card = document.createElement('button');
+    card.type = 'button';
+    card.className = 'story-card';
+    const avatar = document.createElement('span');
+    avatar.className = 'story-card-avatar';
+    avatar.textContent = (group.author.name || '?').slice(0, 1).toUpperCase();
+    const image = document.createElement('img');
+    image.src = latest.image;
+    image.alt = '';
+    avatar.appendChild(image);
+    const name = document.createElement('strong');
+    name.textContent = group.author.id === state.user.id ? 'Your story' : group.author.name;
+    card.append(avatar, name);
+    card.addEventListener('click', () => openStory(group));
+    list.appendChild(card);
+  });
+}
+
+function openStory(group) {
+  state.storyQueue = group.stories.map(story => ({ ...story, author: group.author }));
+  state.storyIndex = 0;
+  renderStoryViewer();
+  $('story-viewer-dialog').showModal();
+}
+
+function renderStoryViewer() {
+  const story = state.storyQueue[state.storyIndex];
+  if (!story) return;
+  $('story-viewer-title').textContent = story.author.id === state.user.id ? 'Your story' : story.author.name;
+  $('story-viewer-image').src = story.image;
+  $('story-viewer-caption').textContent = story.caption || '';
+  $('story-prev').disabled = state.storyIndex === 0;
+  $('story-next').disabled = state.storyIndex === state.storyQueue.length - 1;
+  $('story-delete').hidden = story.author.id !== state.user.id;
+  $('story-delete').dataset.storyId = story.id;
 }
 
 function renderFriends() {
@@ -2230,6 +2288,45 @@ $('feed-form').addEventListener('submit', async event => {
   } finally {
     submit.disabled = !input.files?.length;
   }
+});
+$('story-photo').addEventListener('change', async event => {
+  const input = event.currentTarget;
+  const file = input.files?.[0];
+  if (!file) return;
+  try {
+    const image = await compressProfilePhoto(file, 256 * 1024);
+    await post('/social/stories', { image });
+    await loadStories();
+    showNotice('Story added. It will disappear after 24 hours.');
+  } catch (error) {
+    showNotice(error.message, true);
+  } finally {
+    input.value = '';
+  }
+});
+$('story-viewer-close').addEventListener('click', () => $('story-viewer-dialog').close());
+$('story-viewer-dialog').addEventListener('click', event => {
+  if (event.target === $('story-viewer-dialog')) $('story-viewer-dialog').close();
+});
+$('story-prev').addEventListener('click', () => {
+  if (state.storyIndex <= 0) return;
+  state.storyIndex -= 1;
+  renderStoryViewer();
+});
+$('story-next').addEventListener('click', () => {
+  if (state.storyIndex >= state.storyQueue.length - 1) return;
+  state.storyIndex += 1;
+  renderStoryViewer();
+});
+$('story-delete').addEventListener('click', async event => {
+  const storyId = event.currentTarget.dataset.storyId;
+  if (!storyId) return;
+  try {
+    await deleteRequest(`/social/stories/${encodeURIComponent(storyId)}`);
+    $('story-viewer-dialog').close();
+    await loadStories();
+    showNotice('Story deleted.');
+  } catch (error) { showNotice(error.message, true); }
 });
 $('chat-profile-button').addEventListener('click', () => {
   if (state.activeFriend) openProfile(state.activeFriend.id);
