@@ -31,6 +31,24 @@ app.use(cors());
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
+const publicAppUrl = (process.env.PUBLIC_APP_URL || 'https://nymix.eu.cc').replace(/\/$/, '');
+
+async function sendPasswordResetEmail({ to, name, resetUrl }) {
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.MAIL_FROM;
+  if (!apiKey || !from) return false;
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from, to: [to], subject: 'Reset your Nymix password',
+      html: `<div style="font-family:Arial,sans-serif;line-height:1.6;color:#24113f;max-width:560px;margin:auto"><h2>Reset your Nymix password</h2><p>Hi ${String(name || 'there').replace(/[<>&\"']/g, '')},</p><p>We received a request to reset your Nymix password. This link expires in 60 minutes.</p><p><a href="${resetUrl}" style="display:inline-block;background:#7c3aed;color:#fff;padding:12px 18px;border-radius:8px;text-decoration:none">Reset password</a></p><p>If you did not request this, you can safely ignore this email.</p></div>`,
+    }),
+  });
+  if (!response.ok) throw new Error(`Password reset email failed (${response.status})`);
+  return true;
+}
+
 // ── Data Helpers ──────────────────────────────────────
 const dataDir = path.join(__dirname, 'data');
 if (!isVercel) fs.mkdirSync(dataDir, { recursive: true });
@@ -408,6 +426,50 @@ app.post('/api/auth/register', async (req, res) => {
     const token = jwt.sign({ id: user.id, name, email, role: 'user', credentialVersion: user.credentialVersion || 0 }, SECRET, { expiresIn: '7d' });
     res.json({ token, user: { id: user.id, name, email, role: 'user', avatar: '' } });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const email = typeof req.body?.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+  const genericResponse = { message: 'If an account exists for that email, a reset link has been sent.' };
+  if (!email || email.length > 254) return res.json(genericResponse);
+  try {
+    const users = rd('users.json');
+    const user = users.find(account => String(account.email || '').toLowerCase() === email && account.role === 'user');
+    if (!user) return res.json(genericResponse);
+    if (!process.env.RESEND_API_KEY || !process.env.MAIL_FROM) {
+      return res.status(503).json({ error: 'Password reset email is not configured yet. Please contact support.' });
+    }
+    const rawToken = crypto.randomBytes(32).toString('hex');
+    user.resetTokenHash = crypto.createHash('sha256').update(rawToken).digest('hex');
+    user.resetTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
+    wd('users.json', users);
+    await sendPasswordResetEmail({ to: email, name: user.name, resetUrl: `${publicAppUrl}/reset-password.html?token=${encodeURIComponent(rawToken)}` });
+    return res.json(genericResponse);
+  } catch (error) {
+    console.error('Password reset request failed:', error.message);
+    return res.status(500).json({ error: 'Could not send the password reset email. Please try again later.' });
+  }
+});
+
+app.post('/api/auth/reset-password', async (req, res) => {
+  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  if (!token || token.length !== 64) return res.status(400).json({ error: 'This reset link is invalid or expired.' });
+  if (password.length < 8 || Buffer.byteLength(password, 'utf8') > 72) return res.status(400).json({ error: 'Password must be 8 to 72 bytes.' });
+  try {
+    const users = rd('users.json');
+    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+    const user = users.find(account => account.role === 'user' && account.resetTokenHash === tokenHash);
+    if (!user || !user.resetTokenExpiresAt || Date.parse(user.resetTokenExpiresAt) <= Date.now()) return res.status(400).json({ error: 'This reset link is invalid or expired.' });
+    user.password = await bcrypt.hash(password, 10);
+    user.credentialVersion = (user.credentialVersion || 0) + 1;
+    delete user.resetTokenHash;
+    delete user.resetTokenExpiresAt;
+    wd('users.json', users);
+    return res.json({ message: 'Password updated successfully. You can now log in.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Could not reset the password. Please try again.' });
+  }
 });
 
 app.post('/api/auth/login', async (req, res) => {

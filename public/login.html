@@ -35,6 +35,8 @@ input::placeholder{color:#4b5563}
 .msg{font-size:13px;text-align:center;padding:10px;border-radius:10px;margin-top:12px;min-height:20px}
 .msg.err{background:rgba(239,68,68,0.15);color:#f87171;border:1px solid rgba(239,68,68,0.3)}
 .msg.ok{background:rgba(34,197,94,0.15);color:#4ade80;border:1px solid rgba(34,197,94,0.3)}
+.text-btn{display:block;width:100%;margin-top:14px;background:none;border:0;color:#c4b5fd;font:inherit;font-size:13px;cursor:pointer;text-align:center}
+.text-btn:hover{text-decoration:underline}
 .privacy-link{position:fixed;right:0;bottom:16px;left:0;z-index:2;text-align:center;font-size:12px}
 .privacy-link a{color:#c4b5fd;text-decoration:none}
 .privacy-link a:hover{text-decoration:underline}
@@ -68,7 +70,15 @@ input::placeholder{color:#4b5563}
       <div class="form-group"><label>Email</label><input type="email" id="l-email" placeholder="your@email.com"/></div>
       <div class="form-group"><label>Password</label><input type="password" id="l-pass" placeholder="••••••••"/></div>
       <button class="btn" onclick="doLogin()">Login <svg class="ui-icon" aria-hidden="true"><use href="/icons.svg#arrow-right-long"></use></svg></button>
+      <button class="text-btn" type="button" onclick="showForgot()">Forgot password?</button>
       <div class="msg" id="l-msg"></div>
+    </div>
+
+    <div id="form-forgot" style="display:none">
+      <div class="form-group"><label>Email</label><input type="email" id="f-email" placeholder="your@email.com" autocomplete="email"/></div>
+      <button class="btn" onclick="requestReset()">Send reset link</button>
+      <button class="text-btn" type="button" onclick="showLogin()">Back to login</button>
+      <div class="msg" id="f-msg"></div>
     </div>
 
     <!-- Register Form -->
@@ -89,7 +99,10 @@ function switchTab(t){
   document.getElementById('tab-register').classList.toggle('active',t==='register');
   document.getElementById('form-login').style.display = t==='login'?'block':'none';
   document.getElementById('form-register').style.display = t==='register'?'block':'none';
+  document.getElementById('form-forgot').style.display = 'none';
 }
+function showForgot(){document.getElementById('form-login').style.display='none';document.getElementById('form-register').style.display='none';document.getElementById('form-forgot').style.display='block';document.getElementById('f-email').focus();}
+function showLogin(){switchTab('login');}
 function dashboardPath(role){
   const next=new URLSearchParams(window.location.search).get('next');
   if(next==='movies' && (role==='admin'||role==='super_admin')) return '/movie-admin.html';
@@ -135,6 +148,16 @@ async function doRegister(){
     showMsg('r-msg','Account created! Redirecting...','ok');
     setTimeout(()=>completeLogin(d),800);
   }catch(e){showMsg('r-msg','Server connection failed. Is the server running?');}
+}
+async function requestReset(){
+  const email=document.getElementById('f-email').value.trim();
+  if(!email){showMsg('f-msg','Enter your email address');return;}
+  try{
+    const r=await fetch(API+'/auth/forgot-password',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email})});
+    const d=await r.json();
+    if(!r.ok){showMsg('f-msg',d.error||'Could not send reset link');return;}
+    showMsg('f-msg',d.message,'ok');
+  }catch(e){showMsg('f-msg','Server connection failed. Please try again.');}
 }
 async function initGoogleSignIn(){
   const button=document.getElementById('google-button');
