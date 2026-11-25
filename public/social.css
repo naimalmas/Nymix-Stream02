@@ -684,6 +684,10 @@ html.embedded-portal #panel-people .discover-sidebar .side-card { padding:22px; 
   html.embedded-portal #panel-people .request-grid { grid-template-columns:1fr; }
   html.embedded-portal #panel-people .request-grid .person { min-height:142px; padding:16px; }
 }
+html.embedded-portal #panel-people.active { padding-inline:clamp(16px,2vw,36px); }
+@media (max-width: 540px) {
+  html.embedded-portal #panel-people.active { padding-inline:14px; }
+}
 @media (max-width: 1080px) {
   .discover-layout { grid-template-columns: minmax(0,1fr) minmax(290px,320px); gap: 15px; }
 }
