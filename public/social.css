@@ -46,7 +46,7 @@ html.embedded-portal .messages-main > .notice { margin:0; padding:3px 12px; }
 html.embedded-portal .inbox-layout { min-height:0; height:100%; border:0; border-radius:0; box-shadow:none; }
 html.embedded-home, html.embedded-home body { height:auto; min-height:0; overflow:visible; }
 html.embedded-home body.messages-page { display:block; }
-html.embedded-home body.messages-page .messages-main { display:block; width:100%; height:auto; min-height:0; flex:none; overflow:visible; margin:0; padding:14px 0 24px; }
+html.embedded-home body.messages-page .messages-main { display:block; width:100%; height:auto; min-height:0; flex:none; overflow:visible; margin:0; padding:14px 24px 24px; }
 html.embedded-home #panel-feed.active { display:grid; grid-template-columns:minmax(0,1fr) minmax(320px,400px); gap:24px 32px; width:100%; margin:0; justify-content:stretch; align-items:start; }
 html.embedded-home #panel-feed > .stories-section { grid-column:1; width:100%; margin:0; padding:20px 24px; border-radius:20px; background:rgba(25,19,37,.88); }
 html.embedded-home #panel-feed > .feed-layout { display:contents; }
