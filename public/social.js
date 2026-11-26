@@ -2260,6 +2260,14 @@ async function refreshSocial() {
   }
 }
 
+function scheduleSocialRefresh() {
+  const delay = state.activeFriend || state.activeRoom || state.activeGame ? 30000 : 330000;
+  setTimeout(async () => {
+    if (!document.hidden) await refreshSocial();
+    scheduleSocialRefresh();
+  }, delay);
+}
+
 document.querySelectorAll('.tab').forEach(tab => tab.addEventListener('click', () => {
 if (tab.dataset.panel === 'profile') openProfile(state.user.id);
 else setPanel(tab.dataset.panel);
@@ -2866,11 +2874,14 @@ if (!token() || !state.user || state.user.role !== 'user') {
     setAvatar($('account-avatar'), state.user);
   if (initialPanel === 'profile') openProfile(state.user.id, false);
   refreshSocial();
+  scheduleSocialRefresh();
   flushOfflineQueue();
   refreshSuggestions().catch(error => showNotice(error.message, true));
-  pollCallSignals().catch(error => showNotice(error.message, true));
-  setInterval(refreshSocial, 4500);
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) refreshSocial();
+  });
   setInterval(() => {
+    if (document.hidden || state.call.status === 'idle') return;
     pollCallSignals().catch(error => {
       if (state.callSignalError !== error.message) showNotice(error.message, true);
       state.callSignalError = error.message;

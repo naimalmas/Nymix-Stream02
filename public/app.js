@@ -1058,7 +1058,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   });
   refreshNotifications();
-  setInterval(refreshNotifications, 4000);
+  // Neon Free suspends compute at its monthly quota. Avoid keeping the
+  // database awake with a four-second notification poll; opening the panel
+  // and returning to the tab still refreshes immediately.
+  setInterval(refreshNotifications, 330000);
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) refreshNotifications();
   });
