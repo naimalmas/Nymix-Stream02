@@ -31,6 +31,10 @@ npm start
 
 Open `http://localhost:3000`. Local development stores data in ignored `data/*.json` files. The first run prints a generated Super Admin password unless `SUPER_ADMIN_PASSWORD` is set.
 
+The movie dashboard at `/movie-admin.html` can upload authorized video files to a private Telegram channel and publish them in the public `/movies.html` catalog. Run `npm run telegram:setup` once, sign in to the Telegram account that can post in the private channel, and enter the channel's exact name. The ignored `.telegram-setup.local.json` stores the Telegram API credentials and login session; keep it private. The server streams Telegram files with byte-range support so the browser player can seek. This is a personal/small-site storage setup; Telegram is not a managed video CDN.
+
+Direct movie uploads require a Node.js host that accepts large request bodies and keeps the app running. Vercel's serverless request/response limits do not support this upload/stream route; deploy the app to a VPS or dedicated Node host to use Telegram movie uploads. For a remote host, configure `TELEGRAM_API_ID`, `TELEGRAM_API_HASH`, `TELEGRAM_SESSION`, `TELEGRAM_CHANNEL_RAW_ID`, and `TELEGRAM_CHANNEL_ACCESS_HASH` as private environment variables from the local setup file. Set `TELEGRAM_MAX_UPLOAD_BYTES` to lower the upload cap if desired. Use MP4 with H.264 video and AAC audio for the widest browser playback support.
+
 ## Vercel deployment
 
 Deploy the GitHub repository as an Express project. Vercel serves files from `public/` and runs the Express app as a Node.js Function. App data is stored in PostgreSQL as one JSONB state row and is initialized from the sanitized `data/*.example.json` files on the first API request.

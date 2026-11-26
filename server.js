@@ -8,10 +8,14 @@ const cors     = require('cors');
 const fs       = require('fs');
 const path     = require('path');
 const crypto   = require('crypto');
+const os       = require('os');
+const { pipeline } = require('node:stream/promises');
+const { Transform } = require('node:stream');
 const fetch    = require('node-fetch');
 const webPush  = require('web-push');
 const { AsyncLocalStorage } = require('async_hooks');
 const { Pool } = require('pg');
+const { getTelegram } = require('./scripts/telegram-storage');
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3000;
@@ -181,7 +185,7 @@ async function persistentState(req, res, next) {
   let client;
   try {
     await initializeDatabase();
-    if (req.method === 'GET' || req.method === 'HEAD') {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.path === '/admin/movies/upload') {
       const isCallSignalPoll = req.originalUrl.split('?')[0] === '/api/calls/signals';
       const columns = isCallSignalPoll ? ['users', 'social'] : Object.values(stateColumnByFile);
       const query = isCallSignalPoll
@@ -320,7 +324,95 @@ app.get('/api/movies', (req, res) => {
   res.json(Array.isArray(catalog) ? catalog.map(movie => ({
     ...movie,
     genre: legacyGenres[movie.genre] || movie.genre,
+    streamUrl: movie.telegramMessageId ? `/api/movies/${encodeURIComponent(movie.id)}/stream` : undefined,
   })) : []);
+});
+
+const movieUploadMaxBytes = Number(process.env.TELEGRAM_MAX_UPLOAD_BYTES) || 1900 * 1024 * 1024;
+
+app.post('/api/admin/movies/upload', adminAuth, async (req, res) => {
+  if (isVercel) return res.status(501).json({ error: 'Large Telegram video uploads need a Node.js host that accepts large request bodies. Deploy this app to a VPS or dedicated Node host.' });
+  const contentType = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  let requestedName = String(req.headers['x-file-name'] || 'movie.mp4');
+  try { requestedName = decodeURIComponent(requestedName); } catch {}
+  const fileName = path.basename(requestedName).replace(/[\r\n"\\]/g, '_').slice(0, 180);
+  const declaredSize = Number(req.headers['content-length']);
+  if (!contentType.startsWith('video/')) return res.status(415).json({ error: 'Upload a supported video file.' });
+  if (!Number.isSafeInteger(declaredSize) || declaredSize <= 0 || declaredSize > movieUploadMaxBytes) {
+    return res.status(413).json({ error: `Video must be smaller than ${Math.floor(movieUploadMaxBytes / 1024 / 1024)} MB.` });
+  }
+
+  const tempPath = path.join(os.tmpdir(), `nymix-movie-${crypto.randomUUID()}.upload`);
+  let received = 0;
+  const meter = new Transform({
+    transform(chunk, encoding, callback) {
+      received += chunk.length;
+      if (received > movieUploadMaxBytes) return callback(new Error('Video upload is too large.'));
+      callback(null, chunk);
+    },
+  });
+  try {
+    await pipeline(req, meter, fs.createWriteStream(tempPath, { flags: 'wx' }));
+    if (received !== declaredSize) return res.status(400).json({ error: 'Video upload ended before the full file arrived.' });
+    const { client, channel } = await getTelegram();
+    const { uploads } = require('teleproto/client');
+    const message = await client.sendFile(channel, {
+      file: new uploads.CustomFile(fileName, received, tempPath),
+      caption: 'Nymix Cinema video',
+      supportsStreaming: true,
+      workers: 4,
+    });
+    if (!message?.id || !message?.document) throw new Error('Telegram did not return an uploaded video.');
+    res.status(201).json({ messageId: message.id, fileName, size: received, mimeType: contentType });
+  } catch (error) {
+    console.error('Telegram movie upload failed:', error.message);
+    if (!res.headersSent) res.status(502).json({ error: `Telegram upload failed: ${error.message}` });
+  } finally {
+    await fs.promises.unlink(tempPath).catch(() => {});
+  }
+});
+
+app.get('/api/movies/:movieId/stream', async (req, res) => {
+  const config = rd('config.json');
+  const movie = (Array.isArray(config.movieCatalog) ? config.movieCatalog : []).find(item => item.id === req.params.movieId);
+  if (!movie?.telegramMessageId) return res.status(404).end('Movie video not found');
+  try {
+    const { client, channel } = await getTelegram();
+    const [message] = await client.getMessages(channel, { ids: Number(movie.telegramMessageId) });
+    const document = message?.document;
+    if (!document || !Number.isSafeInteger(Number(document.size)) || Number(document.size) <= 0) return res.status(404).end('Movie video is unavailable');
+    const size = Number(document.size);
+    const mimeType = /^video\/[a-z0-9.+-]+$/i.test(movie.videoMimeType) ? movie.videoMimeType : 'video/mp4';
+    let start = 0;
+    let end = size - 1;
+    if (req.headers.range) {
+      const match = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range);
+      if (!match) return res.status(416).set('Content-Range', `bytes */${size}`).end();
+      if (match[1]) start = Number(match[1]);
+      if (match[2]) end = Number(match[2]);
+      if (!match[1] && match[2]) start = Math.max(0, size - Number(match[2]));
+      if (start >= size || end < start) return res.status(416).set('Content-Range', `bytes */${size}`).end();
+      end = Math.min(end, size - 1);
+      res.status(206).set('Content-Range', `bytes ${start}-${end}/${size}`);
+    }
+    res.set({
+      'Accept-Ranges': 'bytes',
+      'Content-Length': String(end - start + 1),
+      'Content-Type': mimeType,
+      'Cache-Control': 'private, no-store',
+      'X-Content-Type-Options': 'nosniff',
+    });
+    const chunks = client.iterDownload(message, { offset: start, limit: end - start + 1, requestSize: 512 * 1024 });
+    for await (const chunk of chunks) {
+      if (res.destroyed) break;
+      if (!res.write(chunk)) await new Promise(resolve => res.once('drain', resolve));
+    }
+    if (!res.destroyed) res.end();
+  } catch (error) {
+    console.error('Telegram movie playback failed:', error.message);
+    if (!res.headersSent) res.status(502).end('Movie playback is temporarily unavailable');
+    else res.destroy(error);
+  }
 });
 
 const isValidMovieThumbnail = value => {
@@ -344,14 +436,17 @@ const validateMovieInput = (body, existingMovie = null) => {
   const cleanVideoId = typeof videoId === 'string' ? videoId.trim() : '';
   const cleanPromoLibraryId = typeof promoLibraryId === 'string' ? promoLibraryId.trim() : '';
   const cleanPromoVideoId = typeof promoVideoId === 'string' ? promoVideoId.trim() : '';
+  const telegramMessageId = Number(input.telegramMessageId || existingMovie?.telegramMessageId);
+  const videoFileName = typeof input.videoFileName === 'string' ? path.basename(input.videoFileName).slice(0, 180) : existingMovie?.videoFileName;
+  const videoMimeType = typeof input.videoMimeType === 'string' ? input.videoMimeType : existingMovie?.videoMimeType;
   const allowedGenres = new Set(['Drama', 'Adventure', 'Comedy', 'Thriller', 'Documentary', 'Other']);
   if (!cleanTitle || cleanTitle.length > 80) return { error: 'Movie title is required and must be 80 characters or fewer' };
   if (!Number.isInteger(year) || year < 1888 || year > 2100) return { error: 'Enter a valid release year' };
   if (!allowedGenres.has(cleanGenre)) return { error: 'Choose a supported movie genre' };
   if (cleanDescription.length > 240) return { error: 'Description must be 240 characters or fewer' };
-  if (!/^[A-Za-z0-9_-]+$/.test(cleanLibraryId) || !/^[A-Za-z0-9_-]+$/.test(cleanVideoId)) {
-    return { error: 'Enter valid Bunny Stream Library and Video IDs' };
-  }
+  const hasTelegramVideo = Number.isSafeInteger(telegramMessageId) && telegramMessageId > 0;
+  const hasBunnyVideo = /^[A-Za-z0-9_-]+$/.test(cleanLibraryId) && /^[A-Za-z0-9_-]+$/.test(cleanVideoId);
+  if (!hasTelegramVideo && !hasBunnyVideo) return { error: 'Upload a video to Telegram before publishing this movie.' };
   const thumbnailData = input.thumbnailData;
   if (thumbnailData !== undefined && !isValidMovieThumbnail(thumbnailData)) {
     return { error: 'Upload a valid JPG, PNG, or WebP thumbnail no larger than 512 KB' };
@@ -365,7 +460,7 @@ const validateMovieInput = (body, existingMovie = null) => {
   }
   if (featured !== undefined && typeof featured !== 'boolean') return { error: 'Homepage feature selection is invalid' };
   const isFeatured = featured === undefined ? existingMovie?.featured === true : featured;
-  if (isFeatured && !cleanPromoLibraryId) return { error: 'Add a promo trailer before featuring this movie' };
+  if (isFeatured && !cleanPromoLibraryId && !hasTelegramVideo) return { error: 'Add a movie video before featuring this movie' };
   return {
     values: {
       title: cleanTitle,
@@ -373,7 +468,14 @@ const validateMovieInput = (body, existingMovie = null) => {
       genre: cleanGenre,
       description: cleanDescription,
       ...(thumbnailData ? { thumbnailData, thumbnailUrl: undefined } : {}),
-      embedUrl: `https://iframe.mediadelivery.net/embed/${encodeURIComponent(cleanLibraryId)}/${encodeURIComponent(cleanVideoId)}`,
+      ...(hasTelegramVideo ? {
+        telegramMessageId,
+        videoFileName: videoFileName || 'movie.mp4',
+        videoMimeType: /^video\/[a-z0-9.+-]+$/i.test(videoMimeType) ? videoMimeType : 'video/mp4',
+        embedUrl: undefined,
+      } : {
+        embedUrl: `https://iframe.mediadelivery.net/embed/${encodeURIComponent(cleanLibraryId)}/${encodeURIComponent(cleanVideoId)}`,
+      }),
       promoEmbedUrl: cleanPromoLibraryId
         ? `https://iframe.mediadelivery.net/embed/${encodeURIComponent(cleanPromoLibraryId)}/${encodeURIComponent(cleanPromoVideoId)}`
         : undefined,

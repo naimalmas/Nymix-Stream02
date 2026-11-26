@@ -66,7 +66,7 @@
       return `<article class="movie-row">
         ${thumbnail ? `<img class="movie-art" src="${escapeHtml(thumbnail)}" alt="" loading="lazy" />` : '<div class="movie-art" aria-hidden="true">N</div>'}
         <div class="movie-details"><strong>${escapeHtml(movie.title)}${movie.featured ? ' <span class="featured-badge">FEATURED</span>' : ''}</strong><span>${escapeHtml(movie.genre)} · ${escapeHtml(movie.year)}</span>${thumbnail ? '' : '<small class="thumbnail-missing">Thumbnail needs upload</small>'}${movie.featured && !movie.promoEmbedUrl ? '<small class="promo-missing">Promo trailer needs Bunny IDs</small>' : ''}</div>
-        ${movie.promoEmbedUrl || movie.featured ? `<button class="feature-button" type="button" data-feature="${escapeHtml(movie.id)}" data-featured="${movie.featured ? 'true' : 'false'}">${movie.featured ? 'Remove feature' : 'Feature on home'}</button>` : ''}
+        ${movie.promoEmbedUrl || movie.featured || movie.telegramMessageId ? `<button class="feature-button" type="button" data-feature="${escapeHtml(movie.id)}" data-featured="${movie.featured ? 'true' : 'false'}">${movie.featured ? 'Remove feature' : 'Feature on home'}</button>` : ''}
         <button class="edit-button" type="button" data-edit="${escapeHtml(movie.id)}">Edit</button>
         <button class="delete-button" type="button" data-delete="${escapeHtml(movie.id)}" aria-label="Remove ${escapeHtml(movie.title)}">Remove</button>
       </article>`;
@@ -95,6 +95,8 @@
     form.elements.year.value = movie.year;
     form.elements.genre.value = movie.genre;
     form.elements.description.value = movie.description || '';
+    form.elements.videoFile.value = '';
+    form.elements.videoFile.required = !movie.telegramMessageId && !movie.embedUrl;
     form.elements.libraryId.value = libraryId;
     form.elements.videoId.value = videoId;
     form.elements.promoLibraryId.value = promoLibraryId;
@@ -121,6 +123,7 @@
   function resetMovieForm() {
     editingMovieId = null;
     form.reset();
+    form.elements.videoFile.required = false;
     form.elements.thumbnailFile.required = false;
     form.elements.licensed.required = true;
     $('#license-consent').hidden = false;
@@ -165,9 +168,16 @@
     const promoLibraryId = String(data.get('promoLibraryId')).trim();
     const promoVideoId = String(data.get('promoVideoId')).trim();
     const thumbnailFile = data.get('thumbnailFile');
+    const videoFile = data.get('videoFile');
     let thumbnailData = '';
-    if (!/^[A-Za-z0-9_-]+$/.test(libraryId) || !/^[A-Za-z0-9_-]+$/.test(videoId)) {
-      showFormMessage('Library ID and Video ID can only contain letters, numbers, underscores, and hyphens.');
+    const hasVideoFile = videoFile instanceof File && videoFile.size > 0;
+    const hasLegacyVideo = /^[A-Za-z0-9_-]+$/.test(libraryId) && /^[A-Za-z0-9_-]+$/.test(videoId);
+    if (!editingMovieId && !hasVideoFile && !hasLegacyVideo) {
+      showFormMessage('Choose a movie video to upload to Telegram.');
+      return;
+    }
+    if (hasVideoFile && !videoFile.type.startsWith('video/')) {
+      showFormMessage('Choose a supported video file.');
       return;
     }
     const hasThumbnailFile = thumbnailFile instanceof File && thumbnailFile.size > 0;
@@ -184,8 +194,8 @@
       return;
     }
     const featured = data.has('featured');
-    if ((promoLibraryId && !promoVideoId) || (!promoLibraryId && promoVideoId) || (featured && (!promoLibraryId || !promoVideoId))) {
-      showFormMessage('Enter both promo video IDs to add or feature a trailer.');
+    if ((promoLibraryId && !promoVideoId) || (!promoLibraryId && promoVideoId)) {
+      showFormMessage('Enter both promo video IDs to add a trailer.');
       return;
     }
     if (promoLibraryId && (!/^[A-Za-z0-9_-]+$/.test(promoLibraryId) || !/^[A-Za-z0-9_-]+$/.test(promoVideoId))) {
@@ -206,6 +216,17 @@
       }
     }
     try {
+      let telegramVideo = null;
+      if (hasVideoFile) {
+        showFormMessage('Uploading movie to your Telegram channel…');
+        const uploadResponse = await authorizedFetch('/api/admin/movies/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': videoFile.type || 'video/mp4', 'X-File-Name': encodeURIComponent(videoFile.name) },
+          body: videoFile,
+        });
+        telegramVideo = await uploadResponse.json();
+        if (!uploadResponse.ok) throw new Error(telegramVideo.error || 'Could not upload the movie to Telegram.');
+      }
       const payload = {
         title: String(data.get('title')).trim(),
         year: Number(data.get('year')),
@@ -217,6 +238,11 @@
         promoVideoId,
         featured,
       };
+      if (telegramVideo) {
+        payload.telegramMessageId = telegramVideo.messageId;
+        payload.videoFileName = telegramVideo.fileName;
+        payload.videoMimeType = telegramVideo.mimeType;
+      }
       if (thumbnailData) payload.thumbnailData = thumbnailData;
       const isEditing = Boolean(editingMovieId);
       const response = await authorizedFetch(

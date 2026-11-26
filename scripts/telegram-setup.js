@@ -36,10 +36,17 @@ async function main() {
     }
 
     const channelId = await client.getPeerId(matches[0].entity);
+    const channelRawId = matches[0].entity.id.toString();
+    const channelAccessHash = matches[0].entity.accessHash?.toString();
+    if (!channelAccessHash) throw new Error('Telegram did not provide the private channel access hash. Select a channel you own or can access.');
     const outputPath = path.join(__dirname, '..', '.telegram-setup.local.json');
     fs.writeFileSync(outputPath, JSON.stringify({
+      apiId,
+      apiHash,
       session: client.session.save(),
       channelId,
+      channelRawId,
+      channelAccessHash,
     }, null, 2), { mode: 0o600 });
     console.log(`Setup details saved locally to ${outputPath}`);
     console.log(`Channel ID: ${channelId}`);

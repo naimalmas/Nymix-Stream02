@@ -94,7 +94,7 @@
       if (!response.ok) throw new Error(`Movie catalog request failed (${response.status})`);
       const catalog = await response.json();
       if (!Array.isArray(catalog)) throw new Error('Movie catalog response is invalid');
-      movies = catalog.filter(movie => movie && typeof movie.id === 'string' && typeof movie.title === 'string' && typeof movie.embedUrl === 'string');
+      movies = catalog.filter(movie => movie && typeof movie.id === 'string' && typeof movie.title === 'string' && (typeof movie.embedUrl === 'string' || Number.isInteger(movie.telegramMessageId)));
       renderFeaturedMovie(movies.find(movie => movie.featured));
       watchlist = watchlist.filter(id => movies.some(movie => movie.id === id));
       save(WATCHLIST_KEY, watchlist);
@@ -111,7 +111,13 @@
   function showMovie(movie) {
     const inList = watchlist.includes(movie.id);
     const thumbnail = movie.thumbnailData || movie.thumbnailUrl;
-    const video = movie.embedUrl
+    const video = movie.streamUrl
+      ? `<section class="player-shell" id="player-shell" aria-label="Movie player">
+          <div class="player-toolbar"><span class="player-brand"><i></i> NYMIX CINEMA</span><button class="fullscreen-button" id="fullscreen-player" type="button" aria-label="Enter fullscreen">â›¶</button></div>
+          <video class="detail-video" src="${escapeHtml(movie.streamUrl)}" title="${escapeHtml(movie.title)}" controls playsinline preload="metadata"></video>
+          <div class="player-footer"><span>${escapeHtml(movie.title)}</span><span>Now playing</span></div>
+        </section>`
+      : movie.embedUrl
       ? `<section class="player-shell" id="player-shell" aria-label="Movie player">
           <div class="player-toolbar"><span class="player-brand"><i></i> NYMIX CINEMA</span><button class="fullscreen-button" id="fullscreen-player" type="button" aria-label="Enter fullscreen">⛶</button></div>
           <iframe class="detail-video" src="${escapeHtml(movie.embedUrl)}" title="${escapeHtml(movie.title)}" allow="accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture" allowfullscreen loading="eager" referrerpolicy="strict-origin-when-cross-origin"></iframe>
