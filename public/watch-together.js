@@ -19,7 +19,7 @@
     if (response.status === 401) {
       localStorage.removeItem('nx_token');
       localStorage.removeItem('nx_user');
-      window.location.replace('/login.html?next=movies');
+      window.location.replace('/login.html?next=watch-together');
       throw new Error('Please sign in again.');
     }
     if (!response.ok) throw new Error(result.error || `Request failed (${response.status})`);
@@ -105,7 +105,7 @@
 
   async function initialize() {
     if (!token()) {
-      window.location.replace('/login.html?next=movies');
+      window.location.replace('/login.html?next=watch-together');
       return;
     }
     try {

@@ -632,7 +632,7 @@
 
   async function initialize() {
     if (!/^[A-F0-9]{8}$/.test(code)) {
-      window.location.replace('/movies.html');
+      window.location.replace('/watch-together.html');
       return;
     }
     if (!token()) {
@@ -648,7 +648,7 @@
         return;
       }
       showToast(error.message || 'Could not join the room.');
-      setTimeout(() => window.location.replace('/movies.html'), 2200);
+      setTimeout(() => window.location.replace('/watch-together.html'), 2200);
     }
   }
 
@@ -765,7 +765,7 @@
       clearInterval(chatTimer);
       clearInterval(signalTimer);
       await api(`/api/watch-rooms/${encodeURIComponent(code)}`, { method: 'DELETE' });
-      window.location.replace('/movies.html');
+      window.location.replace('/watch-together.html');
     } catch (error) {
       console.error('Could not leave watch room.', error);
       showToast(error.message || 'Could not leave the room.');

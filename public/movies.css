@@ -66,6 +66,8 @@ a { color: inherit; text-decoration: none; }
 .filter-chip { flex:0 0 auto; border:1px solid var(--line); border-radius:100px; padding:7px 15px; background:transparent; color:#c6c6ce; cursor:pointer; font-size:14px; }
 .filter-chip:hover,.filter-chip.active { color:#fff; border-color:#e96b91; background:#e957831c; }
 .movie-grid { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:24px 17px; }
+.empty-state { padding:38px 18px; border:1px solid var(--line); border-radius:12px; color:var(--muted); text-align:center; }
+.empty-state[hidden] { display:none; }
 .movie-card { min-width:0; }
 .movie-open { width:100%; display:block; position:relative; overflow:hidden; aspect-ratio:2/2.75; padding:0; border:1px solid #ffffff15; border-radius:10px; background:#1b1922; cursor:pointer; text-align:left; }
 .movie-poster,.poster-placeholder { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; transition:transform .35s; }

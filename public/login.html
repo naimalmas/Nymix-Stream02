@@ -107,6 +107,8 @@ function dashboardPath(role){
   const next=new URLSearchParams(window.location.search).get('next');
   if(next==='movies' && (role==='admin'||role==='super_admin')) return '/movie-admin.html';
   if(next==='movies' && role==='user') return '/movies.html';
+  if(next==='watch-together' && role==='user') return '/watch-together.html';
+  if(next==='watch-together' && (role==='admin'||role==='super_admin')) return '/movie-admin.html';
   if(role==='user' && next){
     try{
       const target=new URL(next,window.location.origin);
