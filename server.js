@@ -184,7 +184,20 @@ async function persistentState(req, res, next) {
     if (req.method === 'GET' || req.method === 'HEAD') {
       const isCallSignalPoll = req.originalUrl.split('?')[0] === '/api/calls/signals';
       const columns = isCallSignalPoll ? ['users', 'social'] : Object.values(stateColumnByFile);
-      const result = await database.query(`SELECT ${columns.join(', ')} FROM nymix_state WHERE id = 1`);
+      const query = isCallSignalPoll
+        ? `SELECT
+            (SELECT COALESCE(jsonb_agg(jsonb_build_object(
+              'id', account.value->'id',
+              'name', account.value->'name',
+              'email', account.value->'email',
+              'role', account.value->'role',
+              'banned', account.value->'banned',
+              'credentialVersion', account.value->'credentialVersion'
+            )), '[]'::jsonb) FROM jsonb_array_elements(users) AS account(value)) AS users,
+            jsonb_build_object('callSignals', COALESCE(social->'callSignals', '[]'::jsonb)) AS social
+          FROM nymix_state WHERE id = 1`
+        : `SELECT ${columns.join(', ')} FROM nymix_state WHERE id = 1`;
+      const result = await database.query(query);
       if (!result.rowCount) throw new Error('Application database state is not initialized');
       const state = Object.fromEntries(columns.map(column => [`${Object.keys(stateColumnByFile).find(file => stateColumnByFile[file] === column)}.json`, result.rows[0][column]]));
       requestState.run(state, next);
