@@ -5,7 +5,8 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node server.js"
+    "dev": "node server.js",
+    "telegram:setup": "node scripts/telegram-setup.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
@@ -14,6 +15,7 @@
     "jsonwebtoken": "^9.0.0",
     "node-fetch": "^2.7.0",
     "pg": "^8.23.1",
+    "teleproto": "^1.234.0",
     "web-push": "^3.6.7"
   }
 }
